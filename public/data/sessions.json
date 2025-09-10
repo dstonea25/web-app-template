@@ -1,0 +1,24 @@
+[
+  {
+    "id": "1",
+    "started_at": "2025-09-08T09:00:00.000Z",
+    "ended_at": "2025-09-08T10:30:00.000Z",
+    "duration_ms": 5400000,
+    "note": "Morning standup and planning"
+  },
+  {
+    "id": "2",
+    "started_at": "2025-09-08T11:00:00.000Z",
+    "ended_at": "2025-09-08T12:00:00.000Z",
+    "duration_ms": 3600000,
+    "note": "Code review session"
+  },
+  {
+    "id": "3",
+    "started_at": "2025-09-08T14:00:00.000Z",
+    "ended_at": "2025-09-08T15:30:00.000Z",
+    "duration_ms": 5400000,
+    "note": "Feature development"
+  }
+]
+

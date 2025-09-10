@@ -1,0 +1,323 @@
+import React, { useRef, useEffect } from 'react';
+import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import type { Todo, Priority, TodoPatch } from '../types';
+import { tokens, cn } from '../theme/config';
+import { stageRowEdit } from '../lib/storage';
+import SelectPriority from './SelectPriority';
+
+interface TodosTableProps {
+  todos: Todo[];
+  filter: string;
+  sortBy: keyof Todo;
+  sortOrder: 'asc' | 'desc';
+  editingId: string | null;
+  onFilterChange: (filter: string) => void;
+  onSortChange: (sortBy: keyof Todo) => void;
+  onSortOrderChange: (order: 'asc' | 'desc') => void;
+  onEditStart: (id: string) => void;
+  onEditEnd: () => void;
+  onTodoUpdate: (id: string, updates: Partial<Todo>) => void;
+  onTodoComplete: (id: string) => void;
+  onCommitRowEdit: (id: string, patch: TodoPatch) => void;
+}
+
+export const TodosTable: React.FC<TodosTableProps> = ({
+  todos,
+  filter,
+  sortBy,
+  sortOrder,
+  editingId,
+  onFilterChange,
+  onSortChange,
+  onSortOrderChange,
+  onEditStart,
+  onEditEnd,
+  onTodoUpdate,
+  onTodoComplete,
+  onCommitRowEdit,
+}) => {
+  const tableRef = useRef<HTMLTableElement>(null);
+  const editingCellRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  const priorityRank = (p: Priority | undefined) => {
+    switch (p) {
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  };
+
+  const filteredAndSortedTodos = todos
+    .filter(todo => {
+      // Add safety check for todo object
+      if (!todo || typeof todo !== 'object') {
+        console.warn('Invalid todo object:', todo);
+        return false;
+      }
+      return (todo.task || '').toLowerCase().includes(filter.toLowerCase()) ||
+             (todo.category || '').toLowerCase().includes(filter.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (sortBy === 'priority') {
+        const cmp = priorityRank(a.priority) - priorityRank(b.priority);
+        return sortOrder === 'asc' ? cmp : -cmp;
+      }
+      const aVal = (a as any)[sortBy] || '';
+      const bVal = (b as any)[sortBy] || '';
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+  // Focus the editing cell when editing starts
+  useEffect(() => {
+    if (editingId && editingCellRef.current) {
+      editingCellRef.current.focus();
+    }
+  }, [editingId]);
+
+  // Handle Tab/Shift+Tab navigation between editable cells
+  const handleKeyDown = (e: React.KeyboardEvent, todoObj: Todo) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      const currentIndex = filteredAndSortedTodos.findIndex(todo => todo.id === todoObj.id);
+      const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+      
+      if (nextIndex >= 0 && nextIndex < filteredAndSortedTodos.length) {
+        const nextTodo = filteredAndSortedTodos[nextIndex];
+        onEditStart(String(nextTodo.id!));
+      } else {
+        // If at the end/beginning, commit current edit and move to next/previous row
+        onCommitRowEdit(String(todoObj.id!), { id: String(todoObj.id!), task: todoObj.task, category: todoObj.category ?? null, priority: todoObj.priority, statusUi: todoObj.statusUi });
+        if (nextIndex >= 0 && nextIndex < filteredAndSortedTodos.length) {
+          const nextTodo = filteredAndSortedTodos[nextIndex];
+          onEditStart(String(nextTodo.id!));
+        }
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onCommitRowEdit(String(todoObj.id!), { id: String(todoObj.id!), task: todoObj.task, category: todoObj.category ?? null, priority: todoObj.priority, statusUi: todoObj.statusUi });
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onEditEnd();
+    }
+  };
+
+  const handleBlurCommit = (todoObj: Todo) => {
+    onCommitRowEdit(String(todoObj.id!), { id: String(todoObj.id!), task: todoObj.task, category: todoObj.category ?? null, priority: todoObj.priority, statusUi: todoObj.statusUi });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Live region for announcing sort changes */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {`Sorted by ${sortBy === 'created_at' ? 'Created' : sortBy === 'priority' ? 'Priority' : String(sortBy)}, ${sortOrder === 'asc' ? 'ascending' : 'descending'}. ${filteredAndSortedTodos.length} items.`}
+      </div>
+      {/* Filter and Sort Controls */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <input
+          type="text"
+          placeholder="Filter todos..."
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          className={cn(tokens.input.base, tokens.input.focus)}
+        />
+        <select
+          value={sortBy}
+          onChange={(e) => onSortChange(e.target.value as keyof Todo)}
+          className={cn(tokens.input.base, tokens.input.focus)}
+        >
+          <option value="task">Sort by Task</option>
+          <option value="priority">Sort by Priority</option>
+          <option value="category">Sort by Category</option>
+          <option value="created_at">Sort by Created</option>
+        </select>
+        <button
+          onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
+          className={cn(tokens.button.base, tokens.button.secondary)}
+        >
+          {sortOrder === 'asc' ? '↑' : '↓'}
+        </button>
+      </div>
+
+      {/* Todos Table */}
+      <div className={tokens.table.wrapper}>
+        <table ref={tableRef} className={tokens.table.table}>
+          <thead className={tokens.table.thead}>
+            <tr>
+              <th className={tokens.table.th} aria-sort="none">Task</th>
+              {/* Priority sortable header */}
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'priority' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Priority"
+                  aria-pressed={sortBy === 'priority'}
+                  aria-describedby="priority-sort-description"
+                  onClick={() => {
+                    if (sortBy === 'priority') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('priority');
+                      onSortOrderChange('desc');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (sortBy === 'priority') {
+                        onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        onSortChange('priority');
+                        onSortOrderChange('desc');
+                      }
+                    }
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Priority
+                    {sortBy === 'priority' ? (
+                      sortOrder === 'asc' ? (
+                        <ChevronUp className={tokens.icon.default} />
+                      ) : (
+                        <ChevronDown className={tokens.icon.default} />
+                      )
+                    ) : (
+                      <ChevronsUpDown className={tokens.icon.default} />
+                    )}
+                  </span>
+                </button>
+                <span id="priority-sort-description" className="sr-only">
+                  {sortBy === 'priority' ? `Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : 'Not sorted'}
+                </span>
+              </th>
+              <th className={tokens.table.th} aria-sort="none">Category</th>
+              {/* Created sortable header */}
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'created_at' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Created"
+                  aria-pressed={sortBy === 'created_at'}
+                  aria-describedby="created-sort-description"
+                  onClick={() => {
+                    if (sortBy === 'created_at') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('created_at');
+                      onSortOrderChange('desc');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (sortBy === 'created_at') {
+                        onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        onSortChange('created_at');
+                        onSortOrderChange('desc');
+                      }
+                    }
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Created
+                    {sortBy === 'created_at' ? (
+                      sortOrder === 'asc' ? (
+                        <ChevronUp className={tokens.icon.default} />
+                      ) : (
+                        <ChevronDown className={tokens.icon.default} />
+                      )
+                    ) : (
+                      <ChevronsUpDown className={tokens.icon.default} />
+                    )}
+                  </span>
+                </button>
+                <span id="created-sort-description" className="sr-only">
+                  {sortBy === 'created_at' ? `Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : 'Not sorted'}
+                </span>
+              </th>
+              <th className={tokens.table.th}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAndSortedTodos.length === 0 ? (
+              <tr>
+                <td colSpan={6} className={tokens.table.empty_state}>
+                  No todos found. Add one above!
+                </td>
+              </tr>
+            ) : (
+              filteredAndSortedTodos.map((todo) => (
+                <tr key={todo.id} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
+                  <td className={cn(tokens.table.td)}>
+                    <div className={cn(tokens.editable?.cell, 'rounded-none')}>
+                      {editingId === todo.id ? (
+                        <input
+                          ref={(el) => { editingCellRef.current = el; }}
+                          type="text"
+                          value={todo.task || ''}
+                          onChange={(e) => onTodoUpdate(String(todo.id!), { task: e.target.value })}
+                          className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus)}
+                          onBlur={() => handleBlurCommit(todo)}
+                          onKeyDown={(e) => handleKeyDown(e, todo)}
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          className={cn('cursor-pointer', tokens.accent.text_hover)}
+                          onClick={() => onEditStart(String(todo.id!))}
+                          aria-label="Edit task"
+                        >
+                          {todo.task || ''}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {/* Status column removed per request */}
+                  <td className={tokens.table.td}>
+                    <SelectPriority
+                      value={todo.priority ?? null}
+                      onChange={(p) => { onTodoUpdate(String(todo.id!), { priority: p, _dirty: true }); stageRowEdit({ id: String(todo.id!), patch: { id: String(todo.id!), priority: p } as TodoPatch }); }}
+                      ariaLabel="Set priority"
+                    />
+                  </td>
+                  <td className={tokens.table.td}>{todo.category}</td>
+                  <td className={tokens.table.td}>
+                    {todo.created_at ? new Date(todo.created_at).toLocaleDateString() : '—'}
+                  </td>
+                  <td className={tokens.table.td}>
+                    {todo._dirty ? (
+                      <button
+                        onClick={() => onCommitRowEdit(String(todo.id!), { id: String(todo.id!), task: todo.task, category: todo.category ?? null, priority: todo.priority, statusUi: todo.statusUi })}
+                        className={cn(tokens.button.base, tokens.button.info, 'text-sm')}
+                        aria-label="Update task"
+                      >
+                        Update
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onTodoComplete(String(todo.id!))}
+                        className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
+                        aria-label="Complete task"
+                      >
+                        Complete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
