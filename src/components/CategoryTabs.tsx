@@ -29,7 +29,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
           onClick={() => onCategoryChange(category)}
           className={cn(
             tokens.tabs.trigger,
-            activeCategory === category && 'data-[active=true]:bg-slate-800/70'
+            activeCategory === category && 'bg-neutral-800/70'
           )}
           data-active={activeCategory === category}
         >

@@ -47,13 +47,13 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
   return (
     <div className={tokens.modal.overlay}>
       <div className={tokens.modal.content}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-4 text-slate-100')}>
+        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
           Edit Session
         </h3>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-slate-100">
+            <label className={cn("block text-sm font-medium mb-1", tokens.palette.dark.text)}>
               Start Time
             </label>
             <input
@@ -66,7 +66,7 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-slate-100">
+            <label className={cn("block text-sm font-medium mb-1", tokens.palette.dark.text)}>
               End Time
             </label>
             <input
@@ -78,7 +78,7 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-slate-100">
+            <label className={cn("block text-sm font-medium mb-1", tokens.palette.dark.text)}>
               Note
             </label>
             <textarea

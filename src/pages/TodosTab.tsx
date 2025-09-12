@@ -112,7 +112,7 @@ export const TodosTab: React.FC = () => {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
-          <div className="text-slate-400">Loading todos...</div>
+          <div className={tokens.palette.dark.text_muted}>Loading todos...</div>
         </div>
       </div>
     );
@@ -127,7 +127,7 @@ export const TodosTab: React.FC = () => {
     <div className={tokens.layout.container}>
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-slate-100')}>
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             To-Dos ({filteredTodos.length})
           </h2>
           <button
@@ -168,7 +168,7 @@ export const TodosTab: React.FC = () => {
 
       {/* Add new todo form (moved below table) */}
       <div className={cn(tokens.card.base, 'mt-6')}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3 text-slate-100')}>
+        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
           Add New Todo
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

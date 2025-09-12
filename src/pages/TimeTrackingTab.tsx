@@ -143,7 +143,7 @@ export const TimeTrackingTab: React.FC = () => {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
-          <div className="text-slate-400">Loading sessions...</div>
+          <div className={tokens.palette.dark.text_muted}>Loading sessions...</div>
         </div>
       </div>
     );
@@ -176,7 +176,7 @@ export const TimeTrackingTab: React.FC = () => {
       {/* Sessions List */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-slate-100')}>
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             Sessions ({sessions.length})
           </h2>
           <button
@@ -227,7 +227,7 @@ export const TimeTrackingTab: React.FC = () => {
                         {formatDateTime(session.ended_at)}
                       </span>
                     ) : (
-                      <span className="text-slate-400">Running...</span>
+                      <span className={tokens.palette.dark.text_muted}>Running...</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>

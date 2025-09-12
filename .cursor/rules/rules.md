@@ -58,6 +58,14 @@ Ask first: when introducing new dependencies, changing project structure, or tou
 
 Free to act: small refactors, type fixes, comments, lint/style cleanup.
 
+Meta is agent-only: read to plan, **never** import at runtime.
+
+Before editing /meta/**, back up to /meta/backups/.
+
+Plan → Implement small diffs → Self-audit vs meta acceptance → Cleanup dead code.
+
+Prohibited: adding any runtime meta loaders.
+
 Definition of Done
 
 Code compiles (build and typecheck) with zero warnings.

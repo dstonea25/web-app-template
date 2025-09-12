@@ -3,14 +3,205 @@
   "updated_at": "2025-09-08",
   "product_name": "Geronimo",
   "adjectives": ["calm", "crisp", "modern", "tactile", "focused"],
-  "modes": {"default": "dark", "supports_dark": true},
-  "icons": {"set": "lucide", "default_size_px": 20},
-  "layout": {"container": "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8", "topnav_height_px": 56, "sidebar_expanded_px": 264, "sidebar_collapsed_px": 72, "content_gap": "gap-4 sm:gap-6", "radius": {"card": "rounded-2xl", "button": "rounded-xl", "input": "rounded-lg", "pill": "rounded-full"}, "shadow": {"card": "shadow-lg", "elevated": "shadow-xl", "focus": "ring-2 ring-offset-2"}, "motion": {"duration_ms": 180, "easing": "ease-out"}, "responsive_rules": ["Mobile-first; content in a centered container on desktop.", "Tap targets >= 40px on touch breakpoints.", "Tables scroll horizontally on small screens (overflow-x-auto)."]},
-  "palette": {"light": {"bg": "bg-white", "surface": "bg-white", "surface_alt": "bg-slate-50", "border": "border-slate-200", "text": "text-slate-900", "text_muted": "text-slate-600", "primary": "emerald-600", "primary_hover": "emerald-700", "accent": "teal-500", "success": "emerald-600", "warning": "amber-600", "danger": "rose-600"}, "dark": {"bg": "bg-neutral-950", "surface": "bg-neutral-900", "surface_alt": "bg-neutral-800/60", "border": "border-neutral-800", "text": "text-neutral-100", "text_muted": "text-neutral-400", "primary": "emerald-500", "primary_hover": "emerald-400", "accent": "teal-400", "success": "emerald-400", "warning": "amber-400", "danger": "rose-400"}, "gradients": {"primary_tile": "bg-gradient-to-br from-emerald-600 to-teal-600", "primary_tile_dark": "bg-gradient-to-br from-emerald-500 to-teal-500"}, "focus_ring": {"light": "ring-emerald-500 ring-offset-white", "dark": "ring-emerald-400 ring-offset-neutral-950"}},
-  "typography": {"font_family": "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji", "scale": {"h1": "text-3xl sm:text-4xl", "h2": "text-2xl sm:text-3xl", "h3": "text-xl sm:text-2xl", "body": "text-base", "muted": "text-sm"}, "weights": {"regular": "font-normal", "medium": "font-medium", "semibold": "font-semibold", "bold": "font-bold"}},
-  "component_tokens": {"app_shell": {"grid": "min-h-screen grid grid-cols-[auto_1fr]", "content": "min-w-0"}, "topnav": {"base": "flex items-center justify-between h-14 px-3 sm:px-4 border-b", "brand": "flex items-center gap-2 text-lg sm:text-xl font-semibold", "burger": "inline-flex items-center justify-center w-10 h-10 rounded-lg border focus:outline-none focus:shadow-[var(--focus)] sm:hidden", "right": "flex items-center gap-2"}, "sidebar": {"wrapper": "hidden sm:flex flex-col h-screen sticky top-0 border-r", "surface": "bg-white dark:bg-neutral-950", "collapsed": "w-[72px]", "expanded": "w-[264px]", "section_label": "px-3 pt-4 pb-2 text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400", "item_base": "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors", "item_hover": "hover:bg-slate-100 dark:hover:bg-neutral-800/70", "item_active": "bg-neutral-800 text-white", "icon": "shrink-0 w-5 h-5", "label": "truncate", "collapse_toggle": "absolute -right-3 top-16 z-10 w-6 h-6 rounded-full border bg-white dark:bg-neutral-900 flex items-center justify-center", "tooltip": "absolute left-full ml-2 px-2 py-1 text-xs rounded-md border bg-white dark:bg-neutral-900 dark:text-neutral-100 shadow-lg"}, "mobile_drawer": {"overlay": "fixed inset-0 bg-black/40 sm:hidden", "panel": "fixed inset-y-0 left-0 w-72 p-3 bg-white dark:bg-neutral-950 border-r sm:hidden"}, "tabs": {"list": "inline-flex flex-wrap gap-2", "trigger": "px-3 py-1.5 border rounded-xl data-[active=true]:bg-slate-100 dark:data-[active=true]:bg-neutral-800/70", "content": "mt-3"}, "card": {"base": "rounded-2xl border p-4", "muted": "bg-slate-50 dark:bg-neutral-900"}, "button": {"base": "inline-flex items-center justify-center px-3 py-2 font-medium rounded-xl border transition focus:outline-none", "primary": "text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-400", "secondary": "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800", "ghost": "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/70", "danger": "text-white bg-rose-600 border-rose-600 hover:bg-rose-700", "success": "text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-400", "info": "text-neutral-100 bg-teal-500 border-teal-500 hover:bg-teal-400"}, "input": {"base": "w-full px-3 py-2 border rounded-lg bg-white dark:bg-neutral-900 placeholder:text-neutral-500 focus:outline-none", "focus": "focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"}, "table": {"wrapper": "overflow-x-auto rounded-2xl border", "table": "min-w-full text-sm", "thead": "sticky top-0 z-10 bg-slate-50 dark:bg-neutral-900", "th": "text-left font-semibold px-4 py-2 border-b", "tr_zebra": "odd:bg-white even:bg-slate-50 dark:odd:bg-neutral-900 dark:even:bg-neutral-800/60", "td": "px-4 py-3 align-middle border-b", "row_hover": "hover:bg-slate-100 dark:hover:bg-neutral-800/70", "empty_state": "p-8 text-center text-slate-500", "density": {"comfortable": "td:px-4 td:py-3", "compact": "td:px-3 td:py-2"}}, "badge": {"base": "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border", "neutral": "bg-slate-100 text-slate-700 border-slate-200 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700", "success": "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-900/30", "warning": "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-900/30", "danger": "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-900/30", "priority_low": "badge.neutral", "priority_medium": "badge.warning", "priority_high": "badge.danger"}, "timer": {"card": "rounded-2xl border p-6 flex flex-col items-center justify-center text-center", "time": "text-3xl sm:text-4xl font-semibold tracking-tight", "state": "text-slate-500 mt-1", "actions": "mt-4 flex items-center gap-2"}, "modal": {"overlay": "fixed inset-0 bg-black/50", "content": "fixed inset-x-0 top-20 mx-auto w-[min(600px,92%)] rounded-2xl border p-4 bg-white dark:bg-neutral-900"}, "toast": {"base": "fixed bottom-4 right-4 px-4 py-2 rounded-xl border bg-white dark:bg-neutral-900"}},
-  "editable": {"cell": "focus-within:ring-2 focus-within:ring-emerald-400 focus-within:ring-offset-2 focus-within:ring-offset-neutral-950 rounded-lg", "input": "w-full bg-transparent outline-none text-neutral-100 placeholder:text-neutral-500"},
-  "rules": ["Do not hardcode colors or fonts in components; use tokens from this profile.", "TopBanner must render identically on all modules.", "Sidebar collapses to icons-only on desktop; on mobile it becomes a hamburger-driven drawer.", "When sidebar is collapsed, show tooltips on hover/focus for items.", "Icons come from the configured icon set; do not inline SVGs unless necessary.", "Use zebra rows and sticky header for all data tables.", "Buttons and inputs must use the shared radius/shadow/focus tokens.", "Keep surfaces neutral (slate). Reserve emerald/teal for interactive accents (buttons, focus, badges)."],
-  "acceptance": ["App shows 'Geronimo' brand in TopBanner.", "Desktop layout uses a collapsible left sidebar (264px expanded / 72px collapsed).", "Mobile shows a hamburger in TopNav that opens the same menu as the sidebar.", "Both To-Dos and Time Tracking use the same container, card, button, and typography tokens.", "To-Dos table renders with borders, zebra rows, sticky header, and hover state.", "Dark mode is the default visual base with neutral surfaces; accents use emerald/teal.", "Light mode styles exist (even if toggle is not yet exposed)."]
+  "modes": {
+    "default": "dark",
+    "supports_dark": true
+  },
+  "icons": {
+    "set": "lucide",
+    "default_size_px": 20
+  },
+  "layout": {
+    "container": "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8",
+    "topnav_height_px": 56,
+    "sidebar_expanded_px": 264,
+    "sidebar_collapsed_px": 72,
+    "content_gap": "gap-4 sm:gap-6",
+    "radius": {
+      "card": "rounded-2xl",
+      "button": "rounded-xl",
+      "input": "rounded-lg",
+      "pill": "rounded-full"
+    },
+    "shadow": {
+      "card": "shadow-lg",
+      "elevated": "shadow-xl",
+      "focus": "ring-2 ring-offset-2"
+    },
+    "motion": {
+      "duration_ms": 180,
+      "easing": "ease-out"
+    },
+    "responsive_rules": [
+      "Mobile-first; content in a centered container on desktop.",
+      "Tap targets >= 40px on touch breakpoints.",
+      "Tables scroll horizontally on small screens (overflow-x-auto)."
+    ]
+  },
+  "palette": {
+    "light": {
+      "bg": "bg-white",
+      "surface": "bg-white",
+      "surface_alt": "bg-slate-50",
+      "border": "border-slate-200",
+      "text": "text-slate-900",
+      "text_muted": "text-slate-600",
+      "primary": "emerald-600",
+      "primary_hover": "emerald-700",
+      "accent": "teal-500",
+      "success": "emerald-600",
+      "warning": "amber-600",
+      "danger": "rose-600"
+    },
+    "dark": {
+      "bg": "bg-neutral-950",
+      "surface": "bg-neutral-900",
+      "surface_alt": "bg-neutral-800/60",
+      "border": "border-neutral-800",
+      "text": "text-neutral-100",
+      "text_muted": "text-neutral-400",
+      "primary": "emerald-500",
+      "primary_hover": "emerald-400",
+      "accent": "teal-400",
+      "success": "emerald-400",
+      "warning": "amber-400",
+      "danger": "rose-400"
+    },
+    "gradients": {
+      "primary_tile": "bg-gradient-to-br from-emerald-600 to-teal-600",
+      "primary_tile_dark": "bg-gradient-to-br from-emerald-500 to-teal-500"
+    },
+    "focus_ring": {
+      "light": "ring-emerald-500 ring-offset-white",
+      "dark": "ring-emerald-400 ring-offset-neutral-950"
+    }
+  },
+  "typography": {
+    "font_family": "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji",
+    "scale": {
+      "h1": "text-3xl sm:text-4xl",
+      "h2": "text-2xl sm:text-3xl",
+      "h3": "text-xl sm:text-2xl",
+      "body": "text-base",
+      "muted": "text-sm"
+    },
+    "weights": {
+      "regular": "font-normal",
+      "medium": "font-medium",
+      "semibold": "font-semibold",
+      "bold": "font-bold"
+    }
+  },
+  "component_tokens": {
+    "app_shell": {
+      "grid": "min-h-screen grid grid-cols-[auto_1fr]",
+      "content": "min-w-0"
+    },
+    "topnav": {
+      "base": "flex items-center justify-between h-14 px-3 sm:px-4 border-b",
+      "brand": "flex items-center gap-2 text-lg sm:text-xl font-semibold",
+      "burger": "inline-flex items-center justify-center w-10 h-10 rounded-lg border focus:outline-none focus:shadow-[var(--focus)] sm:hidden",
+      "right": "flex items-center gap-2"
+    },
+    "sidebar": {
+      "wrapper": "hidden sm:flex flex-col h-screen sticky top-0 border-r",
+      "surface": "bg-white dark:bg-neutral-950",
+      "collapsed": "w-[72px]",
+      "expanded": "w-[264px]",
+      "section_label": "px-3 pt-4 pb-2 text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400",
+      "item_base": "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors",
+      "item_hover": "hover:bg-slate-100 dark:hover:bg-neutral-800/70",
+      "item_active": "bg-neutral-800 text-white",
+      "icon": "shrink-0 w-5 h-5",
+      "label": "truncate",
+      "collapse_toggle": "absolute -right-3 top-16 z-10 w-6 h-6 rounded-full border bg-white dark:bg-neutral-900 flex items-center justify-center",
+      "tooltip": "absolute left-full ml-2 px-2 py-1 text-xs rounded-md border bg-white dark:bg-neutral-900 dark:text-neutral-100 shadow-lg"
+    },
+    "mobile_drawer": {
+      "overlay": "fixed inset-0 bg-black/40 sm:hidden",
+      "panel": "fixed inset-y-0 left-0 w-72 p-3 bg-white dark:bg-neutral-950 border-r sm:hidden"
+    },
+    "tabs": {
+      "list": "inline-flex flex-wrap gap-2",
+      "trigger": "px-3 py-1.5 border rounded-xl data-[active=true]:bg-slate-100 dark:data-[active=true]:bg-neutral-800/70",
+      "content": "mt-3"
+    },
+    "card": {
+      "base": "rounded-2xl border p-4",
+      "muted": "bg-slate-50 dark:bg-neutral-900"
+    },
+    "button": {
+      "base": "inline-flex items-center justify-center px-3 py-2 font-medium rounded-xl border transition focus:outline-none",
+      "primary": "text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-400",
+      "secondary": "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800",
+      "ghost": "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/70",
+      "danger": "text-white bg-rose-600 border-rose-600 hover:bg-rose-700",
+      "success": "text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-400",
+      "info": "text-neutral-100 bg-teal-500 border-teal-500 hover:bg-teal-400"
+    },
+    "input": {
+      "base": "w-full px-3 py-2 border rounded-lg bg-white dark:bg-neutral-900 placeholder:text-neutral-500 focus:outline-none",
+      "focus": "focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+    },
+    "table": {
+      "wrapper": "overflow-x-auto rounded-2xl border",
+      "table": "min-w-full text-sm",
+      "thead": "sticky top-0 z-10 bg-slate-50 dark:bg-neutral-900",
+      "th": "text-left font-semibold px-4 py-2 border-b",
+      "tr_zebra": "odd:bg-white even:bg-slate-50 dark:odd:bg-neutral-900 dark:even:bg-neutral-800/60",
+      "td": "px-4 py-3 align-middle border-b",
+      "row_hover": "hover:bg-slate-100 dark:hover:bg-neutral-800/70",
+      "empty_state": "p-8 text-center text-slate-500",
+      "density": {
+        "comfortable": "td:px-4 td:py-3",
+        "compact": "td:px-3 td:py-2"
+      }
+    },
+    "badge": {
+      "base": "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border",
+      "neutral": "bg-slate-100 text-slate-700 border-slate-200 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700",
+      "success": "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-900/30",
+      "warning": "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-900/30",
+      "danger": "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-900/30",
+      "priority_low": "badge.neutral",
+      "priority_medium": "badge.warning",
+      "priority_high": "badge.danger"
+    },
+    "timer": {
+      "card": "rounded-2xl border p-6 flex flex-col items-center justify-center text-center",
+      "time": "text-3xl sm:text-4xl font-semibold tracking-tight",
+      "state": "text-slate-500 mt-1",
+      "actions": "mt-4 flex items-center gap-2"
+    },
+    "modal": {
+      "overlay": "fixed inset-0 bg-black/50",
+      "content": "fixed inset-x-0 top-20 mx-auto w-[min(600px,92%)] rounded-2xl border p-4 bg-white dark:bg-neutral-900"
+    },
+    "toast": {
+      "base": "fixed bottom-4 right-4 px-4 py-2 rounded-xl border bg-white dark:bg-neutral-900"
+    }
+  },
+  "editable": {
+    "cell": "focus-within:ring-2 focus-within:ring-emerald-400 focus-within:ring-offset-2 focus-within:ring-offset-neutral-950 rounded-lg",
+    "input": "w-full bg-transparent outline-none text-neutral-100 placeholder:text-neutral-500"
+  },
+  "rules": [
+    "Do not hardcode colors or fonts in components; use tokens from this profile.",
+    "TopBanner must render identically on all modules.",
+    "Sidebar collapses to icons-only on desktop; on mobile it becomes a hamburger-driven drawer.",
+    "When sidebar is collapsed, show tooltips on hover/focus for items.",
+    "Icons come from the configured icon set; do not inline SVGs unless necessary.",
+    "Use zebra rows and sticky header for all data tables.",
+    "Buttons and inputs must use the shared radius/shadow/focus tokens.",
+    "Keep surfaces neutral (slate). Reserve emerald/teal for interactive accents (buttons, focus, badges)."
+  ],
+  "acceptance": [
+    "App shows 'Geronimo' brand in TopBanner.",
+    "Desktop layout uses a collapsible left sidebar (264px expanded / 72px collapsed).",
+    "Mobile shows a hamburger in TopNav that opens the same menu as the sidebar.",
+    "Both To-Dos and Time Tracking use the same container, card, button, and typography tokens.",
+    "To-Dos table renders with borders, zebra rows, sticky header, and hover state.",
+    "Dark mode is the default visual base with neutral surfaces; accents use emerald/teal.",
+    "Light mode styles exist (even if toggle is not yet exposed)."
+  ]
 }
-
