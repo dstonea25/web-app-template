@@ -113,7 +113,45 @@ The application can be configured using environment variables in the `docker-com
 ```yaml
 environment:
   - NODE_ENV=production
+  - VITE_N8N_WEBHOOK_TOKEN=your_webhook_token_here
 ```
+
+#### N8N Webhook Configuration
+
+The todos tab can fetch data from an N8N webhook endpoint instead of using local JSON files. To enable this:
+
+1. **Set the webhook token:**
+   Create a `.env` file in the project root with:
+   ```
+   VITE_N8N_WEBHOOK_TOKEN=your_actual_webhook_token
+   ```
+
+2. **Webhook endpoint:**
+   The application will make GET requests to:
+   ```
+   https://geronimo.askdavidstone.com/webhook/todo
+   ```
+
+3. **Authentication:**
+   The token is sent as a Bearer token in the Authorization header.
+
+4. **Data format:**
+   The webhook should return JSON data in the same format as the local `todos.json` file:
+   ```json
+   [
+     {
+       "id": 1,
+       "task": "Sample task",
+       "status": "open",
+       "category": "work",
+       "priority": null,
+       "created_at": "2025-01-01T00:00:00.000Z"
+     }
+   ]
+   ```
+
+5. **Fallback behavior:**
+   If the webhook fails, the application will automatically fall back to the local JSON file.
 
 ## Project Structure
 

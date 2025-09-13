@@ -74,6 +74,52 @@ export class ApiClient {
   // }
 }
 
+// Webhook configuration
+const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
+const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
+
+// Webhook function to fetch todos
+export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    const response = await fetch(N8N_WEBHOOK_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Transform the data to match our Todo interface
+    // The webhook should return an array of todos with the same structure as our JSON file
+    if (Array.isArray(data)) {
+      return data.map((todo: any) => ({
+        id: String(todo.id),
+        task: todo.task,
+        category: todo.category || null,
+        priority: todo.priority || null,
+        created_at: todo.created_at,
+        statusUi: 'open' as const,
+        _dirty: false,
+      }));
+    } else {
+      throw new Error('Invalid response format: expected array of todos');
+    }
+  } catch (error) {
+    console.error('Failed to fetch todos from webhook:', error);
+    throw error;
+  }
+};
+
 // Export singleton instance
 export const apiClient = new ApiClient();
 

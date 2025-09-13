@@ -3,6 +3,7 @@ import type { Todo, Priority, TodoPatch } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
+import { fetchTodosFromWebhook } from '../lib/api';
 import { tokens, cn } from '../theme/config';
 import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
@@ -13,6 +14,7 @@ import { CategoryTabs } from '../components/CategoryTabs';
 export const TodosTab: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [sortBy, setSortBy] = useState<keyof Todo | ''>('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -28,22 +30,40 @@ export const TodosTab: React.FC = () => {
 
   const loadTodos = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
       // Clear localStorage to force fresh data load
       StorageManager.clearAll();
       
-      // Load from seed data
-      console.log('Loading from seed data...');
-      const response = await fetch('/data/todos.json');
-      const seedTodos = await response.json();
-      console.log('Seed todos loaded:', seedTodos);
+      // Load from webhook
+      console.log('Loading todos from webhook...');
+      const webhookTodos = await fetchTodosFromWebhook();
+      console.log('Webhook todos loaded:', webhookTodos);
+      
       // Ensure transforms on load (priority/id/status handling) by saving then reloading
-      StorageManager.saveTodos(seedTodos);
+      StorageManager.saveTodos(webhookTodos);
       const transformed = StorageManager.loadTodos();
       setTodos(transformed);
       const staged = getStagedChanges();
       setStagedCount(staged.updates.length + staged.completes.length);
     } catch (error) {
-      console.error('Failed to load todos:', error);
+      console.error('Failed to load todos from webhook:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load todos');
+      
+      // Fallback to local JSON file if webhook fails
+      try {
+        console.log('Falling back to local seed data...');
+        const response = await fetch('/data/todos.json');
+        const seedTodos = await response.json();
+        StorageManager.saveTodos(seedTodos);
+        const transformed = StorageManager.loadTodos();
+        setTodos(transformed);
+        setError(null); // Clear error since fallback succeeded
+      } catch (fallbackError) {
+        console.error('Fallback to local data also failed:', fallbackError);
+        setError('Failed to load todos from both webhook and local data');
+      }
     } finally {
       setLoading(false);
     }
@@ -112,7 +132,34 @@ export const TodosTab: React.FC = () => {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
-          <div className={tokens.palette.dark.text_muted}>Loading todos...</div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className={tokens.palette.dark.text_muted}>Loading todos from webhook...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={tokens.layout.container}>
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <h3 className="text-lg font-semibold mb-2">Failed to Load Todos</h3>
+              <p className="text-sm text-gray-600 mb-4">{error}</p>
+              <button
+                onClick={loadTodos}
+                className={cn(tokens.button.base, tokens.button.primary)}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -130,13 +177,22 @@ export const TodosTab: React.FC = () => {
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             To-Dos ({filteredTodos.length})
           </h2>
-          <button
-            onClick={saveBatch}
-            disabled={stagedCount === 0}
-            className={cn(tokens.button.base, tokens.button.primary, stagedCount === 0 && 'opacity-50 cursor-not-allowed')}
-          >
-            {stagedCount > 0 ? `Save (${stagedCount})` : 'Save'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={loadTodos}
+              disabled={loading}
+              className={cn(tokens.button.base, tokens.button.secondary, loading && 'opacity-50 cursor-not-allowed')}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              onClick={saveBatch}
+              disabled={stagedCount === 0}
+              className={cn(tokens.button.base, tokens.button.primary, stagedCount === 0 && 'opacity-50 cursor-not-allowed')}
+            >
+              {stagedCount > 0 ? `Save (${stagedCount})` : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
 
