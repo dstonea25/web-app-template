@@ -1,15 +1,14 @@
 {
-  "version": "1.6.0",
-  "updated_at": "2025-01-15",
+  "version": "1.5.0",
+  "updated_at": "2025-09-08",
   "product_name": "Geronimo",
   "goals": [
     "Local-first MVP (no real writes yet).",
-    "Three modules: todos, ideas, and time_tracking.",
+    "Two modules: todos and time_tracking.",
     "Desktop layout with a collapsible left sidebar; content on the right.",
     "Mobile layout with a top-nav hamburger that opens the same menu.",
     "Shared TopBanner across modules with consistent theme tokens.",
-    "Todos and Ideas use category-derived tabs (including All) computed from the dataset.",
-    "Tab state persists across browser sessions via localStorage.",
+    "Todos uses category-derived tabs (including All) computed from the dataset.",
     "Responsive and accessible UI."
   ],
   "non_goals": [
@@ -75,42 +74,6 @@
       ]
     },
     {
-      "id": "ideas",
-      "title": "Ideas",
-      "surface": "page",
-      "requirements": [
-        "Interactive table with borders, zebra rows, sticky header, hover state.",
-        "Columns: Idea | Category | Notes | Created | Actions.",
-        "Inline editing: clicking Idea/Category/Notes toggles input; Enter/⌘Enter commits to working copy; Esc cancels.",
-        "Category dropdown with predefined options: work, projects, videos, writing, health, business, life, future.",
-        "Row actions: Remove (red) hides row and stages removal; dirty rows show Update (teal) to stage edits.",
-        "Save button: rebuilds entire ideas file from working set and posts array; disabled with zero staged; shows count when >0.",
-        "Sorting: created_at desc default, with placeholder 'Sort by...' option."
-      ],
-      "constraints": [
-        "Category options are predefined dropdown values (not computed from data).",
-        "Keep all behavior local-first (in-memory + optional localStorage).",
-        "Ignore any status found in source data for persistence; only use UI-only status.",
-        "Save is the only network action; Update/Complete are local until Save."
-      ],
-      "defaults": {
-        "tab_order": "alpha",
-        "default_sort": { "column": "", "direction": "desc" },
-        "id_generation": "timestamp"
-      },
-      "acceptance": [
-        "Table headers (desktop): Idea | Category | Notes | Created | Actions.",
-        "Editable cells have visible emerald focus ring and support keyboard shortcuts.",
-        "Category field uses dropdown with predefined lowercase values.",
-        "Notes field supports multiline input and expands row height.",
-        "Save posts one array and clears staging; Update/Complete do not call network.",
-        "Export length N; first element is oldest (id:1), last is newest (id:N).",
-        "All exported status values are 'open'.",
-        "Completed rows are absent from export.",
-        "Local UI reflects applied changes after Save; refresh preserves them."
-      ]
-    },
-    {
       "id": "time_tracking",
       "title": "Time Tracking",
       "surface": "page",
@@ -142,14 +105,6 @@
       "id": "string (internal-only; uuid; never displayed)",
       "status": "(ignored by UI if present)"
     },
-    "idea": {
-      "idea": "string",
-      "category": "string|null (predefined: work|projects|videos|writing|health|business|life|future)",
-      "created_at": "string ISO-8601",
-      "notes": "string|null (multiline supported)",
-      "id": "string (internal-only; timestamp; never displayed)",
-      "status": "(ignored by UI if present)"
-    },
     "session": {
       "id": "string",
       "started_at": "string ISO-8601",
@@ -161,25 +116,17 @@
   "io_contracts": {
     "seed_inputs": [
       "/public/data/todos.json",
-      "/public/data/ideas.json",
       "/public/data/sessions.json"
     ],
     "persistence_strategy": [
       "In-memory React state.",
       "Optional localStorage mirror.",
-      "Tab state persists via localStorage key 'dashboard-active-tab'.",
       "Save rebuilds full file payload for webhook (mocked in dev)."
     ],
     "future_webhooks": [
       {
         "name": "saveTodosFile",
         "path": "/webhook/todo-file-save",
-        "method": "POST",
-        "enabled_in_mvp": false
-      },
-      {
-        "name": "saveIdeasFile",
-        "path": "/webhook/ideas-file-save",
         "method": "POST",
         "enabled_in_mvp": false
       },
@@ -219,9 +166,7 @@
     "Brand displays as Geronimo in TopBanner.",
     "Desktop: collapsible left sidebar; Mobile: hamburger drawer.",
     "To-Dos: category tabs derived from data, table styled per tokens, sort/filter/add/edit, Save stubbed.",
-    "Ideas: category tabs with predefined options, table styled per tokens, sort/filter/add/edit, Save stubbed.",
     "Time Tracking: start/stop/edit/append, Submit mocked.",
-    "Tab state persists across browser sessions via localStorage.",
     "Theme tokens are used consistently across modules.",
     "A global toast system exists; any module can trigger success/error/info and it renders once via AppShell."
   ]

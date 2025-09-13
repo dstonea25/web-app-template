@@ -1,5 +1,7 @@
 import React from 'react';
+import { LogOut } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TopBannerProps {
   title?: string;
@@ -10,6 +12,12 @@ export const TopBanner: React.FC<TopBannerProps> = ({
   title = "Geronimo", 
   subtitle = "Your personal productivity app" 
 }) => {
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
     <header className={cn('py-6 border-b', tokens.palette.dark.border)}>
       <div className={tokens.layout.container}>
@@ -23,6 +31,16 @@ export const TopBanner: React.FC<TopBannerProps> = ({
                 {subtitle}
               </p>
             )}
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <button
+              onClick={handleLogout}
+              className={`${tokens.button.base} ${tokens.button.ghost} text-sm`}
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="ml-2">Sign out</span>
+            </button>
           </div>
         </div>
       </div>

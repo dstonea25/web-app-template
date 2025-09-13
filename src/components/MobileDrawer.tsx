@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { tokens, cn } from '../theme/config';
 
-export type ModuleId = 'todos' | 'time_tracking';
+export type ModuleId = 'todos' | 'ideas' | 'time_tracking';
 
 interface MobileDrawerItem {
   id: ModuleId;

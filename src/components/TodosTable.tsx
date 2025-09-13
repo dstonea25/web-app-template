@@ -8,11 +8,11 @@ import SelectPriority from './SelectPriority';
 interface TodosTableProps {
   todos: Todo[];
   filter: string;
-  sortBy: keyof Todo;
+  sortBy: keyof Todo | '';
   sortOrder: 'asc' | 'desc';
   editingId: string | null;
   onFilterChange: (filter: string) => void;
-  onSortChange: (sortBy: keyof Todo) => void;
+  onSortChange: (sortBy: keyof Todo | '') => void;
   onSortOrderChange: (order: 'asc' | 'desc') => void;
   onEditStart: (id: string) => void;
   onEditEnd: () => void;
@@ -59,6 +59,9 @@ export const TodosTable: React.FC<TodosTableProps> = ({
              (todo.category || '').toLowerCase().includes(filter.toLowerCase());
     })
     .sort((a, b) => {
+      // If no sort is selected, keep original order
+      if (!sortBy) return 0;
+      
       if (sortBy === 'priority') {
         const cmp = priorityRank(a.priority) - priorityRank(b.priority);
         return sortOrder === 'asc' ? cmp : -cmp;
@@ -112,7 +115,7 @@ export const TodosTable: React.FC<TodosTableProps> = ({
     <div className="space-y-4">
       {/* Live region for announcing sort changes */}
       <div className="sr-only" role="status" aria-live="polite">
-        {`Sorted by ${sortBy === 'created_at' ? 'Created' : sortBy === 'priority' ? 'Priority' : String(sortBy)}, ${sortOrder === 'asc' ? 'ascending' : 'descending'}. ${filteredAndSortedTodos.length} items.`}
+        {sortBy ? `Sorted by ${sortBy === 'created_at' ? 'Created' : sortBy === 'priority' ? 'Priority' : String(sortBy)}, ${sortOrder === 'asc' ? 'ascending' : 'descending'}. ${filteredAndSortedTodos.length} items.` : `${filteredAndSortedTodos.length} items.`}
       </div>
       {/* Filter and Sort Controls */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -124,10 +127,12 @@ export const TodosTable: React.FC<TodosTableProps> = ({
           className={cn(tokens.input.base, tokens.input.focus)}
         />
         <select
-          value={sortBy}
-          onChange={(e) => onSortChange(e.target.value as keyof Todo)}
-          className={cn(tokens.input.base, tokens.input.focus)}
+          value={sortBy || ''}
+          onChange={(e) => onSortChange(e.target.value as keyof Todo | '')}
+          className={cn(tokens.input.base, tokens.input.focus, !sortBy && 'text-neutral-400')}
+          style={!sortBy ? { color: '#9ca3af' } : {}}
         >
+          <option value="" style={{ color: '#9ca3af' }}>Sort by...</option>
           <option value="task">Sort by Task</option>
           <option value="priority">Sort by Priority</option>
           <option value="category">Sort by Category</option>

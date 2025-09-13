@@ -1,47 +1,29 @@
 # Dependencies
 node_modules
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Production build
+# Build outputs
 dist
+build
 
-# Environment files
-.env
+# Development files
+.git
+.gitignore
+README.md
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# IDE and editor files
+# IDE files
 .vscode
 .idea
 *.swp
 *.swo
-*~
 
-# OS generated files
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Git
-.git
-.gitignore
-
-# Docker
-Dockerfile
-.dockerignore
-docker-compose*.yml
-
-# Documentation
-README.md
-*.md
 
 # Logs
 logs
@@ -74,34 +56,12 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
+# dotenv environment variables file
+.env
 
-# next.js build output
-.next
+# Backup files
+backups/
+meta/backups/
 
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Temporary folders
-tmp/
-temp/
+# Development scripts
+start-production.sh

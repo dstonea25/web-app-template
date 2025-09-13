@@ -14,7 +14,7 @@ export const TodosTab: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  const [sortBy, setSortBy] = useState<keyof Todo>('created_at');
+  const [sortBy, setSortBy] = useState<keyof Todo | ''>('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');

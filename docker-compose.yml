@@ -5,19 +5,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - GITHUB_REPO=${GITHUB_REPO}
+        - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
+        - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
     container_name: dashboard-app
     ports:
-      - "3000:3000"
+      - "3000:8080"
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-    volumes:
-      # Mount data directory for persistent storage
-      - ./public/data:/usr/share/nginx/html/data:rw
+      - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
+      - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
     networks:
       - dashboard-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -26,28 +29,3 @@ services:
 networks:
   dashboard-network:
     driver: bridge
-
-# Optional: Add a reverse proxy for production use
-# Uncomment the following if you want to use Traefik or nginx as reverse proxy
-# 
-# services:
-#   traefik:
-#     image: traefik:v2.10
-#     container_name: dashboard-traefik
-#     command:
-#       - "--api.insecure=true"
-#       - "--providers.docker=true"
-#       - "--providers.docker.exposedbydefault=false"
-#       - "--entrypoints.web.address=:80"
-#     ports:
-#       - "80:80"
-#       - "8080:8080"  # Traefik dashboard
-#     volumes:
-#       - /var/run/docker.sock:/var/run/docker.sock:ro
-#     networks:
-#       - dashboard-network
-#     labels:
-#       - "traefik.enable=true"
-#       - "traefik.http.routers.dashboard.rule=Host(`dashboard.localhost`)"
-#       - "traefik.http.routers.dashboard.entrypoints=web"
-#       - "traefik.http.services.dashboard.loadbalancer.server.port=8080"

@@ -22,6 +22,23 @@ export interface TodoPatch {
   statusUi?: StatusUi;
 }
 
+export interface Idea {
+  id?: string; // internal; generate uuid if missing
+  idea: string;
+  category?: string | null;
+  created_at: string;
+  status?: 'open' | 'closed';
+  notes?: string;
+  _dirty?: boolean; // UI flag for pending edits
+}
+
+export interface IdeaPatch {
+  id: string;
+  idea?: string;
+  category?: string | null;
+  notes?: string;
+}
+
 export interface Session {
   id?: string;
   started_at: string; // ISO-8601
@@ -52,4 +69,17 @@ export interface TodoFileItem {
   category: string | null;
   priority: Priority;
   created_at: string;
+}
+
+// Authentication types
+export interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthContextType {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (credentials: AuthCredentials) => Promise<boolean>;
+  logout: () => void;
 }

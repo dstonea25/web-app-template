@@ -1,4 +1,6 @@
 import { AppShell } from './components/AppShell'
+import { AuthProvider } from './contexts/AuthContext'
+import { ProtectedRoute } from './components/ProtectedRoute'
 import React from 'react'
 
 interface ErrorBoundaryState {
@@ -42,7 +44,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 function App() {
   return (
     <ErrorBoundary>
-      <AppShell />
+      <AuthProvider>
+        <ProtectedRoute>
+          <AppShell />
+        </ProtectedRoute>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }

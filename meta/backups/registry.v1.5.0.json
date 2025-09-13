@@ -1,13 +1,7 @@
 {
-  "version": "1.1.0",
-  "updated_at": "2025-01-15",
+  "version": "1.0.0",
+  "updated_at": "2025-09-12",
   "default_tab": "todos",
-  "tab_persistence": {
-    "enabled": true,
-    "storage_key": "dashboard-active-tab",
-    "fallback_behavior": "first_enabled_tab_or_default",
-    "validation": ["todos", "ideas", "time_tracking"]
-  },
   "tabs": [
     {
       "id": "todos",
