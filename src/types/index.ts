@@ -20,6 +20,12 @@ export interface TodoPatch {
   category?: string | null;
   priority?: Priority;
   statusUi?: StatusUi;
+  // Track which fields have been changed for counting
+  _changedFields?: string[];
+  // Special flag for new todos - should count as 1 change regardless of field count
+  _isNew?: boolean;
+  // UI flag for dirty state - should not count as a field change
+  _dirty?: boolean;
 }
 
 export interface Idea {
@@ -37,6 +43,13 @@ export interface IdeaPatch {
   idea?: string;
   category?: string | null;
   notes?: string;
+  status?: 'open' | 'closed';
+  // Track which fields have been changed for counting
+  _changedFields?: string[];
+  // Special flag for new ideas - should count as 1 change regardless of field count
+  _isNew?: boolean;
+  // UI flag for dirty state - should not count as a field change
+  _dirty?: boolean;
 }
 
 export interface Session {

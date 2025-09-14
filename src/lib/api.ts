@@ -1,4 +1,4 @@
-import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem } from '../types';
+import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea } from '../types';
 
 // Mocked API client for MVP - all saves are stubbed
 export class ApiClient {
@@ -77,6 +77,8 @@ export class ApiClient {
 // Webhook configuration
 const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
 const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
+const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
+const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Webhook function to fetch todos
@@ -145,7 +147,7 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
 
     // Convert todos to the format expected by n8n (remove internal fields)
     const todosToSave = todos.map(todo => ({
-      id: parseInt(todo.id),
+      id: parseInt(todo.id || '0'),
       task: todo.task,
       status: todo.statusUi,
       category: todo.category,
@@ -179,6 +181,110 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
     console.log('✅ Todos saved successfully to webhook');
   } catch (error) {
     console.error('Failed to save todos to webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to fetch ideas
+export const fetchIdeasFromWebhook = async (): Promise<Idea[]> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+    console.log('🌐 Making request to:', N8N_IDEAS_WEBHOOK_URL);
+
+    const response = await fetch(N8N_IDEAS_WEBHOOK_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('❌ Ideas webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    console.log('📦 Ideas webhook response data:', data);
+    console.log('📦 Data type:', typeof data);
+    console.log('📦 Is array?', Array.isArray(data));
+    
+    // Transform the data to match our Idea interface
+    // The webhook returns an object with a 'data' property containing the ideas array
+    if (data && data.data && Array.isArray(data.data)) {
+      const ideas = data.data;
+      return ideas.map((idea: any) => ({
+        id: String(idea.id),
+        idea: idea.idea,
+        category: idea.category || null,
+        notes: idea.notes || '',
+        created_at: idea.created_at,
+        status: idea.status || 'open',
+        _dirty: false,
+      }));
+    } else {
+      console.error('❌ Ideas response format not recognized:', data);
+      throw new Error('Invalid response format: expected object with data property containing ideas array');
+    }
+  } catch (error) {
+    console.error('❌ Failed to fetch ideas from webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to save ideas
+export const saveIdeasToWebhook = async (ideas: Idea[]): Promise<void> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('💾 Saving ideas to webhook...');
+    console.log('📦 Ideas to save:', ideas);
+
+    // Convert ideas to the format expected by n8n (remove internal fields)
+    const ideasToSave = ideas.map(idea => ({
+      id: parseInt(idea.id || '0'),
+      idea: idea.idea,
+      status: idea.status,
+      category: idea.category,
+      notes: idea.notes,
+      created_at: idea.created_at,
+    }));
+
+    const requestBody = { data: ideasToSave };
+    console.log('📤 Ideas request body being sent:', JSON.stringify(requestBody, null, 2));
+    console.log('📤 Request headers:', {
+      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+      'Content-Type': 'application/json',
+    });
+
+    const response = await fetch(N8N_SAVE_IDEAS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: ideasToSave }),
+    });
+
+    if (!response.ok) {
+      console.error('❌ Save ideas webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    }
+
+    console.log('✅ Ideas saved successfully to webhook');
+  } catch (error) {
+    console.error('Failed to save ideas to webhook:', error);
     throw error;
   }
 };

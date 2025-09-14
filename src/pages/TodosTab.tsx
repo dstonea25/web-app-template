@@ -33,15 +33,25 @@ export const TodosTab: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Check cache first
+      // Check if this was a hard refresh (Cmd+Shift+R)
+      // Hard refresh bypasses cache by default
+      const isHardRefresh = !document.referrer || 
+                           document.referrer === window.location.href ||
+                           (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
+      
+      // Check cache first, but skip if hard refresh
       const cachedTodos = getCachedData<Todo[]>('todos-cache');
-      if (cachedTodos) {
+      if (cachedTodos && !isHardRefresh) {
         console.log('📦 Loading todos from cache');
         setTodos(cachedTodos);
         const staged = getStagedChanges();
-        setStagedCount(staged.updates.length + staged.completes.length);
+        setStagedCount(staged.fieldChangeCount);
         setLoading(false);
         return;
+      }
+      
+      if (isHardRefresh) {
+        console.log('🔄 Hard refresh detected - clearing cache and loading fresh data');
       }
       
       // Clear localStorage to force fresh data load
@@ -60,7 +70,7 @@ export const TodosTab: React.FC = () => {
       const transformed = StorageManager.loadTodos();
       setTodos(transformed);
       const staged = getStagedChanges();
-      setStagedCount(staged.updates.length + staged.completes.length);
+      setStagedCount(staged.fieldChangeCount);
     } catch (error) {
       console.error('Failed to load todos from webhook:', error);
       setError(error instanceof Error ? error.message : 'Failed to load todos from webhook');
@@ -123,19 +133,20 @@ export const TodosTab: React.FC = () => {
     const newTodoItem = updatedTodos[updatedTodos.length - 1];
     if (newTodoItem) {
       stageRowEdit({ 
-        id: newTodoItem.id, 
+        id: newTodoItem.id || '', 
         patch: { 
-          id: newTodoItem.id, 
+          id: newTodoItem.id || '', 
           task: newTodoItem.task, 
           category: newTodoItem.category, 
           priority: newTodoItem.priority,
-          statusUi: newTodoItem.statusUi
+          statusUi: newTodoItem.statusUi,
+          _isNew: true // Mark as new todo - counts as 1 change
         } 
       });
       
       // Update staged count
       const staged = getStagedChanges();
-      setStagedCount(staged.updates.length + staged.completes.length);
+      setStagedCount(staged.fieldChangeCount);
     }
     
     setNewTodo({ task: '', category: '', priority: null });
@@ -162,7 +173,7 @@ export const TodosTab: React.FC = () => {
     // Update staged count
     const staged = getStagedChanges();
     console.log('📊 Staged changes:', staged);
-    setStagedCount(staged.updates.length + staged.completes.length);
+    setStagedCount(staged.fieldChangeCount);
   };
 
 

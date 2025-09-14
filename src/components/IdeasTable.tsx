@@ -9,14 +9,13 @@ interface IdeasTableProps {
   sortBy: keyof Idea | '';
   sortOrder: 'asc' | 'desc';
   editingId: string | null;
-  editingField: string | null;
   onFilterChange: (filter: string) => void;
   onSortChange: (sortBy: keyof Idea | '') => void;
   onSortOrderChange: (order: 'asc' | 'desc') => void;
-  onEditStart: (id: string, field: string) => void;
+  onEditStart: (id: string) => void;
   onEditEnd: () => void;
   onIdeaUpdate: (id: string, updates: Partial<Idea>) => void;
-  onIdeaComplete: (id: string) => void; // TODO: Rename to onIdeaRemove in future refactor
+  onIdeaComplete: (id: string) => void;
   onCommitRowEdit: (id: string, patch: IdeaPatch) => void;
 }
 
@@ -26,7 +25,6 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
   sortBy,
   sortOrder,
   editingId,
-  editingField,
   onFilterChange,
   onSortChange,
   onSortOrderChange,
@@ -77,7 +75,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
       
       if (nextIndex >= 0 && nextIndex < filteredAndSortedIdeas.length) {
         const nextIdea = filteredAndSortedIdeas[nextIndex];
-        onEditStart(String(nextIdea.id!), 'idea');
+        onEditStart(String(nextIdea.id!));
       } else {
         // If at the end/beginning, commit current edit and move to next/previous row
         onCommitRowEdit(String(ideaObj.id!), { 
@@ -88,7 +86,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
         });
         if (nextIndex >= 0 && nextIndex < filteredAndSortedIdeas.length) {
           const nextIdea = filteredAndSortedIdeas[nextIndex];
-          onEditStart(String(nextIdea.id!), 'idea');
+          onEditStart(String(nextIdea.id!));
         }
       }
     } else if (e.key === 'Enter' && !e.shiftKey) {
@@ -211,7 +209,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                 <tr key={idea.id} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
                   <td className={cn(tokens.table.td)}>
                     <div className={cn(tokens.editable?.cell, 'rounded-none')}>
-                      {editingId === idea.id && editingField === 'idea' ? (
+                      {editingId === idea.id ? (
                         <input
                           ref={(el) => { editingCellRef.current = el; }}
                           type="text"
@@ -224,7 +222,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                       ) : (
                         <span
                           className={cn('cursor-pointer', tokens.accent.text_hover)}
-                          onClick={() => onEditStart(String(idea.id!), 'idea')}
+                          onClick={() => onEditStart(String(idea.id!))}
                           aria-label="Edit idea"
                         >
                           {idea.idea || ''}
@@ -233,39 +231,27 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                     </div>
                   </td>
                   <td className={tokens.table.td}>
-                    <div className={cn(tokens.editable?.cell, 'rounded-none')}>
-                      {editingId === idea.id && editingField === 'category' ? (
-                        <select
-                          value={idea.category || ''}
-                          onChange={(e) => onIdeaUpdate(String(idea.id!), { category: e.target.value })}
-                          className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus)}
-                          onKeyDown={(e) => handleKeyDown(e, idea)}
-                          autoFocus
-                        >
-                          <option value="">Select category</option>
-                          <option value="work">work</option>
-                          <option value="projects">projects</option>
-                          <option value="videos">videos</option>
-                          <option value="writing">writing</option>
-                          <option value="health">health</option>
-                          <option value="business">business</option>
-                          <option value="life">life</option>
-                          <option value="future">future</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={cn('cursor-pointer', tokens.accent.text_hover)}
-                          onClick={() => onEditStart(String(idea.id!), 'category')}
-                          aria-label="Edit category"
-                        >
-                          {idea.category || 'No category'}
-                        </span>
-                      )}
-                    </div>
+                    <select
+                      value={idea.category || ''}
+                      onChange={(e) => { onIdeaUpdate(String(idea.id!), { category: e.target.value || null, _dirty: true }); }}
+                      className={cn(tokens.input.base, tokens.input.focus, !idea.category && 'text-neutral-400')}
+                      style={!idea.category ? { color: '#9ca3af' } : {}}
+                      aria-label="Set category"
+                    >
+                      <option value="" style={{ color: '#9ca3af' }}>No category</option>
+                      <option value="work">work</option>
+                      <option value="projects">projects</option>
+                      <option value="videos">videos</option>
+                      <option value="writing">writing</option>
+                      <option value="health">health</option>
+                      <option value="business">business</option>
+                      <option value="life">life</option>
+                      <option value="future">future</option>
+                    </select>
                   </td>
                   <td className={tokens.table.td}>
                     <div className={cn(tokens.editable?.cell, 'rounded-none')}>
-                      {editingId === idea.id && editingField === 'notes' ? (
+                      {editingId === idea.id ? (
                         <textarea
                           ref={(el) => { editingCellRef.current = el; }}
                           value={idea.notes || ''}
@@ -277,7 +263,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                       ) : (
                         <span
                           className={cn('cursor-pointer block', tokens.accent.text_hover)}
-                          onClick={() => onEditStart(String(idea.id!), 'notes')}
+                          onClick={() => onEditStart(String(idea.id!))}
                           aria-label="Edit notes"
                           style={{ 
                             minHeight: idea.notes && idea.notes.length > 50 ? '60px' : 'auto',
@@ -293,28 +279,13 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                     {idea.created_at ? new Date(idea.created_at).toLocaleDateString() : '—'}
                   </td>
                   <td className={tokens.table.td}>
-                    {idea._dirty ? (
-                      <button
-                        onClick={() => onCommitRowEdit(String(idea.id!), { 
-                          id: String(idea.id!), 
-                          idea: idea.idea, 
-                          category: idea.category ?? null, 
-                          notes: idea.notes 
-                        })}
-                        className={cn(tokens.button.base, tokens.button.info, 'text-sm')}
-                        aria-label="Update idea"
-                      >
-                        Update
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onIdeaComplete(String(idea.id!))}
-                        className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
-                        aria-label="Remove idea"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onIdeaComplete(String(idea.id!))}
+                      className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                      aria-label="Remove idea"
+                    >
+                      Remove
+                    </button>
                   </td>
                 </tr>
               ))

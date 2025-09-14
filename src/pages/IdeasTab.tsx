@@ -3,22 +3,26 @@ import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
 import { IdeasCategoryTabs } from '../components/IdeasCategoryTabs';
-import { getCachedData, setCachedData } from '../lib/storage';
+import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, getCachedData, setCachedData } from '../lib/storage';
+import { applyIdeaFileSave, getWorkingIdeas } from '../lib/storage';
+import { addIdea as storageAddIdea } from '../lib/storage';
+import { fetchIdeasFromWebhook, saveIdeasToWebhook } from '../lib/api';
 
 export const IdeasTab: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [sortBy, setSortBy] = useState<keyof Idea | ''>('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingField, setEditingField] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [newIdea, setNewIdea] = useState<Partial<Idea>>({ 
     idea: '', 
     category: '', 
     notes: '' 
   });
+  const [stagedCount, setStagedCount] = useState<number>(0);
 
   // Load initial data
   useEffect(() => {
@@ -28,38 +32,54 @@ export const IdeasTab: React.FC = () => {
   const loadIdeas = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Check cache first
+      // Check if this was a hard refresh (Cmd+Shift+R)
+      // Hard refresh bypasses cache by default
+      const isHardRefresh = !document.referrer || 
+                           document.referrer === window.location.href ||
+                           (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
+      
       const cachedIdeas = getCachedData<Idea[]>('ideas-cache');
-      if (cachedIdeas) {
+      const hasToken = import.meta.env.VITE_N8N_WEBHOOK_TOKEN;
+      
+      // Check cache first, but skip if hard refresh
+      if (cachedIdeas && hasToken && !isHardRefresh) {
         console.log('📦 Loading ideas from cache');
         setIdeas(cachedIdeas);
+        const staged = getStagedIdeaChanges();
+        setStagedCount(staged.fieldChangeCount);
         setLoading(false);
         return;
       }
       
-      // Load from seed data
-      console.log('🌐 Loading ideas from seed data...');
-      const response = await fetch('/data/ideas.json');
-      const seedIdeas = await response.json();
-      console.log('✅ Seed ideas loaded:', seedIdeas);
+      if (isHardRefresh) {
+        console.log('🔄 Hard refresh detected - clearing cache and loading fresh data');
+      }
       
-      // Transform the data to match our Idea interface
-      const transformedIdeas = seedIdeas.map((item: any) => ({
-        id: String(item.id),
-        idea: item.idea,
-        category: item.category || null,
-        created_at: item.created_at,
-        status: item.status || 'open',
-        notes: item.notes || '',
-      }));
+      // Clear localStorage to force fresh data load
+      StorageManager.clearAll();
+      
+      // Load from webhook
+      console.log('🌐 Loading ideas from webhook...');
+      const webhookIdeas = await fetchIdeasFromWebhook();
+      console.log('✅ Webhook ideas loaded:', webhookIdeas);
       
       // Cache the data
-      setCachedData('ideas-cache', transformedIdeas);
+      setCachedData('ideas-cache', webhookIdeas);
       
-      setIdeas(transformedIdeas);
+      // Ensure transforms on load by saving then reloading
+      StorageManager.saveIdeas(webhookIdeas);
+      const transformed = StorageManager.loadIdeas();
+      setIdeas(transformed);
+      const staged = getStagedIdeaChanges();
+      setStagedCount(staged.fieldChangeCount);
     } catch (error) {
-      console.error('Failed to load ideas:', error);
+      console.error('Failed to load ideas from webhook:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load ideas from webhook');
+      setIdeas([]); // Clear ideas on error
+      // Clear cache on error to prevent stale data
+      setCachedData('ideas-cache', null);
     } finally {
       setLoading(false);
     }
@@ -67,45 +87,98 @@ export const IdeasTab: React.FC = () => {
 
   const saveBatch = async () => {
     try {
-      // Get only the dirty ideas that need saving
-      const dirtyIdeas = ideas.filter(idea => idea._dirty);
-      console.log('Saving ideas:', dirtyIdeas);
+      setLoading(true);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Apply staged changes to get the final state
+      const result = await applyIdeaFileSave();
+      if (!result.ok) {
+        throw new Error('Failed to apply staged changes');
+      }
       
-      // Clear dirty flags after successful save
-      const cleanedIdeas = ideas.map(idea => ({ ...idea, _dirty: false }));
-      setIdeas(cleanedIdeas);
+      // Get the updated ideas after applying changes
+      const updatedIdeas = getWorkingIdeas();
+      
+      // Save to n8n webhook
+      await saveIdeasToWebhook(updatedIdeas);
+      
+      // Refresh data from webhook to get the latest state
+      console.log('🔄 Refreshing data from webhook after save...');
+      const freshIdeas = await fetchIdeasFromWebhook();
+      
+      // Update local state with fresh data
+      StorageManager.saveIdeas(freshIdeas);
+      const transformed = StorageManager.loadIdeas();
+      setIdeas(transformed);
+      
+      // Update cache with fresh data
+      setCachedData('ideas-cache', freshIdeas);
+      
+      // Clear staged changes
+      setStagedCount(0);
+      
+      console.log('✅ Save completed successfully');
     } catch (error) {
-      console.error('Failed to save ideas:', error);
-      alert('Failed to save');
+      console.error('Failed to save:', error);
+      alert(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   const addIdea = () => {
     if (!newIdea.idea?.trim()) return;
-    
-    const idea: Idea = {
-      id: String(Date.now()), // Simple ID generation
+    const updatedIdeas = storageAddIdea(ideas, {
       idea: newIdea.idea!,
       category: (newIdea.category as string) || null,
-      created_at: new Date().toISOString(),
-      status: 'open',
       notes: newIdea.notes || '',
-    };
-    
-    const updatedIdeas = [...ideas, idea];
+    });
     setIdeas(updatedIdeas);
+    
+    // Stage the new idea for saving (get the last added idea)
+    const newIdeaItem = updatedIdeas[updatedIdeas.length - 1];
+    if (newIdeaItem) {
+      stageIdeaEdit({ 
+        id: newIdeaItem.id || '', 
+        patch: { 
+          id: newIdeaItem.id || '', 
+          idea: newIdeaItem.idea, 
+          category: newIdeaItem.category, 
+          notes: newIdeaItem.notes,
+          status: newIdeaItem.status,
+          _isNew: true // Mark as new idea - counts as 1 change
+        } 
+      });
+      
+      // Update staged count
+      const staged = getStagedIdeaChanges();
+      setStagedCount(staged.fieldChangeCount);
+    }
+    
     setNewIdea({ idea: '', category: '', notes: '' });
   };
 
   const updateIdea = (id: string, updates: Partial<Idea>) => {
+    console.log('🔄 updateIdea called:', { id, updates });
+    
     // Local working copy update
     const updatedIdeas = ideas.map(idea =>
-      idea.id === id ? { ...idea, ...updates, _dirty: true } : idea
+      idea.id === id ? { ...idea, ...updates } : idea
     );
     setIdeas(updatedIdeas);
+    
+    // Stage the change for saving
+    stageIdeaEdit({ 
+      id, 
+      patch: { 
+        id, 
+        ...updates 
+      } as IdeaPatch 
+    });
+    
+    // Update staged count
+    const staged = getStagedIdeaChanges();
+    console.log('📊 Staged changes:', staged);
+    setStagedCount(staged.fieldChangeCount);
   };
 
   const commitRowEdit = (id: string, patch: IdeaPatch) => {
@@ -123,27 +196,53 @@ export const IdeasTab: React.FC = () => {
   };
 
   const removeIdea = (id: string) => {
-    // In a real app, this would stage the removal for batch saving
-    console.log('Staging removal for idea:', id);
+    stageIdeaComplete({ id });
+    const staged = getStagedIdeaChanges();
+    setStagedCount(staged.fieldChangeCount);
     // Hide row from current view
     setIdeas(prev => prev.filter(i => String(i.id) !== String(id)));
   };
 
-  const handleEditStart = (id: string, field: string) => {
+  const handleEditStart = (id: string) => {
     setEditingId(id);
-    setEditingField(field);
   };
 
   const handleEditEnd = () => {
     setEditingId(null);
-    setEditingField(null);
   };
 
   if (loading) {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
-          <div className={tokens.palette.dark.text_muted}>Loading ideas...</div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className={tokens.palette.dark.text_muted}>Loading ideas from webhook...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={tokens.layout.container}>
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <h3 className="text-lg font-semibold mb-2">Failed to Load Ideas</h3>
+              <p className="text-sm text-gray-600 mb-4">{error}</p>
+              <button
+                onClick={loadIdeas}
+                className={cn(tokens.button.base, tokens.button.primary)}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -154,9 +253,6 @@ export const IdeasTab: React.FC = () => {
     ? ideas 
     : ideas.filter(idea => idea.category === activeCategory);
 
-  // Count dirty items for save button
-  const dirtyCount = ideas.filter(idea => idea._dirty).length;
-
   return (
     <div className={tokens.layout.container}>
       <div className="mb-6">
@@ -164,13 +260,15 @@ export const IdeasTab: React.FC = () => {
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             Ideas ({filteredIdeas.length})
           </h2>
-          <button
-            onClick={saveBatch}
-            disabled={dirtyCount === 0}
-            className={cn(tokens.button.base, tokens.button.primary, dirtyCount === 0 && 'opacity-50 cursor-not-allowed')}
-          >
-            {dirtyCount > 0 ? `Save (${dirtyCount})` : 'Save'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={saveBatch}
+              disabled={stagedCount === 0 || loading}
+              className={cn(tokens.button.base, tokens.button.primary, (stagedCount === 0 || loading) && 'opacity-50 cursor-not-allowed')}
+            >
+              {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -190,7 +288,6 @@ export const IdeasTab: React.FC = () => {
         sortBy={sortBy}
         sortOrder={sortOrder}
         editingId={editingId}
-        editingField={editingField}
         onFilterChange={setFilter}
         onSortChange={setSortBy}
         onSortOrderChange={setSortOrder}

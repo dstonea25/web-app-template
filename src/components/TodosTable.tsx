@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Todo, Priority, TodoPatch } from '../types';
 import { tokens, cn } from '../theme/config';
-import { stageRowEdit } from '../lib/storage';
+// Removed unused import: stageRowEdit
 import SelectPriority from './SelectPriority';
 
 interface TodosTableProps {
@@ -295,7 +295,22 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                       ariaLabel="Set priority"
                     />
                   </td>
-                  <td className={tokens.table.td}>{todo.category}</td>
+                  <td className={tokens.table.td}>
+                    <select
+                      value={todo.category || ''}
+                      onChange={(e) => { onTodoUpdate(String(todo.id!), { category: e.target.value || null, _dirty: true }); }}
+                      className={cn(tokens.input.base, tokens.input.focus, !todo.category && 'text-neutral-400')}
+                      style={!todo.category ? { color: '#9ca3af' } : {}}
+                      aria-label="Set category"
+                    >
+                      <option value="" style={{ color: '#9ca3af' }}>No category</option>
+                      <option value="work">work</option>
+                      <option value="n8n">n8n</option>
+                      <option value="content">content</option>
+                      <option value="research">research</option>
+                      <option value="personal">personal</option>
+                    </select>
+                  </td>
                   <td className={tokens.table.td}>
                     {todo.created_at ? new Date(todo.created_at).toLocaleDateString() : '—'}
                   </td>
