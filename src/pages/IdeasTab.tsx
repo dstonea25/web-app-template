@@ -3,6 +3,7 @@ import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
 import { IdeasCategoryTabs } from '../components/IdeasCategoryTabs';
+import { getCachedData, setCachedData } from '../lib/storage';
 
 export const IdeasTab: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -26,11 +27,22 @@ export const IdeasTab: React.FC = () => {
 
   const loadIdeas = async () => {
     try {
+      setLoading(true);
+      
+      // Check cache first
+      const cachedIdeas = getCachedData<Idea[]>('ideas-cache');
+      if (cachedIdeas) {
+        console.log('📦 Loading ideas from cache');
+        setIdeas(cachedIdeas);
+        setLoading(false);
+        return;
+      }
+      
       // Load from seed data
-      console.log('Loading ideas from seed data...');
+      console.log('🌐 Loading ideas from seed data...');
       const response = await fetch('/data/ideas.json');
       const seedIdeas = await response.json();
-      console.log('Seed ideas loaded:', seedIdeas);
+      console.log('✅ Seed ideas loaded:', seedIdeas);
       
       // Transform the data to match our Idea interface
       const transformedIdeas = seedIdeas.map((item: any) => ({
@@ -41,6 +53,9 @@ export const IdeasTab: React.FC = () => {
         status: item.status || 'open',
         notes: item.notes || '',
       }));
+      
+      // Cache the data
+      setCachedData('ideas-cache', transformedIdeas);
       
       setIdeas(transformedIdeas);
     } catch (error) {

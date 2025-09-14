@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Todo, Priority, TodoPatch } from '../types';
-import { StorageManager, stageRowEdit, stageComplete, getStagedChanges } from '../lib/storage';
+import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosToWebhook } from '../lib/api';
@@ -33,13 +33,27 @@ export const TodosTab: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Check cache first
+      const cachedTodos = getCachedData<Todo[]>('todos-cache');
+      if (cachedTodos) {
+        console.log('📦 Loading todos from cache');
+        setTodos(cachedTodos);
+        const staged = getStagedChanges();
+        setStagedCount(staged.updates.length + staged.completes.length);
+        setLoading(false);
+        return;
+      }
+      
       // Clear localStorage to force fresh data load
       StorageManager.clearAll();
       
       // Load from webhook
-      console.log('Loading todos from webhook...');
+      console.log('🌐 Loading todos from webhook...');
       const webhookTodos = await fetchTodosFromWebhook();
-      console.log('Webhook todos loaded:', webhookTodos);
+      console.log('✅ Webhook todos loaded:', webhookTodos);
+      
+      // Cache the data
+      setCachedData('todos-cache', webhookTodos);
       
       // Ensure transforms on load (priority/id/status handling) by saving then reloading
       StorageManager.saveTodos(webhookTodos);
@@ -80,6 +94,9 @@ export const TodosTab: React.FC = () => {
       StorageManager.saveTodos(freshTodos);
       const transformed = StorageManager.loadTodos();
       setTodos(transformed);
+      
+      // Update cache with fresh data
+      setCachedData('todos-cache', freshTodos);
       
       // Clear staged changes
       setStagedCount(0);

@@ -122,6 +122,41 @@ export const completeTodo = (todos: Todo[], id: string): { updated: Todo[]; remo
 const stagedUpdates: Map<string, TodoPatch> = new Map();
 const stagedCompletes: Set<string> = new Set();
 
+// Cache utilities
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+export const getCachedData = <T>(key: string): T | null => {
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+    
+    const { data, timestamp } = JSON.parse(cached);
+    const now = Date.now();
+    
+    // Check if cache is still valid
+    if (now - timestamp > CACHE_DURATION) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+export const setCachedData = <T>(key: string, data: T): void => {
+  try {
+    const cacheItem = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(cacheItem));
+  } catch {
+    // Ignore cache errors
+  }
+};
+
 export const stageRowEdit = ({ id, patch }: { id: string; patch: TodoPatch }): void => {
   const existing = stagedUpdates.get(id) || { id };
   const merged: TodoPatch = { ...existing, ...patch };
