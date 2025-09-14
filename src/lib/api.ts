@@ -76,6 +76,7 @@ export class ApiClient {
 
 // Webhook configuration
 const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
+const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Webhook function to fetch todos
@@ -128,6 +129,49 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
     }
   } catch (error) {
     console.error('Failed to fetch todos from webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to save todos
+export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('💾 Saving todos to webhook...');
+    console.log('📦 Todos to save:', todos);
+
+    // Convert todos to the format expected by n8n (remove internal fields)
+    const todosToSave = todos.map(todo => ({
+      id: parseInt(todo.id),
+      task: todo.task,
+      status: todo.statusUi,
+      category: todo.category,
+      priority: todo.priority,
+      created_at: todo.created_at,
+    }));
+
+    const response = await fetch(N8N_SAVE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: todosToSave }),
+    });
+
+    if (!response.ok) {
+      console.error('❌ Save webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    }
+
+    console.log('✅ Todos saved successfully to webhook');
+  } catch (error) {
+    console.error('Failed to save todos to webhook:', error);
     throw error;
   }
 };

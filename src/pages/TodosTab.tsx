@@ -3,7 +3,7 @@ import type { Todo, Priority, TodoPatch } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
-import { fetchTodosFromWebhook } from '../lib/api';
+import { fetchTodosFromWebhook, saveTodosToWebhook } from '../lib/api';
 import { tokens, cn } from '../theme/config';
 import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
@@ -58,17 +58,38 @@ export const TodosTab: React.FC = () => {
 
   const saveBatch = async () => {
     try {
+      setLoading(true);
+      
+      // Apply staged changes to get the final state
       const result = await applyFileSave();
-      if (result.ok) {
-        const next = getWorkingTodos();
-        setTodos(next);
-        setStagedCount(0);
-      } else {
-        alert('Failed to save');
+      if (!result.ok) {
+        throw new Error('Failed to apply staged changes');
       }
+      
+      // Get the updated todos after applying changes
+      const updatedTodos = getWorkingTodos();
+      
+      // Save to n8n webhook
+      await saveTodosToWebhook(updatedTodos);
+      
+      // Refresh data from webhook to get the latest state
+      console.log('🔄 Refreshing data from webhook after save...');
+      const freshTodos = await fetchTodosFromWebhook();
+      
+      // Update local state with fresh data
+      StorageManager.saveTodos(freshTodos);
+      const transformed = StorageManager.loadTodos();
+      setTodos(transformed);
+      
+      // Clear staged changes
+      setStagedCount(0);
+      
+      console.log('✅ Save completed successfully');
     } catch (error) {
-      console.error('Failed to save file:', error);
-      alert('Failed to save');
+      console.error('Failed to save:', error);
+      alert(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,10 +188,10 @@ export const TodosTab: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={saveBatch}
-              disabled={stagedCount === 0}
-              className={cn(tokens.button.base, tokens.button.primary, stagedCount === 0 && 'opacity-50 cursor-not-allowed')}
+              disabled={stagedCount === 0 || loading}
+              className={cn(tokens.button.base, tokens.button.primary, (stagedCount === 0 || loading) && 'opacity-50 cursor-not-allowed')}
             >
-              {stagedCount > 0 ? `Save (${stagedCount})` : 'Save'}
+              {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
             </button>
           </div>
         </div>
