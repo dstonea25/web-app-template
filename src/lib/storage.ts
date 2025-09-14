@@ -97,8 +97,15 @@ export const setSessions = (sessions: Session[]): void => StorageManager.saveSes
 
 // Add a new todo with defaults
 export const addTodo = (todos: Todo[], input: { task: string; category?: string | null; priority?: Priority }): Todo[] => {
+  // Generate sequential ID based on existing todos
+  const maxId = todos.reduce((max, todo) => {
+    const id = parseInt(todo.id);
+    return isNaN(id) ? max : Math.max(max, id);
+  }, 0);
+  const newId = String(maxId + 1);
+  
   const newTodo: Todo = {
-    id: generateId(),
+    id: newId,
     task: input.task,
     category: input.category ?? null,
     created_at: nowIso(),
