@@ -110,9 +110,9 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
     console.log('📦 Is array?', Array.isArray(data));
     
     // Transform the data to match our Todo interface
-    // The webhook returns an array with one object containing a 'data' property with the todos
-    if (Array.isArray(data) && data.length > 0 && data[0].data && Array.isArray(data[0].data)) {
-      const todos = data[0].data;
+    // The webhook returns an object with a 'data' property containing the todos array
+    if (data && data.data && Array.isArray(data.data)) {
+      const todos = data.data;
       return todos.map((todo: any) => ({
         id: String(todo.id),
         task: todo.task,
@@ -124,7 +124,7 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
       }));
     } else {
       console.error('❌ Response format not recognized:', data);
-      throw new Error('Invalid response format: expected array with data property containing todos');
+      throw new Error('Invalid response format: expected object with data property containing todos array');
     }
   } catch (error) {
     console.error('Failed to fetch todos from webhook:', error);
