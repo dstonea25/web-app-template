@@ -155,9 +155,51 @@ export const completeTodo = (todos: Todo[], id: string): { updated: Todo[]; remo
   return { updated, removed };
 };
 
-// In-memory staging store (module scope)
-const stagedUpdates: Map<string, TodoPatch> = new Map();
-const stagedCompletes: Set<string> = new Set();
+// Staging system with sessionStorage persistence across tab switches
+const getStagedUpdates = (): Map<string, TodoPatch> => {
+  try {
+    const stored = sessionStorage.getItem('dashboard-staged-updates');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return new Map(parsed);
+    }
+  } catch (e) {
+    console.warn('Failed to load staged updates from sessionStorage:', e);
+  }
+  return new Map();
+};
+
+const saveStagedUpdates = (updates: Map<string, TodoPatch>) => {
+  try {
+    sessionStorage.setItem('dashboard-staged-updates', JSON.stringify([...updates]));
+  } catch (e) {
+    console.warn('Failed to save staged updates to sessionStorage:', e);
+  }
+};
+
+const getStagedCompletes = (): Set<string> => {
+  try {
+    const stored = sessionStorage.getItem('dashboard-staged-completes');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return new Set(parsed);
+    }
+  } catch (e) {
+    console.warn('Failed to load staged completes from sessionStorage:', e);
+  }
+  return new Set();
+};
+
+const saveStagedCompletes = (completes: Set<string>) => {
+  try {
+    sessionStorage.setItem('dashboard-staged-completes', JSON.stringify([...completes]));
+  } catch (e) {
+    console.warn('Failed to save staged completes to sessionStorage:', e);
+  }
+};
+
+const stagedUpdates = getStagedUpdates();
+const stagedCompletes = getStagedCompletes();
 
 // Cache utilities
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -246,6 +288,10 @@ export const stageRowEdit = ({ id, patch }: { id: string; patch: TodoPatch }): v
   if (stagedCompletes.has(id)) {
     stagedCompletes.delete(id);
   }
+  
+  // Persist changes to sessionStorage
+  saveStagedUpdates(stagedUpdates);
+  saveStagedCompletes(stagedCompletes);
 };
 
 export const stageComplete = ({ id }: { id: string }): void => {
@@ -254,6 +300,10 @@ export const stageComplete = ({ id }: { id: string }): void => {
   if (stagedUpdates.has(id)) {
     stagedUpdates.delete(id);
   }
+  
+  // Persist changes to sessionStorage
+  saveStagedUpdates(stagedUpdates);
+  saveStagedCompletes(stagedCompletes);
 };
 
 export const getStagedChanges = (): { updates: TodoPatch[]; completes: string[]; fieldChangeCount: number } => {
@@ -280,6 +330,10 @@ export const getStagedChanges = (): { updates: TodoPatch[]; completes: string[];
 export const clearStagedChanges = (): void => {
   stagedUpdates.clear();
   stagedCompletes.clear();
+  
+  // Clear from sessionStorage
+  sessionStorage.removeItem('dashboard-staged-updates');
+  sessionStorage.removeItem('dashboard-staged-completes');
 };
 
 // Build working todos (apply staged updates, remove staged completes) without mutation
@@ -334,9 +388,51 @@ export const applyFileSave = async (): Promise<{ ok: boolean; count: number }> =
 // ===== IDEAS STAGING SYSTEM =====
 // (Mirrors the Todos staging system but for Ideas)
 
-// In-memory staging store for ideas (module scope)
-const stagedIdeaUpdates: Map<string, IdeaPatch> = new Map();
-const stagedIdeaCompletes: Set<string> = new Set();
+// Staging system for ideas with sessionStorage persistence across tab switches
+const getStagedIdeaUpdates = (): Map<string, IdeaPatch> => {
+  try {
+    const stored = sessionStorage.getItem('dashboard-staged-idea-updates');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return new Map(parsed);
+    }
+  } catch (e) {
+    console.warn('Failed to load staged idea updates from sessionStorage:', e);
+  }
+  return new Map();
+};
+
+const saveStagedIdeaUpdates = (updates: Map<string, IdeaPatch>) => {
+  try {
+    sessionStorage.setItem('dashboard-staged-idea-updates', JSON.stringify([...updates]));
+  } catch (e) {
+    console.warn('Failed to save staged idea updates to sessionStorage:', e);
+  }
+};
+
+const getStagedIdeaCompletes = (): Set<string> => {
+  try {
+    const stored = sessionStorage.getItem('dashboard-staged-idea-completes');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return new Set(parsed);
+    }
+  } catch (e) {
+    console.warn('Failed to load staged idea completes from sessionStorage:', e);
+  }
+  return new Set();
+};
+
+const saveStagedIdeaCompletes = (completes: Set<string>) => {
+  try {
+    sessionStorage.setItem('dashboard-staged-idea-completes', JSON.stringify([...completes]));
+  } catch (e) {
+    console.warn('Failed to save staged idea completes to sessionStorage:', e);
+  }
+};
+
+const stagedIdeaUpdates = getStagedIdeaUpdates();
+const stagedIdeaCompletes = getStagedIdeaCompletes();
 
 export const stageIdeaEdit = ({ id, patch }: { id: string; patch: IdeaPatch }): void => {
   const existing = stagedIdeaUpdates.get(id) || { id, _changedFields: [] };
@@ -386,6 +482,10 @@ export const stageIdeaEdit = ({ id, patch }: { id: string; patch: IdeaPatch }): 
   if (stagedIdeaCompletes.has(id)) {
     stagedIdeaCompletes.delete(id);
   }
+  
+  // Persist changes to sessionStorage
+  saveStagedIdeaUpdates(stagedIdeaUpdates);
+  saveStagedIdeaCompletes(stagedIdeaCompletes);
 };
 
 export const stageIdeaComplete = ({ id }: { id: string }): void => {
@@ -394,6 +494,10 @@ export const stageIdeaComplete = ({ id }: { id: string }): void => {
   if (stagedIdeaUpdates.has(id)) {
     stagedIdeaUpdates.delete(id);
   }
+  
+  // Persist changes to sessionStorage
+  saveStagedIdeaUpdates(stagedIdeaUpdates);
+  saveStagedIdeaCompletes(stagedIdeaCompletes);
 };
 
 export const getStagedIdeaChanges = (): { updates: IdeaPatch[]; completes: string[]; fieldChangeCount: number } => {
@@ -420,6 +524,10 @@ export const getStagedIdeaChanges = (): { updates: IdeaPatch[]; completes: strin
 export const clearStagedIdeaChanges = (): void => {
   stagedIdeaUpdates.clear();
   stagedIdeaCompletes.clear();
+  
+  // Clear from sessionStorage
+  sessionStorage.removeItem('dashboard-staged-idea-updates');
+  sessionStorage.removeItem('dashboard-staged-idea-completes');
 };
 
 // Build working ideas (apply staged updates, remove staged completes) without mutation

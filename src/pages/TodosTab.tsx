@@ -23,24 +23,31 @@ export const TodosTab: React.FC = () => {
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: null });
   const [stagedCount, setStagedCount] = useState<number>(0);
 
-  // Load initial data
+  // Load initial data only on first mount
   useEffect(() => {
     loadTodos();
-  }, []);
+  }, []); // Empty dependency array - only run once
 
   const loadTodos = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Check if this was a hard refresh (Cmd+Shift+R)
-      // Only trigger on actual page reloads, not internal navigation
-      const navigationEntry = window.performance.getEntriesByType('navigation')[0] as any;
-      const isHardRefresh = navigationEntry?.type === 'reload';
+      // Check if refresh was explicitly requested via URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceRefresh = urlParams.get('refresh') === 'true';
       
-      // Check cache first, but skip if hard refresh
+      if (forceRefresh) {
+        console.log('🔄 Force refresh requested via URL parameter');
+        // Remove the refresh parameter from URL without reloading
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('refresh');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+      
+      // Always check cache first - only bypass if explicitly refreshing
       const cachedTodos = getCachedData<Todo[]>('todos-cache');
-      if (cachedTodos && !isHardRefresh) {
+      if (cachedTodos && !forceRefresh) {
         console.log('📦 Loading todos from cache');
         setTodos(cachedTodos);
         const staged = getStagedChanges();
@@ -49,8 +56,8 @@ export const TodosTab: React.FC = () => {
         return;
       }
       
-      if (isHardRefresh) {
-        console.log('🔄 Hard refresh detected - clearing cache and loading fresh data');
+      if (forceRefresh) {
+        console.log('🔄 Force refresh requested - clearing cache and loading fresh data');
       }
       
       // Clear localStorage to force fresh data load
