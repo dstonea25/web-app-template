@@ -265,6 +265,48 @@ export const TodosTab: React.FC = () => {
 
   return (
     <div className={tokens.layout.container}>
+      {/* Add new todo form - moved to top as separate section */}
+      <div className={cn(tokens.card.base, 'mb-6')}>
+        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
+          Add New Todo
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input
+            type="text"
+            placeholder="Todo task"
+            value={newTodo.task}
+            onChange={(e) => setNewTodo({ ...newTodo, task: e.target.value })}
+            className={cn(tokens.input.base, tokens.input.focus)}
+          />
+          <select
+            value={(newTodo.category as string) || ''}
+            onChange={(e) => setNewTodo({ ...newTodo, category: e.target.value })}
+            className={cn(tokens.input.base, tokens.input.focus, !newTodo.category && 'text-neutral-400')}
+            style={!newTodo.category ? { color: '#9ca3af' } : {}}
+          >
+            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
+            <option value="work">work</option>
+            <option value="n8n">n8n</option>
+            <option value="content">content</option>
+            <option value="research">research</option>
+            <option value="personal">personal</option>
+          </select>
+          <SelectPriority
+            value={(newTodo.priority as Priority) ?? null}
+            onChange={(p) => setNewTodo({ ...newTodo, priority: p })}
+            ariaLabel="Set priority"
+            placeholderLabel="Priority"
+          />
+          <button
+            onClick={addTodo}
+            className={cn(tokens.button.base, tokens.button.primary)}
+          >
+            Add Todo
+          </button>
+        </div>
+      </div>
+
+      {/* Main todos section - separate from add new todo */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
@@ -321,47 +363,6 @@ export const TodosTab: React.FC = () => {
         onTodoComplete={completeTodo}
         onCommitRowEdit={() => {}} // No longer used
       />
-
-      {/* Add new todo form (moved below table) */}
-      <div className={cn(tokens.card.base, 'mt-6')}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
-          Add New Todo
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="Todo task"
-            value={newTodo.task}
-            onChange={(e) => setNewTodo({ ...newTodo, task: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <select
-            value={(newTodo.category as string) || ''}
-            onChange={(e) => setNewTodo({ ...newTodo, category: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus, !newTodo.category && 'text-neutral-400')}
-            style={!newTodo.category ? { color: '#9ca3af' } : {}}
-          >
-            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
-            <option value="work">work</option>
-            <option value="n8n">n8n</option>
-            <option value="content">content</option>
-            <option value="research">research</option>
-            <option value="personal">personal</option>
-          </select>
-          <SelectPriority
-            value={(newTodo.priority as Priority) ?? null}
-            onChange={(p) => setNewTodo({ ...newTodo, priority: p })}
-            ariaLabel="Set priority"
-            placeholderLabel="Priority"
-          />
-          <button
-            onClick={addTodo}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-            Add Todo
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

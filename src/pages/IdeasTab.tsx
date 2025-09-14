@@ -292,6 +292,53 @@ export const IdeasTab: React.FC = () => {
 
   return (
     <div className={tokens.layout.container}>
+      {/* Add new idea form - moved to top as separate section */}
+      <div className={cn(tokens.card.base, 'mb-6')}>
+        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
+          Add New Idea
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input
+            type="text"
+            placeholder="Idea description"
+            value={newIdea.idea}
+            onChange={(e) => setNewIdea({ ...newIdea, idea: e.target.value })}
+            className={cn(tokens.input.base, tokens.input.focus)}
+          />
+          <select
+            value={(newIdea.category as string) || ''}
+            onChange={(e) => setNewIdea({ ...newIdea, category: e.target.value })}
+            className={cn(tokens.input.base, tokens.input.focus, !newIdea.category && 'text-neutral-400')}
+            style={!newIdea.category ? { color: '#9ca3af' } : {}}
+          >
+            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
+            <option value="work">work</option>
+            <option value="projects">projects</option>
+            <option value="videos">videos</option>
+            <option value="writing">writing</option>
+            <option value="health">health</option>
+            <option value="business">business</option>
+            <option value="life">life</option>
+            <option value="future">future</option>
+            <option value="travel">travel</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Notes (optional)"
+            value={(newIdea.notes as string) || ''}
+            onChange={(e) => setNewIdea({ ...newIdea, notes: e.target.value })}
+            className={cn(tokens.input.base, tokens.input.focus)}
+          />
+          <button
+            onClick={addIdea}
+            className={cn(tokens.button.base, tokens.button.primary)}
+          >
+            Add Idea
+          </button>
+        </div>
+      </div>
+
+      {/* Main ideas section - separate from add new idea */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
@@ -348,52 +395,6 @@ export const IdeasTab: React.FC = () => {
         onIdeaComplete={removeIdea}
         onCommitRowEdit={commitRowEdit}
       />
-
-      {/* Add new idea form (moved below table) */}
-      <div className={cn(tokens.card.base, 'mt-6')}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
-          Add New Idea
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="Idea description"
-            value={newIdea.idea}
-            onChange={(e) => setNewIdea({ ...newIdea, idea: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <select
-            value={(newIdea.category as string) || ''}
-            onChange={(e) => setNewIdea({ ...newIdea, category: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus, !newIdea.category && 'text-neutral-400')}
-            style={!newIdea.category ? { color: '#9ca3af' } : {}}
-          >
-            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
-            <option value="work">work</option>
-            <option value="projects">projects</option>
-            <option value="videos">videos</option>
-            <option value="writing">writing</option>
-            <option value="health">health</option>
-            <option value="business">business</option>
-            <option value="life">life</option>
-            <option value="future">future</option>
-            <option value="travel">travel</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Notes (optional)"
-            value={(newIdea.notes as string) || ''}
-            onChange={(e) => setNewIdea({ ...newIdea, notes: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <button
-            onClick={addIdea}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-            Add Idea
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
