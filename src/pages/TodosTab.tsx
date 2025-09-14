@@ -118,6 +118,26 @@ export const TodosTab: React.FC = () => {
       priority: (newTodo.priority as Priority) ?? null,
     });
     setTodos(updatedTodos);
+    
+    // Stage the new todo for saving (get the last added todo)
+    const newTodoItem = updatedTodos[updatedTodos.length - 1];
+    if (newTodoItem) {
+      stageRowEdit({ 
+        id: newTodoItem.id, 
+        patch: { 
+          id: newTodoItem.id, 
+          task: newTodoItem.task, 
+          category: newTodoItem.category, 
+          priority: newTodoItem.priority,
+          statusUi: newTodoItem.statusUi
+        } 
+      });
+      
+      // Update staged count
+      const staged = getStagedChanges();
+      setStagedCount(staged.updates.length + staged.completes.length);
+    }
+    
     setNewTodo({ task: '', category: '', priority: null });
   };
 
