@@ -356,7 +356,16 @@ export const applyStagedChangesToTodos = (baseTodos: Todo[]): Todo[] => {
       }
       return t;
     });
-  return working;
+  
+  // Add new todos that were created but not yet in the base data
+  const newTodos = Array.from(stagedUpdates.values())
+    .filter(patch => patch._isNew && !baseTodos.some(base => String(base.id) === String(patch.id)))
+    .map(patch => {
+      const { _changedFields, _isNew, _dirty, ...patchData } = patch;
+      return { ...patchData, _dirty: false } as Todo;
+    });
+  
+  return [...working, ...newTodos];
 };
 
 // Serialize todos into file format (created_at ASC, ids 1..N, status 'open')
@@ -554,7 +563,16 @@ export const applyStagedChangesToIdeas = (baseIdeas: Idea[]): Idea[] => {
       }
       return t;
     });
-  return working;
+  
+  // Add new ideas that were created but not yet in the base data
+  const newIdeas = Array.from(stagedIdeaUpdates.values())
+    .filter(patch => patch._isNew && !baseIdeas.some(base => String(base.id) === String(patch.id)))
+    .map(patch => {
+      const { _changedFields, _isNew, _dirty, ...patchData } = patch;
+      return { ...patchData, _dirty: false } as Idea;
+    });
+  
+  return [...working, ...newIdeas];
 };
 
 // Add a new idea with defaults

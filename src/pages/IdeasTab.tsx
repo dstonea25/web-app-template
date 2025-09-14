@@ -79,15 +79,6 @@ export const IdeasTab: React.FC = () => {
         const staged = getStagedIdeaChanges();
         console.log('🔍 Debug: staged changes:', staged);
         
-        // TEMPORARY FIX: Clear staged completes to show all ideas
-        if (staged.completes.length > 0) {
-          console.log('🔧 TEMP FIX: Clearing staged completes to show ideas');
-          clearStagedIdeaChanges();
-          // Reapply staged changes without the completes
-          const workingIdeas = applyStagedChangesToIdeas(cachedIdeas);
-          setIdeas(workingIdeas);
-        }
-        
         setStagedCount(staged.fieldChangeCount);
         setLoading(false);
         return;
