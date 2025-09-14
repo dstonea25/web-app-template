@@ -4,11 +4,7 @@ import { cn, tokens } from '../theme/config';
 import { 
   nowIso, 
   msToTimerDisplay,
-  msToHm,
   computeDurationMinutes, 
-  formatDate,
-  minutesToHhMm,
-  hhMmToMinutes,
   getDateAtMidnight,
   addMinutes,
   generateId
@@ -112,7 +108,7 @@ export const TimeTrackingTab: React.FC = () => {
       console.log('🌐 Loading sessions from webhook...');
       const webhookSessions = await fetchSessionsFromWebhook();
       console.log('✅ Webhook sessions loaded:', webhookSessions);
-      setSessions(webhookSessions);
+      setSessions(webhookSessions as Session[]);
       
       // Restore active session from localStorage
       const stored = localStorage.getItem('geronimo.time.activeSession');
@@ -138,7 +134,7 @@ export const TimeTrackingTab: React.FC = () => {
       setError(error instanceof Error ? error.message : 'Failed to load sessions from webhook');
       // Fall back to mock data on error
       console.log('🔄 Falling back to mock data');
-      setSessions(MOCK_DATA.sessions);
+      setSessions(MOCK_DATA.sessions as Session[]);
     } finally {
       setLoading(false);
     }
@@ -191,34 +187,6 @@ export const TimeTrackingTab: React.FC = () => {
     setJustSubmitted(false);
   };
 
-  const editPendingDuration = (duration: string) => {
-    if (!pendingSession) return;
-    
-    let minutes: number;
-    
-    // Handle "Xh Ym" format (e.g., "1h 30m", "2h", "45m")
-    if (duration.includes('h') || duration.includes('m')) {
-      const hoursMatch = duration.match(/(\d+)h/);
-      const minutesMatch = duration.match(/(\d+)m/);
-      
-      const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
-      const mins = minutesMatch ? parseInt(minutesMatch[1]) : 0;
-      
-      minutes = hours * 60 + mins;
-    } else if (duration.includes(':')) {
-      minutes = hhMmToMinutes(duration);
-    } else {
-      minutes = parseInt(duration) || 0;
-    }
-    
-    const endedAt = addMinutes(pendingSession.startedAt, minutes);
-    
-    setPendingSession({
-      ...pendingSession,
-      endedAt,
-      minutes
-    });
-  };
 
   const submitPendingSession = async () => {
     if (!pendingSession) return;
@@ -242,7 +210,7 @@ export const TimeTrackingTab: React.FC = () => {
       
       // Refresh data from webhook to get latest
       const webhookSessions = await fetchSessionsFromWebhook();
-      setSessions(webhookSessions);
+      setSessions(webhookSessions as Session[]);
       
       // Show success toast
       toast.success(`Session submitted: ${pendingSession.minutes} minutes of ${pendingSession.category}`);
@@ -278,7 +246,7 @@ export const TimeTrackingTab: React.FC = () => {
       
       // Refresh data from webhook to get latest
       const webhookSessions = await fetchSessionsFromWebhook();
-      setSessions(webhookSessions);
+      setSessions(webhookSessions as Session[]);
       
       // Show success toast
       toast.success(`Time added: ${minutes} minutes of ${manualCategory}`);

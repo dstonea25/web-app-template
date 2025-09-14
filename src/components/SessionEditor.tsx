@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { Session } from '../types';
 import { tokens, cn } from '../theme/config';
-import { formatDateTimeLocal, parseDateTimeLocal } from '../lib/time';
 
 interface SessionEditorProps {
   session: Session;
@@ -22,25 +21,18 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
   };
 
   const handleStartTimeChange = (value: string) => {
-    const startedAt = parseDateTimeLocal(value);
+    const startedAt = new Date(value).toISOString();
     setEditedSession(prev => ({
       ...prev,
-      started_at: startedAt,
+      startedAt: startedAt,
     }));
   };
 
   const handleEndTimeChange = (value: string) => {
-    const endedAt = parseDateTimeLocal(value);
+    const endedAt = new Date(value).toISOString();
     setEditedSession(prev => ({
       ...prev,
-      ended_at: endedAt,
-    }));
-  };
-
-  const handleNoteChange = (value: string) => {
-    setEditedSession(prev => ({
-      ...prev,
-      note: value,
+      endedAt: endedAt,
     }));
   };
 
@@ -58,7 +50,7 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
             </label>
             <input
               type="datetime-local"
-              value={formatDateTimeLocal(editedSession.started_at)}
+              value={editedSession.startedAt ? new Date(editedSession.startedAt).toISOString().slice(0, 16) : ''}
               onChange={(e) => handleStartTimeChange(e.target.value)}
               className={cn(tokens.input.base, tokens.input.focus)}
               required
@@ -71,24 +63,12 @@ export const SessionEditor: React.FC<SessionEditorProps> = ({
             </label>
             <input
               type="datetime-local"
-              value={editedSession.ended_at ? formatDateTimeLocal(editedSession.ended_at) : ''}
+              value={editedSession.endedAt ? new Date(editedSession.endedAt).toISOString().slice(0, 16) : ''}
               onChange={(e) => handleEndTimeChange(e.target.value)}
               className={cn(tokens.input.base, tokens.input.focus)}
             />
           </div>
 
-          <div>
-            <label className={cn("block text-sm font-medium mb-1", tokens.palette.dark.text)}>
-              Note
-            </label>
-            <textarea
-              value={editedSession.note || ''}
-              onChange={(e) => handleNoteChange(e.target.value)}
-              className={cn(tokens.input.base, tokens.input.focus)}
-              rows={3}
-              placeholder="Add a note for this session..."
-            />
-          </div>
 
           <div className="flex space-x-3 pt-4">
             <button
