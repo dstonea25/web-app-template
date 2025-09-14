@@ -9,6 +9,7 @@ services:
         - GITHUB_REPO=${GITHUB_REPO}
         - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
         - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
+        - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
     container_name: dashboard-app
     ports:
       - "3000:8080"

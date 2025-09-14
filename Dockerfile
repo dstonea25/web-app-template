@@ -18,11 +18,13 @@ RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 # Set build-time environment variables
 ARG VITE_AUTH_USERNAME=admin
 ARG VITE_AUTH_PASSWORD=password123
+ARG VITE_N8N_WEBHOOK_TOKEN
 ARG GITHUB_REPO
 
 # Set environment variables for build
 ENV VITE_AUTH_USERNAME=$VITE_AUTH_USERNAME
 ENV VITE_AUTH_PASSWORD=$VITE_AUTH_PASSWORD
+ENV VITE_N8N_WEBHOOK_TOKEN=$VITE_N8N_WEBHOOK_TOKEN
 
 # Clone the private repository
 RUN git clone git@github.com:${GITHUB_REPO}.git /app
