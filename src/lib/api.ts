@@ -153,6 +153,13 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
       created_at: todo.created_at,
     }));
 
+    const requestBody = { data: todosToSave };
+    console.log('📤 Request body being sent:', JSON.stringify(requestBody, null, 2));
+    console.log('📤 Request headers:', {
+      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+      'Content-Type': 'application/json',
+    });
+
     const response = await fetch(N8N_SAVE_WEBHOOK_URL, {
       method: 'POST',
       headers: {
