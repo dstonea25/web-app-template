@@ -17,6 +17,7 @@ services:
       - NODE_ENV=production
       - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
       - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
+      - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
     networks:
       - dashboard-network
     healthcheck:
