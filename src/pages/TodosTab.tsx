@@ -144,7 +144,7 @@ export const TodosTab: React.FC = () => {
   const updateTodo = (id: string, updates: Partial<Todo>) => {
     // Local working copy update
     const updatedTodos = todos.map(todo =>
-      todo.id === id ? { ...todo, ...updates, _dirty: true } : todo
+      todo.id === id ? { ...todo, ...updates } : todo
     );
     setTodos(updatedTodos);
     
@@ -162,13 +162,6 @@ export const TodosTab: React.FC = () => {
     setStagedCount(staged.updates.length + staged.completes.length);
   };
 
-  const commitRowEdit = (id: string, patch: TodoPatch) => {
-    stageRowEdit({ id, patch });
-    const staged = getStagedChanges();
-    setStagedCount(staged.updates.length + staged.completes.length);
-    // Mark as not editing
-    setEditingId(null);
-  };
 
   const completeTodo = (id: string) => {
     stageComplete({ id });
@@ -270,7 +263,7 @@ export const TodosTab: React.FC = () => {
         onEditEnd={handleEditEnd}
         onTodoUpdate={updateTodo}
         onTodoComplete={completeTodo}
-        onCommitRowEdit={commitRowEdit}
+        onCommitRowEdit={() => {}} // No longer used
       />
 
       {/* Add new todo form (moved below table) */}

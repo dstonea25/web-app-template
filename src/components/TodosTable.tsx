@@ -299,23 +299,13 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                     {todo.created_at ? new Date(todo.created_at).toLocaleDateString() : '—'}
                   </td>
                   <td className={tokens.table.td}>
-                    {todo._dirty ? (
-                      <button
-                        onClick={() => onCommitRowEdit(String(todo.id!), { id: String(todo.id!), task: todo.task, category: todo.category ?? null, priority: todo.priority, statusUi: todo.statusUi })}
-                        className={cn(tokens.button.base, tokens.button.info, 'text-sm')}
-                        aria-label="Update task"
-                      >
-                        Update
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onTodoComplete(String(todo.id!))}
-                        className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
-                        aria-label="Complete task"
-                      >
-                        Complete
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onTodoComplete(String(todo.id!))}
+                      className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
+                      aria-label="Complete task"
+                    >
+                      Complete
+                    </button>
                   </td>
                 </tr>
               ))
