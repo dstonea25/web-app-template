@@ -242,13 +242,19 @@ export const TodosTab: React.FC = () => {
             onChange={(e) => setNewTodo({ ...newTodo, task: e.target.value })}
             className={cn(tokens.input.base, tokens.input.focus)}
           />
-          <input
-            type="text"
-            placeholder="Category"
+          <select
             value={(newTodo.category as string) || ''}
             onChange={(e) => setNewTodo({ ...newTodo, category: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
+            className={cn(tokens.input.base, tokens.input.focus, !newTodo.category && 'text-neutral-400')}
+            style={!newTodo.category ? { color: '#9ca3af' } : {}}
+          >
+            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
+            <option value="work">work</option>
+            <option value="n8n">n8n</option>
+            <option value="content">content</option>
+            <option value="research">research</option>
+            <option value="personal">personal</option>
+          </select>
           <SelectPriority
             value={(newTodo.priority as Priority) ?? null}
             onChange={(p) => setNewTodo({ ...newTodo, priority: p })}
