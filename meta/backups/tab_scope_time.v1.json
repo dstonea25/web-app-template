@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "tab_id": "time",
+  "acceptance": [
+    "Timer local-first; submit mocked; modal a11y intact."
+  ]
+}

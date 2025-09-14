@@ -53,11 +53,11 @@ export interface IdeaPatch {
 }
 
 export interface Session {
-  id?: string;
-  started_at: string; // ISO-8601
-  ended_at?: string; // ISO-8601 (optional until stopped)
-  duration_ms?: number; // computed on stop or edit
-  note?: string;
+  id: string;
+  category: 'Work' | 'Personal Projects' | 'Gaming';
+  startedAt: string; // ISO-8601
+  endedAt: string; // ISO-8601
+  minutes: number; // duration in minutes
 }
 
 // API response types for future webhooks

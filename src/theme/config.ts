@@ -148,13 +148,14 @@ export const tokens = {
     info: 'text-neutral-100 bg-teal-500 border-teal-500 hover:bg-teal-400 focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950',
   },
   input: {
-    base: 'w-full px-3 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 caret-emerald-400 focus:outline-none',
+    base: 'w-full px-3 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 placeholder:text-neutral-400 caret-emerald-400 focus:outline-none',
     focus: 'focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950',
+    date: 'w-full px-3 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 placeholder:text-neutral-400 caret-emerald-400 focus:outline-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-0 [&::-webkit-calendar-picker-indicator]:contrast-100',
   },
   select: {
     wrapper: 'relative',
-    base: 'appearance-none w-full px-3 py-2 border rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 border-neutral-200 dark:border-neutral-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950 pr-9',
-    chevron: 'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 dark:text-neutral-400',
+    base: 'appearance-none w-full px-3 py-2 border rounded-lg bg-neutral-900 text-neutral-100 placeholder:text-neutral-400 border-neutral-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950 pr-9',
+    chevron: 'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400',
   },
   icon: {
     default: 'w-4 h-4 text-neutral-400',
@@ -193,6 +194,46 @@ export const tokens = {
   },
   toast: {
     base: 'fixed bottom-4 right-4 z-[1000] space-y-2',
+  },
+  // Time tab specific styles
+  time: {
+    categoryPills: {
+      container: 'flex items-center gap-2',
+      pill: 'px-3 py-1.5 rounded-full border text-sm cursor-pointer transition-colors',
+      work: 'border-emerald-500 text-emerald-500 data-[active=true]:bg-emerald-500 data-[active=true]:text-white',
+      personal: 'border-teal-400 text-teal-400 data-[active=true]:bg-teal-400 data-[active=true]:text-white',
+      gaming: 'border-amber-400 text-amber-400 data-[active=true]:bg-amber-400 data-[active=true]:text-white'
+    },
+    timerCard: {
+      wrapper: 'rounded-2xl border border-neutral-800 p-8 flex flex-col items-center justify-center text-center bg-neutral-900',
+      time: 'text-6xl font-semibold tracking-tight text-neutral-100',
+      state: 'mt-1 text-neutral-400',
+      actions: 'mt-4 flex items-center gap-2'
+    },
+    pendingEditor: {
+      row: 'mt-4 grid grid-cols-1 sm:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,180px)_auto] gap-3 items-center',
+      input: 'px-3 py-2 border border-neutral-800 rounded-lg bg-neutral-900 text-neutral-100',
+      submit: 'btn btn-primary'
+    },
+    manualAdd: {
+      wrapper: 'mt-6 rounded-2xl border border-neutral-800 p-4 bg-neutral-900',
+      row: 'grid grid-cols-1 md:grid-cols-[minmax(0,220px)_minmax(0,220px)_minmax(0,220px)_auto] gap-3',
+      button: 'btn btn-primary'
+    },
+    filters: {
+      range: 'flex items-center gap-2',
+      category: 'flex items-center gap-2'
+    },
+    charts: {
+      container: 'mt-6 grid gap-6',
+      panel: 'rounded-2xl border border-neutral-800 p-4 bg-neutral-900',
+      legend: 'flex items-center gap-3 text-sm text-neutral-400',
+      seriesColors: {
+        work: 'emerald-500',
+        personal: 'teal-400',
+        gaming: 'amber-400'
+      }
+    }
   },
 } as const;
 

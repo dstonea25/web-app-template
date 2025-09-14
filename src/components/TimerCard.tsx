@@ -1,9 +1,11 @@
 import React from 'react';
-import { tokens, cn } from '../theme/config';
+import { cn, tokens } from '../theme/config';
+import { msToTimerDisplay } from '../lib/time';
 
 interface TimerCardProps {
   running: boolean;
   elapsedMs: number;
+  selectedCategory: string | null;
   onStart: () => void;
   onStop: () => void;
 }
@@ -11,44 +13,31 @@ interface TimerCardProps {
 export const TimerCard: React.FC<TimerCardProps> = ({
   running,
   elapsedMs,
+  selectedCategory,
   onStart,
   onStop,
 }) => {
-  const formatTime = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    
-    const displaySeconds = seconds % 60;
-    const displayMinutes = minutes % 60;
-    const displayHours = hours;
-    
-    if (displayHours > 0) {
-      return `${displayHours.toString().padStart(2, '0')}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
-    }
-    return `${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
-  };
-
   return (
-    <div className={tokens.timer.card}>
-      <div className={tokens.timer.time}>
-        {formatTime(elapsedMs)}
+    <div className={tokens.time.timerCard.wrapper}>
+      <div className={tokens.time.timerCard.time} aria-live="polite">
+        {msToTimerDisplay(elapsedMs)}
       </div>
-      <div className={tokens.timer.state}>
-        {running ? 'Running' : 'Stopped'}
+      <div className={tokens.time.timerCard.state}>
+        {running ? 'Running' : selectedCategory ? 'Ready' : 'Select a category to start'}
       </div>
-      <div className={tokens.timer.actions}>
+      <div className={tokens.time.timerCard.actions}>
         {running ? (
           <button
             onClick={onStop}
-            className={cn(tokens.button.base, tokens.button.danger)}
+            className={cn(tokens.button.base, tokens.button.primary)}
           >
             Stop
           </button>
         ) : (
           <button
             onClick={onStart}
-            className={cn(tokens.button.base, tokens.button.primary)}
+            disabled={!selectedCategory}
+            className={cn(tokens.button.base, tokens.button.primary, "disabled:opacity-50 disabled:cursor-not-allowed")}
           >
             Start
           </button>

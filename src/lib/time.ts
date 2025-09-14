@@ -3,6 +3,36 @@ export const nowIso = (): string => {
   return new Date().toISOString();
 };
 
+// Convert minutes to HH:MM format
+export const minutesToHhMm = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+// Convert HH:MM format to minutes
+export const hhMmToMinutes = (hhMm: string): number => {
+  const [hours, minutes] = hhMm.split(':').map(Number);
+  return (hours * 60) + minutes;
+};
+
+// Convert milliseconds to dynamic timer display format
+export const msToTimerDisplay = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
+
+// Convert milliseconds to HH:MM:SS format for timer display (legacy)
 export const msToHms = (ms: number): string => {
   const hours = Math.floor(ms / (1000 * 60 * 60));
   const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -10,21 +40,52 @@ export const msToHms = (ms: number): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-export const computeDurationMs = (startedAt: string, endedAt?: string): number => {
-  const startTime = new Date(startedAt);
-  const endTime = endedAt ? new Date(endedAt) : new Date();
-  return endTime.getTime() - startTime.getTime();
+// Convert milliseconds to hours and minutes only (for stopped timer display)
+export const msToHm = (ms: number): string => {
+  const totalMinutes = Math.floor(ms / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else {
+    return `${minutes}m`;
+  }
 };
 
+// Compute duration in minutes between two ISO strings
+export const computeDurationMinutes = (startedAt: string, endedAt: string): number => {
+  const startTime = new Date(startedAt);
+  const endTime = new Date(endedAt);
+  return Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+};
+
+// Format date for display
+export const formatDate = (isoString: string): string => {
+  return new Date(isoString).toLocaleDateString();
+};
+
+// Format date and time for display
 export const formatDateTime = (isoString: string): string => {
   return new Date(isoString).toLocaleString();
 };
 
-export const formatDateTimeLocal = (isoString: string): string => {
-  return isoString.slice(0, 16); // YYYY-MM-DDTHH:MM format for datetime-local inputs
+// Get date at midnight local time
+export const getDateAtMidnight = (date: Date): string => {
+  const localDate = new Date(date);
+  localDate.setHours(0, 0, 0, 0);
+  return localDate.toISOString();
 };
 
-export const parseDateTimeLocal = (localString: string): string => {
-  return new Date(localString).toISOString();
+// Add minutes to a date
+export const addMinutes = (isoString: string, minutes: number): string => {
+  const date = new Date(isoString);
+  date.setMinutes(date.getMinutes() + minutes);
+  return date.toISOString();
+};
+
+// Generate a simple ID
+export const generateId = (): string => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
