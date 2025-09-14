@@ -3,7 +3,7 @@ import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
 import { IdeasCategoryTabs } from '../components/IdeasCategoryTabs';
-import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, getCachedData, setCachedData, applyStagedChangesToIdeas } from '../lib/storage';
+import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, clearStagedIdeaChanges, getCachedData, setCachedData, applyStagedChangesToIdeas } from '../lib/storage';
 import { applyIdeaFileSave, getWorkingIdeas } from '../lib/storage';
 import { addIdea as storageAddIdea } from '../lib/storage';
 import { fetchIdeasFromWebhook, saveIdeasToWebhook } from '../lib/api';
@@ -34,9 +34,10 @@ export const IdeasTab: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Check if refresh was explicitly requested via URL parameter
+      // Check if refresh was explicitly requested via URL parameter or hard refresh
       const urlParams = new URLSearchParams(window.location.search);
-      const forceRefresh = urlParams.get('refresh') === 'true';
+      const forceRefresh = urlParams.get('refresh') === 'true' || 
+                          (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
       
       if (forceRefresh) {
         console.log('🔄 Force refresh requested via URL parameter');
@@ -63,6 +64,16 @@ export const IdeasTab: React.FC = () => {
         
         const staged = getStagedIdeaChanges();
         console.log('🔍 Debug: staged changes:', staged);
+        
+        // TEMPORARY FIX: Clear staged completes to show all ideas
+        if (staged.completes.length > 0) {
+          console.log('🔧 TEMP FIX: Clearing staged completes to show ideas');
+          clearStagedIdeaChanges();
+          // Reapply staged changes without the completes
+          const workingIdeas = applyStagedChangesToIdeas(cachedIdeas);
+          setIdeas(workingIdeas);
+        }
+        
         setStagedCount(staged.fieldChangeCount);
         setLoading(false);
         return;

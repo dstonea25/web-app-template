@@ -33,9 +33,10 @@ export const TodosTab: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Check if refresh was explicitly requested via URL parameter
+      // Check if refresh was explicitly requested via URL parameter or hard refresh
       const urlParams = new URLSearchParams(window.location.search);
-      const forceRefresh = urlParams.get('refresh') === 'true';
+      const forceRefresh = urlParams.get('refresh') === 'true' || 
+                          (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
       
       if (forceRefresh) {
         console.log('🔄 Force refresh requested via URL parameter');
