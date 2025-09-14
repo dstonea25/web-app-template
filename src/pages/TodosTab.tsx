@@ -50,8 +50,8 @@ export const TodosTab: React.FC = () => {
       if (cachedTodos && !forceRefresh) {
         console.log('📦 Loading todos from cache');
         
-        // Apply staged changes to cached data
-        const workingTodos = getWorkingTodos();
+        // Apply staged changes to cached data directly
+        const workingTodos = applyStagedChangesToTodos(cachedTodos);
         setTodos(workingTodos);
         
         const staged = getStagedChanges();

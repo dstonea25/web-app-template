@@ -53,8 +53,8 @@ export const IdeasTab: React.FC = () => {
       if (cachedIdeas && hasToken && !forceRefresh) {
         console.log('📦 Loading ideas from cache');
         
-        // Apply staged changes to cached data
-        const workingIdeas = getWorkingIdeas();
+        // Apply staged changes to cached data directly
+        const workingIdeas = applyStagedChangesToIdeas(cachedIdeas);
         setIdeas(workingIdeas);
         
         const staged = getStagedIdeaChanges();
