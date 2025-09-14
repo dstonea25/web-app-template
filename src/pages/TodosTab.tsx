@@ -49,21 +49,8 @@ export const TodosTab: React.FC = () => {
       setStagedCount(staged.updates.length + staged.completes.length);
     } catch (error) {
       console.error('Failed to load todos from webhook:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load todos');
-      
-      // Fallback to local JSON file if webhook fails
-      try {
-        console.log('Falling back to local seed data...');
-        const response = await fetch('/data/todos.json');
-        const seedTodos = await response.json();
-        StorageManager.saveTodos(seedTodos);
-        const transformed = StorageManager.loadTodos();
-        setTodos(transformed);
-        setError(null); // Clear error since fallback succeeded
-      } catch (fallbackError) {
-        console.error('Fallback to local data also failed:', fallbackError);
-        setError('Failed to load todos from both webhook and local data');
-      }
+      setError(error instanceof Error ? error.message : 'Failed to load todos from webhook');
+      setTodos([]); // Clear todos on error
     } finally {
       setLoading(false);
     }
