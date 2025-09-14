@@ -247,6 +247,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                       <option value="business">business</option>
                       <option value="life">life</option>
                       <option value="future">future</option>
+                      <option value="travel">travel</option>
                     </select>
                   </td>
                   <td className={tokens.table.td}>

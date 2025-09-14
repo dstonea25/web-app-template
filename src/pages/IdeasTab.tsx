@@ -386,6 +386,7 @@ export const IdeasTab: React.FC = () => {
             <option value="business">business</option>
             <option value="life">life</option>
             <option value="future">future</option>
+            <option value="travel">travel</option>
           </select>
           <input
             type="text"
