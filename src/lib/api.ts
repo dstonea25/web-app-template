@@ -75,8 +75,8 @@ export class ApiClient {
 }
 
 // Webhook configuration
-const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook-test/todo';
-const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook-test/save-todo';
+const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
+const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Webhook function to fetch todos
