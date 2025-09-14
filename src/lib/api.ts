@@ -105,6 +105,10 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
 
     const data = await response.json();
     
+    console.log('📦 Webhook response data:', data);
+    console.log('📦 Data type:', typeof data);
+    console.log('📦 Is array?', Array.isArray(data));
+    
     // Transform the data to match our Todo interface
     // The webhook should return an array of todos with the same structure as our JSON file
     if (Array.isArray(data)) {
@@ -118,6 +122,7 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
         _dirty: false,
       }));
     } else {
+      console.error('❌ Response is not an array:', data);
       throw new Error('Invalid response format: expected array of todos');
     }
   } catch (error) {
