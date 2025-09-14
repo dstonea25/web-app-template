@@ -142,6 +142,8 @@ export const TodosTab: React.FC = () => {
   };
 
   const updateTodo = (id: string, updates: Partial<Todo>) => {
+    console.log('🔄 updateTodo called:', { id, updates });
+    
     // Local working copy update
     const updatedTodos = todos.map(todo =>
       todo.id === id ? { ...todo, ...updates } : todo
@@ -159,6 +161,7 @@ export const TodosTab: React.FC = () => {
     
     // Update staged count
     const staged = getStagedChanges();
+    console.log('📊 Staged changes:', staged);
     setStagedCount(staged.updates.length + staged.completes.length);
   };
 
