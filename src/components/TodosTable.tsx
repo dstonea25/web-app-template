@@ -290,7 +290,7 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                   <td className={tokens.table.td}>
                     <SelectPriority
                       value={todo.priority ?? null}
-                      onChange={(p) => { onTodoUpdate(String(todo.id!), { priority: p, _dirty: true }); stageRowEdit({ id: String(todo.id!), patch: { id: String(todo.id!), priority: p } as TodoPatch }); }}
+                      onChange={(p) => { onTodoUpdate(String(todo.id!), { priority: p, _dirty: true }); }}
                       ariaLabel="Set priority"
                     />
                   </td>

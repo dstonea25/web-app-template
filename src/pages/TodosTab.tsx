@@ -148,11 +148,18 @@ export const TodosTab: React.FC = () => {
     );
     setTodos(updatedTodos);
     
-    // Update staged count if this was a priority change
-    if (updates.priority !== undefined) {
-      const staged = getStagedChanges();
-      setStagedCount(staged.updates.length + staged.completes.length);
-    }
+    // Stage the change for saving
+    stageRowEdit({ 
+      id, 
+      patch: { 
+        id, 
+        ...updates 
+      } as TodoPatch 
+    });
+    
+    // Update staged count
+    const staged = getStagedChanges();
+    setStagedCount(staged.updates.length + staged.completes.length);
   };
 
   const commitRowEdit = (id: string, patch: TodoPatch) => {
