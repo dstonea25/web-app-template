@@ -85,6 +85,9 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
       throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
     }
 
+    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+    console.log('🌐 Making request to:', N8N_WEBHOOK_URL);
+
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'GET',
       headers: {
@@ -94,7 +97,10 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error('❌ Webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
     }
 
     const data = await response.json();
