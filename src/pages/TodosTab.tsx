@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Todo, Priority, TodoPatch } from '../types';
-import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
+import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosToWebhook } from '../lib/api';
@@ -264,6 +264,22 @@ export const TodosTab: React.FC = () => {
             >
               {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
             </button>
+            {stagedCount > 0 && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to discard all unsaved changes? This cannot be undone.')) {
+                    clearStagedChanges();
+                    setStagedCount(0);
+                    // Reload data from webhook to get fresh state
+                    loadTodos();
+                  }
+                }}
+                disabled={loading}
+                className={cn(tokens.button.base, tokens.button.ghost, 'border border-red-500 text-red-500 hover:bg-red-500 hover:text-white')}
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       </div>

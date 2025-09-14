@@ -300,6 +300,22 @@ export const IdeasTab: React.FC = () => {
             >
               {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
             </button>
+            {stagedCount > 0 && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to discard all unsaved changes? This cannot be undone.')) {
+                    clearStagedIdeaChanges();
+                    setStagedCount(0);
+                    // Reload data from webhook to get fresh state
+                    loadIdeas();
+                  }
+                }}
+                disabled={loading}
+                className={cn(tokens.button.base, tokens.button.ghost, 'border border-red-500 text-red-500 hover:bg-red-500 hover:text-white')}
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       </div>
