@@ -49,7 +49,11 @@ export const TodosTab: React.FC = () => {
       const cachedTodos = getCachedData<Todo[]>('todos-cache');
       if (cachedTodos && !forceRefresh) {
         console.log('📦 Loading todos from cache');
-        setTodos(cachedTodos);
+        
+        // Apply staged changes to cached data
+        const workingTodos = getWorkingTodos();
+        setTodos(workingTodos);
+        
         const staged = getStagedChanges();
         setStagedCount(staged.fieldChangeCount);
         setLoading(false);
@@ -73,8 +77,11 @@ export const TodosTab: React.FC = () => {
       
       // Ensure transforms on load (priority/id/status handling) by saving then reloading
       StorageManager.saveTodos(webhookTodos);
-      const transformed = StorageManager.loadTodos();
-      setTodos(transformed);
+      
+      // Apply staged changes to get the working todos (what user sees)
+      const workingTodos = getWorkingTodos();
+      setTodos(workingTodos);
+      
       const staged = getStagedChanges();
       setStagedCount(staged.fieldChangeCount);
     } catch (error) {

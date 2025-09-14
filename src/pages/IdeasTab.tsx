@@ -52,7 +52,11 @@ export const IdeasTab: React.FC = () => {
       // Always check cache first - only bypass if explicitly refreshing
       if (cachedIdeas && hasToken && !forceRefresh) {
         console.log('📦 Loading ideas from cache');
-        setIdeas(cachedIdeas);
+        
+        // Apply staged changes to cached data
+        const workingIdeas = getWorkingIdeas();
+        setIdeas(workingIdeas);
+        
         const staged = getStagedIdeaChanges();
         setStagedCount(staged.fieldChangeCount);
         setLoading(false);
@@ -76,8 +80,11 @@ export const IdeasTab: React.FC = () => {
       
       // Ensure transforms on load by saving then reloading
       StorageManager.saveIdeas(webhookIdeas);
-      const transformed = StorageManager.loadIdeas();
-      setIdeas(transformed);
+      
+      // Apply staged changes to get the working ideas (what user sees)
+      const workingIdeas = getWorkingIdeas();
+      setIdeas(workingIdeas);
+      
       const staged = getStagedIdeaChanges();
       setStagedCount(staged.fieldChangeCount);
     } catch (error) {

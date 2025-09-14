@@ -27,7 +27,6 @@ export const AppShell: React.FC = () => {
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  
 
   // Save tab to localStorage whenever it changes
   useEffect(() => {
