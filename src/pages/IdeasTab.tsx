@@ -49,14 +49,20 @@ export const IdeasTab: React.FC = () => {
       const cachedIdeas = getCachedData<Idea[]>('ideas-cache');
       
       // Always check cache first - only bypass if explicitly refreshing
+      console.log('🔍 Debug: cachedIdeas length:', cachedIdeas?.length || 0);
+      console.log('🔍 Debug: forceRefresh:', forceRefresh);
+      
       if (cachedIdeas && !forceRefresh) {
         console.log('📦 Loading ideas from cache');
+        console.log('🔍 Debug: cached ideas:', cachedIdeas);
         
         // Apply staged changes to cached data directly
         const workingIdeas = applyStagedChangesToIdeas(cachedIdeas);
+        console.log('🔍 Debug: working ideas after staged changes:', workingIdeas);
         setIdeas(workingIdeas);
         
         const staged = getStagedIdeaChanges();
+        console.log('🔍 Debug: staged changes:', staged);
         setStagedCount(staged.fieldChangeCount);
         setLoading(false);
         return;
@@ -73,6 +79,7 @@ export const IdeasTab: React.FC = () => {
       console.log('🌐 Loading ideas from webhook...');
       const webhookIdeas = await fetchIdeasFromWebhook();
       console.log('✅ Webhook ideas loaded:', webhookIdeas);
+      console.log('🔍 Debug: webhook ideas length:', webhookIdeas?.length || 0);
       
       // Cache the data
       setCachedData('ideas-cache', webhookIdeas);
@@ -82,9 +89,11 @@ export const IdeasTab: React.FC = () => {
       
       // Apply staged changes to the webhook data directly
       const workingIdeas = applyStagedChangesToIdeas(webhookIdeas);
+      console.log('🔍 Debug: working ideas from webhook after staged changes:', workingIdeas);
       setIdeas(workingIdeas);
       
       const staged = getStagedIdeaChanges();
+      console.log('🔍 Debug: staged changes from webhook:', staged);
       setStagedCount(staged.fieldChangeCount);
     } catch (error) {
       console.error('Failed to load ideas from webhook:', error);
