@@ -340,8 +340,12 @@ export const clearStagedChanges = (): void => {
 export const getWorkingTodos = (): Todo[] => {
   const base = StorageManager.loadTodos();
   if (base.length === 0) return [];
+  return applyStagedChangesToTodos(base);
+};
+
+export const applyStagedChangesToTodos = (baseTodos: Todo[]): Todo[] => {
   const updatesById = new Map<string, TodoPatch>(Array.from(stagedUpdates.values()).map(p => [p.id, p]));
-  const working = base
+  const working = baseTodos
     .filter(t => !stagedCompletes.has(String(t.id)))
     .map(t => {
       const patch = updatesById.get(String(t.id));
@@ -534,8 +538,12 @@ export const clearStagedIdeaChanges = (): void => {
 export const getWorkingIdeas = (): Idea[] => {
   const base = StorageManager.loadIdeas();
   if (base.length === 0) return [];
+  return applyStagedChangesToIdeas(base);
+};
+
+export const applyStagedChangesToIdeas = (baseIdeas: Idea[]): Idea[] => {
   const updatesById = new Map<string, IdeaPatch>(Array.from(stagedIdeaUpdates.values()).map(p => [p.id, p]));
-  const working = base
+  const working = baseIdeas
     .filter(t => !stagedIdeaCompletes.has(String(t.id)))
     .map(t => {
       const patch = updatesById.get(String(t.id));

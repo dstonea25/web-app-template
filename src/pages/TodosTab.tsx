@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Todo, Priority, TodoPatch } from '../types';
-import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData } from '../lib/storage';
+import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosToWebhook } from '../lib/api';
@@ -78,8 +78,8 @@ export const TodosTab: React.FC = () => {
       // Ensure transforms on load (priority/id/status handling) by saving then reloading
       StorageManager.saveTodos(webhookTodos);
       
-      // Apply staged changes to get the working todos (what user sees)
-      const workingTodos = getWorkingTodos();
+      // Apply staged changes to the webhook data directly
+      const workingTodos = applyStagedChangesToTodos(webhookTodos);
       setTodos(workingTodos);
       
       const staged = getStagedChanges();

@@ -3,7 +3,7 @@ import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
 import { IdeasCategoryTabs } from '../components/IdeasCategoryTabs';
-import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, getCachedData, setCachedData } from '../lib/storage';
+import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, getCachedData, setCachedData, applyStagedChangesToIdeas } from '../lib/storage';
 import { applyIdeaFileSave, getWorkingIdeas } from '../lib/storage';
 import { addIdea as storageAddIdea } from '../lib/storage';
 import { fetchIdeasFromWebhook, saveIdeasToWebhook } from '../lib/api';
@@ -81,8 +81,8 @@ export const IdeasTab: React.FC = () => {
       // Ensure transforms on load by saving then reloading
       StorageManager.saveIdeas(webhookIdeas);
       
-      // Apply staged changes to get the working ideas (what user sees)
-      const workingIdeas = getWorkingIdeas();
+      // Apply staged changes to the webhook data directly
+      const workingIdeas = applyStagedChangesToIdeas(webhookIdeas);
       setIdeas(workingIdeas);
       
       const staged = getStagedIdeaChanges();
