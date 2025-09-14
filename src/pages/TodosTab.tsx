@@ -166,13 +166,6 @@ export const TodosTab: React.FC = () => {
           </h2>
           <div className="flex gap-2">
             <button
-              onClick={loadTodos}
-              disabled={loading}
-              className={cn(tokens.button.base, tokens.button.secondary, loading && 'opacity-50 cursor-not-allowed')}
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
-            <button
               onClick={saveBatch}
               disabled={stagedCount === 0}
               className={cn(tokens.button.base, tokens.button.primary, stagedCount === 0 && 'opacity-50 cursor-not-allowed')}
