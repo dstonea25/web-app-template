@@ -34,10 +34,9 @@ export const TodosTab: React.FC = () => {
       setError(null);
       
       // Check if this was a hard refresh (Cmd+Shift+R)
-      // Hard refresh bypasses cache by default
-      const isHardRefresh = !document.referrer || 
-                           document.referrer === window.location.href ||
-                           (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
+      // Only trigger on actual page reloads, not internal navigation
+      const navigationEntry = window.performance.getEntriesByType('navigation')[0] as any;
+      const isHardRefresh = navigationEntry?.type === 'reload';
       
       // Check cache first, but skip if hard refresh
       const cachedTodos = getCachedData<Todo[]>('todos-cache');
