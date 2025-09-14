@@ -28,6 +28,20 @@ export const TodosTab: React.FC = () => {
     loadTodos();
   }, []); // Empty dependency array - only run once
 
+  // Warn user before closing if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (stagedCount > 0) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [stagedCount]);
+
   const loadTodos = async () => {
     try {
       setLoading(true);
@@ -267,15 +281,13 @@ export const TodosTab: React.FC = () => {
             {stagedCount > 0 && (
               <button
                 onClick={() => {
-                  if (confirm('Are you sure you want to discard all unsaved changes? This cannot be undone.')) {
-                    clearStagedChanges();
-                    setStagedCount(0);
-                    // Reload data from webhook to get fresh state
-                    loadTodos();
-                  }
+                  clearStagedChanges();
+                  setStagedCount(0);
+                  // Reload data from webhook to get fresh state
+                  loadTodos();
                 }}
                 disabled={loading}
-                className={cn(tokens.button.base, tokens.button.ghost, 'border border-red-500 text-red-500 hover:bg-red-500 hover:text-white')}
+                className={cn(tokens.button.base, tokens.button.ghost, 'border border-gray-500 text-gray-500 hover:bg-gray-500 hover:text-white')}
               >
                 Cancel
               </button>
