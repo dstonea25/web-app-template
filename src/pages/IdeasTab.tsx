@@ -47,10 +47,9 @@ export const IdeasTab: React.FC = () => {
       }
       
       const cachedIdeas = getCachedData<Idea[]>('ideas-cache');
-      const hasToken = import.meta.env.VITE_N8N_WEBHOOK_TOKEN;
       
       // Always check cache first - only bypass if explicitly refreshing
-      if (cachedIdeas && hasToken && !forceRefresh) {
+      if (cachedIdeas && !forceRefresh) {
         console.log('📦 Loading ideas from cache');
         
         // Apply staged changes to cached data directly
