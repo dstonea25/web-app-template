@@ -1,5 +1,6 @@
 import { AppShell } from './components/AppShell'
 import { AuthProvider } from './contexts/AuthContext'
+import { TimerProvider } from './contexts/TimerContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import React from 'react'
 
@@ -45,9 +46,11 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ProtectedRoute>
-          <AppShell />
-        </ProtectedRoute>
+        <TimerProvider>
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        </TimerProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

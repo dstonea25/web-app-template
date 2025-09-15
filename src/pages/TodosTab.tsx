@@ -11,12 +11,12 @@ import { CategoryTabs } from '../components/CategoryTabs';
 // Example only: toast.success('Saved N items')
 // import { toast } from '../lib/notifications/toast';
 
-export const TodosTab: React.FC = () => {
+export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [sortBy, setSortBy] = useState<keyof Todo | ''>('');
+  const [sortBy, setSortBy] = useState<keyof Todo | ''>('priority');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -221,7 +221,7 @@ export const TodosTab: React.FC = () => {
     setEditingId(null);
   };
 
-  if (loading) {
+  if (loading && isVisible) {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
@@ -234,7 +234,7 @@ export const TodosTab: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && isVisible) {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
@@ -264,7 +264,7 @@ export const TodosTab: React.FC = () => {
     : todos.filter(todo => todo.category === activeCategory);
 
   return (
-    <div className={tokens.layout.container}>
+    <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       {/* Add new todo form - moved to top as separate section */}
       <div className={cn(tokens.card.base, 'mb-6')}>
         <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>

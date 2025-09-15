@@ -11,6 +11,7 @@ import {
 } from '../lib/time';
 import { fetchSessionsFromWebhook, saveSessionsToWebhook } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
+import { useTimer } from '../contexts/TimerContext';
 
 // Mock data from the scope
 const MOCK_DATA = {
@@ -36,7 +37,8 @@ interface PendingSession {
   minutes: number;
 }
 
-export const TimeTrackingTab: React.FC = () => {
+export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
+  const { setActive: setCtxActive, resetElapsed } = useTimer();
   // Core state
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,8 +55,10 @@ export const TimeTrackingTab: React.FC = () => {
   // Manual add state
   const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
   const [manualCategory, setManualCategory] = useState<Category>('Gaming');
-  const [manualDuration, setManualDuration] = useState('60');
+  const [manualHours, setManualHours] = useState('1');
+  const [manualMinutes, setManualMinutes] = useState('0');
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const intervalRef = useRef<number | null>(null);
 
@@ -63,9 +67,9 @@ export const TimeTrackingTab: React.FC = () => {
     initializeTimeTab();
   }, []);
 
-  // Timer effect
+  // Timer effect gated by visibility
   useEffect(() => {
-    if (activeSession) {
+    if (activeSession && isVisible) {
       intervalRef.current = setInterval(() => {
         const now = new Date();
         const startTime = new Date(activeSession.startedAt);
@@ -83,7 +87,7 @@ export const TimeTrackingTab: React.FC = () => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [activeSession]);
+  }, [activeSession, isVisible]);
 
   // Handle visibility change to recalculate timer
   useEffect(() => {
@@ -116,6 +120,7 @@ export const TimeTrackingTab: React.FC = () => {
         try {
           const active = JSON.parse(stored);
           setActiveSession(active);
+          setCtxActive(active);
           const now = new Date();
           const startTime = new Date(active.startedAt);
           setElapsedMs(now.getTime() - startTime.getTime());
@@ -158,6 +163,7 @@ export const TimeTrackingTab: React.FC = () => {
     setActiveSession(active);
     setElapsedMs(0);
     localStorage.setItem('geronimo.time.activeSession', JSON.stringify(active));
+    setCtxActive(active);
   };
 
   const stopTimer = () => {
@@ -179,12 +185,28 @@ export const TimeTrackingTab: React.FC = () => {
     // Keep the elapsed time for display - don't reset to 0
     setElapsedMs(elapsedMs); // Keep current elapsed time
     localStorage.removeItem('geronimo.time.activeSession');
+    setCtxActive(null);
   };
 
   const resetTimer = () => {
     setPendingSession(null);
     setElapsedMs(0);
     setJustSubmitted(false);
+    resetElapsed();
+  };
+
+  const continueTimer = () => {
+    if (!pendingSession || !timerCategory) return;
+    
+    // Calculate new start time based on current elapsed time
+    const now = new Date();
+    const newStartedAt = new Date(now.getTime() - elapsedMs).toISOString();
+    const active = { startedAt: newStartedAt, category: timerCategory };
+    
+    setActiveSession(active);
+    setPendingSession(null);
+    localStorage.setItem('geronimo.time.activeSession', JSON.stringify(active));
+    setCtxActive(active);
   };
 
 
@@ -215,6 +237,12 @@ export const TimeTrackingTab: React.FC = () => {
       // Show success toast
       toast.success(`Session submitted: ${pendingSession.minutes} minutes of ${pendingSession.category}`);
       
+      // Switch chart to the category that was just submitted (if within current time period)
+      const sessionDate = new Date(pendingSession.startedAt).toISOString().split('T')[0];
+      if (isDateInCurrentTimePeriod(sessionDate)) {
+        setChartCategory(pendingSession.category);
+      }
+      
       // Clear pending session and mark as just submitted
       setPendingSession(null);
       setJustSubmitted(true);
@@ -224,20 +252,76 @@ export const TimeTrackingTab: React.FC = () => {
     }
   };
 
-  const addManualSession = async () => {
-    const startedAt = getDateAtMidnight(new Date(manualDate));
-    const minutes = parseInt(manualDuration) || 0;
-    const endedAt = addMinutes(startedAt, minutes);
+  const handleHoursChange = (value: string) => {
+    const num = parseInt(value) || 0;
+    setManualHours(Math.max(0, Math.min(23, num)).toString());
+  };
+
+  const handleMinutesChange = (value: string) => {
+    const num = parseInt(value) || 0;
+    setManualMinutes(Math.max(0, Math.min(59, num)).toString());
+  };
+
+  const isFormValid = () => {
+    const hours = parseInt(manualHours) || 0;
+    const minutes = parseInt(manualMinutes) || 0;
+    return manualDate && manualCategory && (hours > 0 || minutes > 0) && !isSubmitting;
+  };
+
+  const isDateInCurrentTimePeriod = (date: string) => {
+    const sessionDate = new Date(date);
+    const now = new Date();
+    const currentYear = now.getFullYear();
     
-    const session: Session = {
-      id: generateId(),
-      category: manualCategory,
-      startedAt,
-      endedAt,
-      minutes
-    };
+    // Calculate date range based on current time period
+    let rangeStart = new Date();
+    if (timePeriod === 'week') {
+      // Get start of current week (Monday)
+      const dayOfWeek = now.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      rangeStart.setDate(now.getDate() + mondayOffset);
+      rangeStart.setHours(0, 0, 0, 0);
+    } else if (timePeriod === 'month') {
+      // Start of current month
+      rangeStart.setDate(1);
+      rangeStart.setHours(0, 0, 0, 0);
+    } else if (timePeriod === 'ytd') {
+      // Start of current year
+      rangeStart.setMonth(0, 1);
+      rangeStart.setHours(0, 0, 0, 0);
+    }
+    
+    const sessionYear = sessionDate.getFullYear();
+    return sessionYear === currentYear && sessionDate >= rangeStart;
+  };
+
+  const addManualSession = async () => {
+    if (!isFormValid() || isSubmitting) return;
+    
+    setIsSubmitting(true);
     
     try {
+      const startedAt = getDateAtMidnight(new Date(manualDate));
+      const hours = Math.max(0, Math.min(23, parseInt(manualHours) || 0));
+      const minutes = Math.max(0, Math.min(59, parseInt(manualMinutes) || 0));
+      const totalMinutes = (hours * 60) + minutes;
+      
+      if (totalMinutes === 0) {
+        toast.error('Please enter a duration greater than 0');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const endedAt = addMinutes(startedAt, totalMinutes);
+      
+      const session: Session = {
+        id: generateId(),
+        category: manualCategory,
+        startedAt,
+        endedAt,
+        minutes: totalMinutes
+      };
+      
       // Add to local sessions first
       setSessions(prev => [...prev, session]);
       
@@ -249,14 +333,24 @@ export const TimeTrackingTab: React.FC = () => {
       setSessions(webhookSessions as Session[]);
       
       // Show success toast
-      toast.success(`Time added: ${minutes} minutes of ${manualCategory}`);
+      const timeDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+      toast.success(`Time added: ${timeDisplay} of ${manualCategory}`);
       
-      // Reset form
+      // Switch chart to the category that was just added (if within current time period)
+      if (isDateInCurrentTimePeriod(manualDate)) {
+        setChartCategory(manualCategory);
+      }
+      
+      // Reset form completely
       setManualDate(new Date().toISOString().split('T')[0]);
-      setManualDuration('60');
+      setManualHours('1');
+      setManualMinutes('0');
+      setManualCategory('Gaming');
     } catch (error) {
       console.error('Failed to add manual session:', error);
       toast.error('Failed to add time session');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -386,8 +480,9 @@ export const TimeTrackingTab: React.FC = () => {
   console.log('Chart category:', chartCategory);
   console.log('Time period:', timePeriod);
 
-  // Loading state
+  // Loading state (when hidden, render nothing to avoid stale time flash)
   if (loading) {
+    if (!isVisible) return <div className="hidden" />;
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
@@ -402,6 +497,7 @@ export const TimeTrackingTab: React.FC = () => {
 
   // Error state
   if (error) {
+    if (!isVisible) return <div className="hidden" />;
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
@@ -422,7 +518,7 @@ export const TimeTrackingTab: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className={cn("max-w-6xl mx-auto px-4 sm:px-6 lg:px-8", !isVisible && 'hidden')}>
       {/* Timer and Session Editor */}
       <div className="mb-6">
         <div className={tokens.time.timerCard.wrapper}>
@@ -468,12 +564,21 @@ export const TimeTrackingTab: React.FC = () => {
                 Stop
               </button>
             ) : (pendingSession || justSubmitted) ? (
-              <button
-                onClick={resetTimer}
-                className={tokens.button.base + ' ' + tokens.button.primary}
-              >
-                Reset
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={continueTimer}
+                  disabled={!timerCategory}
+                  className={cn(tokens.button.base, tokens.button.primary, "disabled:opacity-50 disabled:cursor-not-allowed")}
+                >
+                  Continue
+                </button>
+                <button
+                  onClick={resetTimer}
+                  className={tokens.button.base + ' ' + tokens.button.secondary}
+                >
+                  Reset
+                </button>
+              </div>
             ) : (
               <button
                 onClick={startTimer}
@@ -532,7 +637,7 @@ export const TimeTrackingTab: React.FC = () => {
       {/* Manual Add Panel */}
       <div className={tokens.time.manualAdd.wrapper}>
         <h3 className="text-lg font-semibold mb-4 text-neutral-100">Add Time</h3>
-        <div className={tokens.time.manualAdd.row}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end">
           <div>
             <label className="block text-sm font-medium mb-1 text-neutral-100">Date</label>
             <input
@@ -555,22 +660,47 @@ export const TimeTrackingTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-neutral-100">Duration (minutes)</label>
-            <input
-              type="number"
-              value={manualDuration}
-              onChange={(e) => setManualDuration(e.target.value)}
-              className={tokens.input.base}
-              placeholder="60"
-            />
-      </div>
-          <div className="flex items-end">
-          <button
+            <label className="block text-sm font-medium mb-1 text-neutral-100">Duration</label>
+            <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={manualHours}
+                  onChange={(e) => handleHoursChange(e.target.value)}
+                  className={cn(tokens.input.base, "w-16")}
+                  placeholder="1"
+                  min="0"
+                  max="23"
+                />
+                <span className="text-sm text-neutral-400">h</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={manualMinutes}
+                  onChange={(e) => handleMinutesChange(e.target.value)}
+                  className={cn(tokens.input.base, "w-16")}
+                  placeholder="0"
+                  min="0"
+                  max="59"
+                />
+                <span className="text-sm text-neutral-400">m</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <button
               onClick={addManualSession}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-              Add Time
-          </button>
+              disabled={!isFormValid()}
+              className={cn(
+                tokens.button.base, 
+                tokens.button.primary,
+                "px-4 py-2",
+                !isFormValid() && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Time'}
+            </button>
           </div>
         </div>
       </div>

@@ -2,15 +2,20 @@ import React from 'react';
 import { LogOut } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 import { useAuth } from '../contexts/AuthContext';
+import { HeaderTimerMini } from './HeaderTimerMini';
 
 interface TopBannerProps {
   title?: string;
   subtitle?: string;
+  onOpenTimeTab?: () => void;
+  isOnTimeTab?: boolean;
 }
 
 export const TopBanner: React.FC<TopBannerProps> = ({ 
   title = "Geronimo", 
-  subtitle = "Your personal productivity app" 
+  subtitle = "Your personal productivity app",
+  onOpenTimeTab,
+  isOnTimeTab = false
 }) => {
   const { logout } = useAuth();
 
@@ -32,7 +37,10 @@ export const TopBanner: React.FC<TopBannerProps> = ({
               </p>
             )}
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            {onOpenTimeTab && (
+              <HeaderTimerMini onOpenTimeTab={onOpenTimeTab} isOnTimeTab={isOnTimeTab} />
+            )}
             <button
               onClick={handleLogout}
               className={`${tokens.button.base} ${tokens.button.ghost} text-sm`}

@@ -50,23 +50,10 @@ export const AppShell: React.FC = () => {
     };
   });
 
-  const renderActiveModule = () => {
-    try {
-      switch (activeModule) {
-        case 'todos':
-          return <TodosTab />;
-        case 'ideas':
-          return <IdeasTab />;
-        case 'time_tracking':
-          return <TimeTrackingTab />;
-        default:
-          return <div>Default module</div>;
-      }
-    } catch (error) {
-      console.error('Error rendering module:', error);
-      return <div>Error loading module: {error instanceof Error ? error.message : String(error)}</div>;
-    }
-  };
+  // Helper casts for passing visibility prop to tab components
+  const TodosTabAny = TodosTab as React.FC<any>;
+  const IdeasTabAny = IdeasTab as React.FC<any>;
+  const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
@@ -87,6 +74,8 @@ export const AppShell: React.FC = () => {
   const handleLogout = () => {
     logout();
   };
+
+  const openTimeTab = () => setActiveModule('time_tracking');
 
   const LogoutButton = () => (
     <button
@@ -112,9 +101,17 @@ export const AppShell: React.FC = () => {
           onToggleCollapse={handleToggleSidebar}
         />
         <div className={tokens.app_shell.content}>
-          <TopBanner />
+          <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
           <main className="p-6">
-            {renderActiveModule()}
+            <div className={cn(activeModule === 'todos' ? 'block' : 'hidden')}>
+              <TodosTabAny isVisible={activeModule === 'todos'} />
+            </div>
+            <div className={cn(activeModule === 'ideas' ? 'block' : 'hidden')}>
+              <IdeasTabAny isVisible={activeModule === 'ideas'} />
+            </div>
+            <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
+              <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+            </div>
           </main>
         </div>
       </div>
@@ -127,7 +124,15 @@ export const AppShell: React.FC = () => {
           rightSlot={<LogoutButton />}
         />
         <main className="p-4">
-          {renderActiveModule()}
+          <div className={cn(activeModule === 'todos' ? 'block' : 'hidden')}>
+            <TodosTabAny isVisible={activeModule === 'todos'} />
+          </div>
+          <div className={cn(activeModule === 'ideas' ? 'block' : 'hidden')}>
+            <IdeasTabAny isVisible={activeModule === 'ideas'} />
+          </div>
+          <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
+            <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+          </div>
         </main>
         <MobileDrawer
           items={navigationItems}

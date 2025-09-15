@@ -8,7 +8,7 @@ import { applyIdeaFileSave, getWorkingIdeas } from '../lib/storage';
 import { addIdea as storageAddIdea } from '../lib/storage';
 import { fetchIdeasFromWebhook, saveIdeasToWebhook } from '../lib/api';
 
-export const IdeasTab: React.FC = () => {
+export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -248,7 +248,7 @@ export const IdeasTab: React.FC = () => {
     setEditingId(null);
   };
 
-  if (loading) {
+  if (loading && isVisible) {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
@@ -261,7 +261,7 @@ export const IdeasTab: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && isVisible) {
     return (
       <div className={tokens.layout.container}>
         <div className="flex justify-center items-center py-12">
@@ -291,7 +291,7 @@ export const IdeasTab: React.FC = () => {
     : ideas.filter(idea => idea.category === activeCategory);
 
   return (
-    <div className={tokens.layout.container}>
+    <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       {/* Add new idea form - moved to top as separate section */}
       <div className={cn(tokens.card.base, 'mb-6')}>
         <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
