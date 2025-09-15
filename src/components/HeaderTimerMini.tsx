@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn, tokens } from '../theme/config';
 import { msToTimerDisplay } from '../lib/time';
@@ -8,8 +8,6 @@ interface HeaderTimerMiniProps {
   onOpenTimeTab: () => void;
   isOnTimeTab?: boolean;
 }
-
-type ActiveSessionStore = { startedAt: string; category: string } | null;
 
 export const HeaderTimerMini: React.FC<HeaderTimerMiniProps> = ({ onOpenTimeTab, isOnTimeTab = false }) => {
   const [hidden, setHidden] = useState<boolean>(() => {
