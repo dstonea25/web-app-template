@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "overrides": {
+    "component_tokens": {
+      "table": { "density": { "comfortable": "td:px-5 td:py-3" } },
+      "button": { "info": "text-neutral-100 bg-teal-500 border-teal-500 hover:bg-teal-400" }
+    }
+  }
+}

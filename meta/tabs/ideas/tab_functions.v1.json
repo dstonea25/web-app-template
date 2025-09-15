@@ -1,5 +1,61 @@
 {
-  "version": "1.0.0",
-  "staging": ["stageRowEdit", "stageComplete", "getStagedChanges", "clearStagedChanges"],
-  "save_flow": ["getWorkingIdeas", "serializeIdeasForExport", "postIdeasFile", "persist+clear"]
+  "version": "1.2.0",
+  "functions": [
+    "loadIdeas",
+    "saveBatch",
+    "addIdea",
+    "updateIdea",
+    "commitRowEdit",
+    "removeIdea",
+    "handleEditStart",
+    "handleEditEnd",
+    "handleBeforeUnload",
+    "stageIdeaEdit",
+    "stageIdeaComplete",
+    "getStagedIdeaChanges",
+    "clearStagedIdeaChanges",
+    "getCachedData",
+    "setCachedData",
+    "applyStagedChangesToIdeas",
+    "applyIdeaFileSave",
+    "getWorkingIdeas",
+    "storageAddIdea",
+    "fetchIdeasFromWebhook",
+    "saveIdeasToWebhook",
+    "StorageManager",
+    "filterIdeas",
+    "sortIdeas",
+    "getUniqueCategories",
+    "handleCategoryChange",
+    "handleSortChange",
+    "handleFilterChange",
+    "handleNewIdeaChange",
+    "handleNewIdeaSubmit"
+  ],
+  "staging": [
+    "stageIdeaEdit",
+    "stageIdeaComplete", 
+    "getStagedIdeaChanges",
+    "clearStagedIdeaChanges"
+  ],
+  "save_flow": [
+    "getWorkingIdeas",
+    "serializeIdeasForExport", 
+    "postIdeasFile",
+    "persist+clear"
+  ],
+  "caching": [
+    "getCachedData",
+    "setCachedData",
+    "applyStagedChangesToIdeas"
+  ],
+  "webhook_integration": [
+    "fetchIdeasFromWebhook",
+    "saveIdeasToWebhook"
+  ],
+  "field_editing": [
+    "commitRowEdit",
+    "handleEditStart",
+    "handleEditEnd"
+  ]
 }

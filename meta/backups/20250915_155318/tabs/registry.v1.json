@@ -1,0 +1,52 @@
+{
+  "version": "1.1.0",
+  "updated_at": "2025-01-15",
+  "default_tab": "todos",
+  "tab_persistence": {
+    "enabled": true,
+    "storage_key": "dashboard-active-tab",
+    "fallback_behavior": "first_enabled_tab_or_default",
+    "validation": ["todos", "ideas", "time_tracking"]
+  },
+  "tabs": [
+    {
+      "id": "todos",
+      "title": "To-Dos",
+      "route": "/todos",
+      "icon": "check-square",
+      "order": 10,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/todos/tab_scope.v1.json",
+        "functions": "/meta/tabs/todos/tab_functions.v1.json",
+        "styles": "/meta/tabs/todos/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "ideas",
+      "title": "Ideas",
+      "route": "/ideas",
+      "icon": "lightbulb",
+      "order": 15,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/ideas/tab_scope.v1.json",
+        "functions": "/meta/tabs/ideas/tab_functions.v1.json",
+        "styles": "/meta/tabs/ideas/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "time",
+      "title": "Time Tracking",
+      "route": "/time",
+      "icon": "timer",
+      "order": 20,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/time/tab_scope.v1.json",
+        "functions": "/meta/tabs/time/tab_functions.v1.json",
+        "styles": "/meta/tabs/time/tab_styles.v1.json"
+      }
+    }
+  ]
+}

@@ -1,16 +1,73 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "updated_at": "2025-09-15",
   "rules": [
     "Do not hardcode colors or fonts; use exported theme tokens.",
     "Dark is default; emerald/teal are accents only.",
     "Sidebar widths and TopNav height are global, not overridable.",
     "Tables use borders, zebra rows, sticky headers.",
-    "Sortable tables expose aria-sort + live announcements."
+    "Sortable tables expose aria-sort + live announcements.",
+    "All interactive elements must have proper focus states.",
+    "Keyboard navigation must work for all interactive elements.",
+    "Form validation must provide clear visual feedback.",
+    "Toast notifications must be accessible and non-intrusive.",
+    "Timer states must be clearly distinguished with appropriate colors.",
+    "Caching system must be transparent to users.",
+    "Staging system must provide clear visual feedback for unsaved changes.",
+    "Cross-tab state management must work seamlessly.",
+    "Responsive design must work on all screen sizes.",
+    "Accessibility must be maintained across all features."
   ],
   "enforcement": {
     "forbidden_token_paths": [
       "palette.*", "typography.*",
       "layout.sidebar_*", "layout.topnav_height_px"
+    ],
+    "required_patterns": [
+      "focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950",
+      "min-h-[40px] min-w-[40px] for all interactive elements",
+      "aria-sort for sortable table headers",
+      "aria-live for dynamic content updates"
     ]
+  },
+  "accessibility": {
+    "keyboard_navigation": [
+      "Tab/Shift+Tab for focus movement",
+      "Enter/Space for activation",
+      "Escape for cancellation",
+      "Arrow keys for navigation within components"
+    ],
+    "screen_reader": [
+      "Proper ARIA labels and descriptions",
+      "Live regions for dynamic content",
+      "Semantic HTML elements",
+      "Focus management during state changes"
+    ],
+    "visual_feedback": [
+      "Clear focus indicators",
+      "Hover states for interactive elements",
+      "Loading states for async operations",
+      "Error states with clear messaging"
+    ]
+  },
+  "performance": {
+    "caching": [
+      "Local cache with staged changes overlay",
+      "Force refresh capability for data updates",
+      "Optimistic updates for immediate feedback"
+    ],
+    "optimization": [
+      "Efficient re-rendering",
+      "Lazy loading where appropriate",
+      "Debounced user input handling",
+      "Minimal network requests"
+    ]
+  },
+  "consistency": {
+    "spacing": "Use consistent gap and padding values",
+    "colors": "Use theme tokens for all colors",
+    "typography": "Use theme scale for all text sizes",
+    "interactions": "Use consistent hover and focus states",
+    "animations": "Use consistent duration and easing"
   }
 }

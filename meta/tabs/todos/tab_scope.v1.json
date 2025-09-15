@@ -1,11 +1,65 @@
 {
-  "version": "1.0.0",
+  "version": "1.2.0",
   "tab_id": "todos",
   "acceptance": [
-    "Inline edit (task) + editable priority.",
-    "Status is UI-only; not exported.",
-    "Update/Complete stage only; no network until Save.",
-    "Save exports full array with ids 1..N by created_at asc; status='open'.",
-    "A11y: aria-sort + live announcements."
+    "Inline edit (task, category, priority) with keyboard navigation support",
+    "Status is UI-only; not exported to backend",
+    "Update/Complete stage only; no network calls until Save",
+    "Save exports full array with sequential IDs by created_at asc; status='open'",
+    "A11y: aria-sort + live announcements for screen readers",
+    "Caching system with staged changes overlay for performance",
+    "Force refresh capability via URL parameter",
+    "BeforeUnload warning for unsaved changes",
+    "Category-based filtering with dynamic tab generation",
+    "Sorting by priority (high>medium>low>null) and created_at",
+    "Real-time search filtering across all fields",
+    "Webhook integration with fallback to mock data"
+  ],
+  "features": [
+    "Todo Management: Add, edit, complete, delete todos",
+    "Category Filtering: Dynamic tabs based on unique categories",
+    "Search & Sort: Real-time filtering and multi-column sorting",
+    "Staging System: Batch changes before saving to backend",
+    "Caching: Local cache with staged changes overlay",
+    "Data Persistence: Webhook integration with localStorage backup",
+    "Accessibility: Full keyboard navigation and screen reader support",
+    "Performance: Optimistic updates and efficient re-rendering"
+  ],
+  "state_management": [
+    "todos: Array of all todo items",
+    "loading: Loading state for data operations",
+    "error: Error state for failed operations",
+    "filter: Search filter string",
+    "sortBy: Current sort column (priority, created_at, etc.)",
+    "sortOrder: Sort direction (asc/desc)",
+    "editingId: Currently editing todo ID",
+    "activeCategory: Selected category filter",
+    "newTodo: New todo form state",
+    "stagedCount: Number of staged changes"
+  ],
+  "data_flow": [
+    "Load: Cache check → Webhook fetch → Transform → Apply staged changes",
+    "Edit: Stage changes → Update local state → Show staged count",
+    "Save: Apply staged changes → Serialize → Webhook save → Clear staging",
+    "Filter: Apply category + search filters → Sort → Render"
+  ],
+  "integrations": [
+    "StorageManager: Local data management and persistence",
+    "Webhook API: Backend data synchronization",
+    "CategoryTabs: Dynamic category filtering component",
+    "TodosTable: Main data display and editing component",
+    "SelectPriority: Priority selection component"
+  ],
+  "accessibility": [
+    "Keyboard navigation: Tab/Shift+Tab, Enter, Escape",
+    "ARIA attributes: aria-sort, aria-live regions",
+    "Screen reader announcements for state changes",
+    "Focus management during editing operations"
+  ],
+  "performance": [
+    "Caching system reduces webhook calls",
+    "Staged changes prevent unnecessary re-renders",
+    "Optimistic updates for immediate feedback",
+    "Efficient filtering and sorting algorithms"
   ]
 }

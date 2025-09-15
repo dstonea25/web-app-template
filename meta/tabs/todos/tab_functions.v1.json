@@ -1,5 +1,55 @@
 {
-  "version": "1.0.0",
-  "staging": ["stageRowEdit", "stageComplete", "getStagedChanges", "clearStagedChanges"],
-  "save_flow": ["getWorkingTodos", "serializeTodosForExport", "postTodosFile", "persist+clear"]
+  "version": "1.2.0",
+  "functions": [
+    "loadTodos",
+    "saveBatch",
+    "addTodo",
+    "updateTodo",
+    "completeTodo",
+    "handleEditStart",
+    "handleEditEnd",
+    "handleBeforeUnload",
+    "stageRowEdit",
+    "stageComplete",
+    "getStagedChanges",
+    "clearStagedChanges",
+    "getCachedData",
+    "setCachedData",
+    "applyStagedChangesToTodos",
+    "applyFileSave",
+    "getWorkingTodos",
+    "storageAddTodo",
+    "fetchTodosFromWebhook",
+    "saveTodosToWebhook",
+    "StorageManager",
+    "filterTodos",
+    "sortTodos",
+    "getUniqueCategories",
+    "handleCategoryChange",
+    "handleSortChange",
+    "handleFilterChange",
+    "handleNewTodoChange",
+    "handleNewTodoSubmit"
+  ],
+  "staging": [
+    "stageRowEdit",
+    "stageComplete", 
+    "getStagedChanges",
+    "clearStagedChanges"
+  ],
+  "save_flow": [
+    "getWorkingTodos",
+    "serializeTodosForExport", 
+    "postTodosFile",
+    "persist+clear"
+  ],
+  "caching": [
+    "getCachedData",
+    "setCachedData",
+    "applyStagedChangesToTodos"
+  ],
+  "webhook_integration": [
+    "fetchTodosFromWebhook",
+    "saveTodosToWebhook"
+  ]
 }

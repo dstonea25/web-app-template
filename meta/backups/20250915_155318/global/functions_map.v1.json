@@ -1,6 +1,6 @@
 {
-  "version": "1.7.0",
-  "updated_at": "2025-09-15",
+  "version": "1.5.0",
+  "updated_at": "2025-09-08",
   "modules": [
     {
       "name": "AppShell",
@@ -60,126 +60,52 @@
       "name": "TodosPage",
       "type": "page",
       "responsibilities": [
-        "Manage todos state with caching and staged changes system.",
-        "Provide inline editing with keyboard navigation support.",
-        "Handle category-based filtering and multi-column sorting.",
-        "Implement staging system for batch operations before saving.",
-        "Integrate with webhook API with fallback to mock data.",
-        "Provide accessibility features and screen reader support.",
-        "Compose CategoryTabs and TodosTable components."
+        "Own todos state (in-memory + optional localStorage).",
+        "Expose Save action (mocked).",
+        "Compose CategoryTabs and TodosTable."
       ],
-      "inputs": ["seed todos", "ApiClient", "Storage", "Webhook API"],
-      "outputs": ["UI, optimistic updates", "staged changes", "cached data"]
+      "inputs": ["seed todos", "ApiClient", "Storage"],
+      "outputs": ["UI, optimistic updates"]
     },
     {
       "name": "CategoryTabs",
       "type": "shared_component",
       "responsibilities": [
-        "Derive unique categories from provided todos dynamically.",
-        "Render tabs: All + each category with proper styling.",
-        "Emit selected category change events.",
-        "Handle responsive design for mobile and desktop.",
-        "Provide accessibility support with proper ARIA attributes."
+        "Derive unique categories from provided todos.",
+        "Render tabs: All + each category; emit selected category.",
+        "Respect default tab order from scope (alpha)."
       ],
-      "inputs": ["todos", "active_category", "theme_tokens"],
+      "inputs": ["todos", "active_category"],
       "outputs": ["category change events"],
       "extension_notes": [
-        "Must not hardcode category list - derive from data.",
-        "Supports keyboard navigation and screen readers."
+        "Must not hardcode category list."
       ]
     },
     {
       "name": "TodosTable",
       "type": "shared_component",
       "responsibilities": [
-        "Render bordered zebra table with sticky header and responsive design.",
-        "Support multi-column sorting by created_at and priority (high>medium>low>null).",
-        "Provide inline editing for task, category, and priority fields.",
-        "Handle row addition, completion, and deletion operations.",
-        "Implement keyboard navigation and accessibility features.",
-        "Support real-time search filtering across all fields.",
-        "Display priority badges and status indicators with proper styling."
+        "Render bordered zebra table with sticky header.",
+        "Sort by created_at and priority (high>medium>low|null).",
+        "Inline edit task/category; add row with optional priority; complete row."
       ],
-      "inputs": ["rows", "onChange handlers", "sort state", "filter term", "editing state"],
-      "outputs": ["row updates", "row adds", "row completes", "edit events"],
+      "inputs": ["rows", "onChange handlers", "sort state", "filter term"],
+      "outputs": ["row updates", "row adds", "row completes"],
       "extension_notes": [
-        "Default sort comes from scope (priority desc, then created_at desc).",
+        "Default sort comes from scope (created_at desc).",
         "Editable cells support keyboard nav: Tab/Shift+Tab to move, Enter to commit, Esc to cancel.",
-        "Status field is UI-only and not exported; ID is internal-only and not displayed.",
-        "Supports screen readers with proper ARIA attributes and live announcements."
+        "Status field is ignored if present; ID is internal-only and not displayed."
       ]
-    },
-    {
-      "name": "IdeasPage",
-      "type": "page",
-      "responsibilities": [
-        "Manage ideas state with caching and staged changes system.",
-        "Provide inline editing with field-specific input types.",
-        "Handle category-based filtering and sorting capabilities.",
-        "Implement staging system for batch operations before saving.",
-        "Integrate with webhook API with fallback to mock data.",
-        "Provide accessibility features and screen reader support.",
-        "Support multiline notes with dynamic height expansion.",
-        "Compose IdeasCategoryTabs and IdeasTable components."
-      ],
-      "inputs": ["seed ideas", "ApiClient", "Storage", "Webhook API"],
-      "outputs": ["UI, optimistic updates", "staged changes", "cached data"]
     },
     {
       "name": "TimeTrackingPage",
       "type": "page",
       "responsibilities": [
-        "Start/stop/continue timer with elapsed time preservation.",
-        "Manual time entry with separate hour/minute inputs and validation.",
-        "Auto-switch chart category when adding time within current period.",
-        "Real-time timer display with proper state management.",
-        "Form validation preventing double-submission and invalid inputs.",
-        "Chart filtering by category and time period (week/month/year).",
-        "Session persistence with localStorage and webhook integration.",
-        "Toast notifications for user feedback and error handling."
+        "Start/stop timer; edit duration/note; append to session list.",
+        "Expose Submit action (mocked)."
       ],
-      "inputs": ["seed sessions", "ApiClient", "Storage", "TimeUtils", "TimerContext"],
-      "outputs": ["UI, optimistic updates", "chart updates", "timer state"]
-    },
-    {
-      "name": "IdeasCategoryTabs",
-      "type": "shared_component",
-      "responsibilities": [
-        "Derive unique categories from provided ideas dynamically.",
-        "Render tabs: All + each category with proper styling.",
-        "Emit selected category change events.",
-        "Handle responsive design for mobile and desktop.",
-        "Provide accessibility support with proper ARIA attributes."
-      ],
-      "inputs": ["ideas", "active_category", "theme_tokens"],
-      "outputs": ["category change events"],
-      "extension_notes": [
-        "Must not hardcode category list - derive from data.",
-        "Supports keyboard navigation and screen readers."
-      ]
-    },
-    {
-      "name": "IdeasTable",
-      "type": "shared_component",
-      "responsibilities": [
-        "Render bordered zebra table with sticky header and responsive design.",
-        "Support sorting by created_at and other fields.",
-        "Provide inline editing for idea, category, and notes fields.",
-        "Handle row addition, removal, and editing operations.",
-        "Implement keyboard navigation and accessibility features.",
-        "Support real-time search filtering across all fields.",
-        "Display field-specific input types (text, select, textarea).",
-        "Handle multiline notes with dynamic height expansion."
-      ],
-      "inputs": ["rows", "onChange handlers", "sort state", "filter term", "editing state"],
-      "outputs": ["row updates", "row adds", "row removes", "edit events"],
-      "extension_notes": [
-        "Default sort comes from scope (created_at desc).",
-        "Editable cells support keyboard nav: Tab/Shift+Tab to move, Enter to commit, Esc to cancel.",
-        "Status field is UI-only and not exported; ID is internal-only and not displayed.",
-        "Supports screen readers with proper ARIA attributes and live announcements.",
-        "Notes field uses textarea with dynamic height adjustment."
-      ]
+      "inputs": ["seed sessions", "ApiClient", "Storage", "TimeUtils"],
+      "outputs": ["UI, optimistic updates"]
     },
     {
       "name": "TimerCard",
@@ -254,30 +180,17 @@
         "nowIso, msToHms, computeDurationMs and related helpers."
       ],
       "exports": ["nowIso", "msToHms", "computeDurationMs", "formatDateTime"]
-    },
-    {
-      "name": "TimerContext",
-      "type": "context",
-      "file": "/src/contexts/TimerContext.tsx",
-      "responsibilities": [
-        "Cross-tab timer state management with localStorage sync.",
-        "Provide active session state and elapsed time to components.",
-        "Handle timer ticking and state updates across tab visibility changes."
-      ],
-      "exports": ["TimerProvider", "useTimer", "activeSession", "elapsedMs", "setActive", "resetElapsed"]
     }
   ],
   "navigation": {
     "items": [
       { "id": "todos", "label": "To-Dos", "icon": "check-square" },
-      { "id": "ideas", "label": "Ideas", "icon": "lightbulb" },
       { "id": "time_tracking", "label": "Time Tracking", "icon": "timer" }
     ],
     "default_item_id": "todos"
   },
   "routes": [
     { "id": "todos", "surface": "module", "component": "TodosPage" },
-    { "id": "ideas", "surface": "module", "component": "IdeasPage" },
     { "id": "time_tracking", "surface": "module", "component": "TimeTrackingPage" }
   ],
   "notifications": {
@@ -313,17 +226,6 @@
         "duration_ms: number",
         "note?: string"
       ]
-    },
-    {
-      "name": "Idea",
-      "fields": [
-        "id: string",
-        "idea: string",
-        "category: string",
-        "notes: string",
-        "created_at: string",
-        "status: string"
-      ]
     }
   ],
   "actions": [
@@ -331,19 +233,8 @@
     { "name": "editTodo", "in": "TodosTable", "payload": { "todo": "Todo" } },
     { "name": "deleteTodo", "in": "TodosTable", "payload": { "id": "number|string" } },
     { "name": "saveTodos", "in": "TodosPage", "payload": { "todos": "Todo[]" } },
-    { "name": "addIdea", "in": "IdeasPage", "payload": { "idea": "Idea" } },
-    { "name": "editIdea", "in": "IdeasTable", "payload": { "idea": "Idea" } },
-    { "name": "removeIdea", "in": "IdeasTable", "payload": { "id": "string" } },
-    { "name": "saveIdeas", "in": "IdeasPage", "payload": { "ideas": "Idea[]" } },
-    { "name": "commitIdeaEdit", "in": "IdeasTable", "payload": { "id": "string", "patch": "IdeaPatch" } },
-    { "name": "startTimer", "in": "TimeTrackingPage", "payload": { "category": "string" } },
+    { "name": "startTimer", "in": "TimeTrackingPage", "payload": {} },
     { "name": "stopTimer", "in": "TimeTrackingPage", "payload": {} },
-    { "name": "continueTimer", "in": "TimeTrackingPage", "payload": {} },
-    { "name": "resetTimer", "in": "TimeTrackingPage", "payload": {} },
-    { "name": "addManualSession", "in": "TimeTrackingPage", "payload": { "date": "string", "category": "string", "hours": "number", "minutes": "number" } },
-    { "name": "submitPendingSession", "in": "TimeTrackingPage", "payload": { "session": "Session" } },
-    { "name": "selectChartCategory", "in": "TimeTrackingPage", "payload": { "category": "string" } },
-    { "name": "setTimePeriod", "in": "TimeTrackingPage", "payload": { "period": "week|month|ytd" } },
     { "name": "appendSession", "in": "TimeTrackingPage", "payload": { "session": "Session" } },
     { "name": "editSession", "in": "SessionEditor", "payload": { "session": "Session" } },
     { "name": "deleteSession", "in": "TimeTrackingPage", "payload": { "id": "string" } },

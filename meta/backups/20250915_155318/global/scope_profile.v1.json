@@ -1,19 +1,16 @@
 {
-  "version": "1.7.0",
-  "updated_at": "2025-09-15",
+  "version": "1.6.0",
+  "updated_at": "2025-01-15",
   "product_name": "Geronimo",
   "goals": [
-    "Local-first MVP with webhook integration for data persistence.",
-    "Three modules: todos, ideas, and time_tracking with full functionality.",
+    "Local-first MVP (no real writes yet).",
+    "Three modules: todos, ideas, and time_tracking.",
     "Desktop layout with a collapsible left sidebar; content on the right.",
     "Mobile layout with a top-nav hamburger that opens the same menu.",
     "Shared TopBanner across modules with consistent theme tokens.",
     "Todos and Ideas use category-derived tabs (including All) computed from the dataset.",
     "Tab state persists across browser sessions via localStorage.",
-    "Responsive and accessible UI with full keyboard navigation support.",
-    "Caching system with staged changes for optimal performance.",
-    "Real-time timer with continue functionality and manual time entry.",
-    "Toast notification system for user feedback."
+    "Responsive and accessible UI."
   ],
   "non_goals": [
     "No Cloudflare/Docker/remote infra.",
@@ -24,9 +21,7 @@
     "frontend": "React + TypeScript",
     "build_tool": "Vite",
     "styling": "TailwindCSS",
-    "routing": "in-app state (no URL routing)",
-    "state_management": "React Context + localStorage",
-    "notifications": "Custom toast system"
+    "routing": "in-app state (no URL routing)"
   },
   "layout": {
     "navigation": "left_sidebar_desktop + mobile_drawer",
@@ -55,12 +50,7 @@
         "Status dropdown (UI-only): open | paused | blocked (default open); changes staged only, not persisted.",
         "Row actions: Complete (green) hides row and stages removal; dirty rows show Update (teal) to stage edits.",
         "Save button: rebuilds entire todos file from working set and posts array; disabled with zero staged; shows count when >0.",
-        "Sorting: created_at desc default and priority (high>medium>low|null).",
-        "Caching system with staged changes overlay for performance.",
-        "Force refresh capability via URL parameter.",
-        "BeforeUnload warning for unsaved changes.",
-        "Real-time search filtering across all fields.",
-        "Webhook integration with fallback to mock data."
+        "Sorting: created_at desc default and priority (high>medium>low|null)."
       ],
       "constraints": [
         "Do not hardcode category options; compute from data.",
@@ -70,7 +60,7 @@
       ],
       "defaults": {
         "tab_order": "alpha",
-        "default_sort": { "column": "priority", "direction": "desc" },
+        "default_sort": { "column": "created_at", "direction": "desc" },
         "id_generation": "uuid"
       },
       "acceptance": [
@@ -81,9 +71,7 @@
         "Export length N; first element is oldest (id:1), last is newest (id:N).",
         "All exported status values are 'open'.",
         "Completed rows are absent from export.",
-        "Local UI reflects applied changes after Save; refresh preserves them.",
-        "Caching system reduces webhook calls and improves performance.",
-        "Full keyboard navigation and screen reader support."
+        "Local UI reflects applied changes after Save; refresh preserves them."
       ]
     },
     {
@@ -97,14 +85,7 @@
         "Category dropdown with predefined options: work, projects, videos, writing, health, business, life, future.",
         "Row actions: Remove (red) hides row and stages removal; dirty rows show Update (teal) to stage edits.",
         "Save button: rebuilds entire ideas file from working set and posts array; disabled with zero staged; shows count when >0.",
-        "Sorting: created_at desc default, with placeholder 'Sort by...' option.",
-        "Field-specific editing: different input types for different fields.",
-        "Multiline notes support with dynamic height expansion.",
-        "Caching system with staged changes overlay for performance.",
-        "Force refresh capability via URL parameter.",
-        "BeforeUnload warning for unsaved changes.",
-        "Real-time search filtering across all fields.",
-        "Webhook integration with fallback to mock data."
+        "Sorting: created_at desc default, with placeholder 'Sort by...' option."
       ],
       "constraints": [
         "Category options are predefined dropdown values (not computed from data).",
@@ -114,7 +95,7 @@
       ],
       "defaults": {
         "tab_order": "alpha",
-        "default_sort": { "column": "created_at", "direction": "desc" },
+        "default_sort": { "column": "", "direction": "desc" },
         "id_generation": "timestamp"
       },
       "acceptance": [
@@ -126,10 +107,7 @@
         "Export length N; first element is oldest (id:1), last is newest (id:N).",
         "All exported status values are 'open'.",
         "Completed rows are absent from export.",
-        "Local UI reflects applied changes after Save; refresh preserves them.",
-        "Field-specific input types with proper styling.",
-        "Multiline notes with dynamic height adjustment.",
-        "Full keyboard navigation and screen reader support."
+        "Local UI reflects applied changes after Save; refresh preserves them."
       ]
     },
     {
@@ -137,36 +115,13 @@
       "title": "Time Tracking",
       "surface": "page",
       "requirements": [
-        "Start timer (count-up), stop, continue from elapsed time, reset.",
-        "Manual time entry with separate hour/minute inputs and validation.",
-        "Auto-switch chart category when adding time within current period.",
-        "Real-time timer display with proper state management.",
-        "Form validation preventing double-submission and invalid inputs.",
-        "Chart filtering by category and time period (week/month/year).",
-        "Session persistence with localStorage and webhook integration.",
-        "Toast notifications for user feedback and error handling.",
-        "Cross-tab timer state management with TimerContext.",
-        "Responsive layout with proper alignment and spacing."
+        "Start timer (count-up), stop, edit duration/note, append to list.",
+        "List sessions with edit/delete before submit.",
+        "Submit action is stubbed (mocked API)."
       ],
       "constraints": [
         "Accurate duration math to seconds.",
-        "Local-first behavior (in-memory + optional localStorage).",
-        "Timer state persists across tab switches and page reloads."
-      ],
-      "defaults": {
-        "default_category": "Gaming",
-        "time_period": "week",
-        "chart_category": "Gaming"
-      },
-      "acceptance": [
-        "Timer starts, stops, continues from elapsed time, and resets properly.",
-        "Manual time entry uses separate hour/minute inputs with validation.",
-        "Chart automatically switches to added time category when within current period.",
-        "Form validation prevents double-submission and invalid inputs.",
-        "All timer state persists across tab switches and page reloads.",
-        "Toast notifications provide clear user feedback.",
-        "Responsive design works on mobile and desktop.",
-        "Full keyboard navigation and accessibility support."
+        "Local-first behavior (in-memory + optional localStorage)."
       ]
     }
   ],
@@ -175,8 +130,7 @@
     "driven_by": "/meta/style_profile.json",
     "rules": [
       "Do not hardcode colors/fonts in components; import tokens.",
-      "TopBanner renders identically on all modules.",
-      "Use consistent focus rings and hover states across all interactive elements."
+      "TopBanner renders identically on all modules."
     ]
   },
   "data_model": {
@@ -198,10 +152,10 @@
     },
     "session": {
       "id": "string",
-      "category": "string",
       "started_at": "string ISO-8601",
-      "ended_at": "string ISO-8601",
-      "minutes": "number"
+      "ended_at": "string ISO-8601|null",
+      "duration_ms": "number",
+      "note": "string|null"
     }
   },
   "io_contracts": {
@@ -214,45 +168,26 @@
       "In-memory React state.",
       "Optional localStorage mirror.",
       "Tab state persists via localStorage key 'dashboard-active-tab'.",
-      "Save rebuilds full file payload for webhook (mocked in dev).",
-      "Caching system with staged changes overlay."
+      "Save rebuilds full file payload for webhook (mocked in dev)."
     ],
-    "webhooks": [
+    "future_webhooks": [
       {
-        "name": "fetchTodosFromWebhook",
-        "path": "/webhook/todos",
-        "method": "GET",
-        "enabled_in_mvp": true
-      },
-      {
-        "name": "saveTodosToWebhook",
-        "path": "/webhook/todos",
+        "name": "saveTodosFile",
+        "path": "/webhook/todo-file-save",
         "method": "POST",
-        "enabled_in_mvp": true
+        "enabled_in_mvp": false
       },
       {
-        "name": "fetchIdeasFromWebhook",
-        "path": "/webhook/ideas",
-        "method": "GET",
-        "enabled_in_mvp": true
-      },
-      {
-        "name": "saveIdeasToWebhook",
-        "path": "/webhook/ideas",
+        "name": "saveIdeasFile",
+        "path": "/webhook/ideas-file-save",
         "method": "POST",
-        "enabled_in_mvp": true
+        "enabled_in_mvp": false
       },
       {
-        "name": "fetchSessionsFromWebhook",
-        "path": "/webhook/sessions",
-        "method": "GET",
-        "enabled_in_mvp": true
-      },
-      {
-        "name": "saveSessionsToWebhook",
-        "path": "/webhook/sessions",
+        "name": "saveSessions",
+        "path": "/webhook/time-log-batch-save",
         "method": "POST",
-        "enabled_in_mvp": true
+        "enabled_in_mvp": false
       }
     ]
   },
@@ -260,59 +195,35 @@
     "rules": [
       "Semantic elements; visible focus.",
       "Keyboard operable navigation and tables.",
-      "ARIA where appropriate.",
-      "Screen reader support with live announcements.",
-      "Focus management during editing operations.",
-      "Full keyboard navigation for all interactive elements."
+      "ARIA where appropriate."
     ]
   },
   "architecture": {
     "principles": [
       "Shared primitives (TopBanner, Sidebar, Tabs, Card, Button).",
       "Pages own local state and logic.",
-      "ApiClient centralizes webhook calls.",
-      "TimerContext provides cross-tab timer state management.",
-      "Caching system improves performance and reduces network calls.",
-      "Staging system enables batch operations before saving.",
+      "ApiClient centralizes mocked POSTs.",
       "Avoid cross-page imports that create coupling."
     ],
     "extension_points": [
       "Add new modules by composing the same AppShell.",
-      "Promote mock API to real webhooks with env vars later.",
-      "Add new timer features through TimerContext.",
-      "Extend caching system for new data types."
+      "Promote mock API to real webhooks with env vars later."
     ],
     "guardrails_for_agent": [
       "Do not modify /meta/*.",
       "Do not hardcode categories.",
-      "Prefer new files over modifying shared primitives unless truly shared.",
-      "Use theme tokens consistently across all components.",
-      "Maintain accessibility standards in all new features."
-    ]
-  },
-  "performance": {
-    "caching": [
-      "Local cache with staged changes overlay",
-      "Reduces webhook calls and improves responsiveness",
-      "Force refresh capability for data updates"
-    ],
-    "optimization": [
-      "Optimistic updates for immediate feedback",
-      "Efficient filtering and sorting algorithms",
-      "Lazy loading and code splitting where appropriate"
+      "Prefer new files over modifying shared primitives unless truly shared."
     ]
   },
   "acceptance_checks": [
     "Brand displays as Geronimo in TopBanner.",
     "Desktop: collapsible left sidebar; Mobile: hamburger drawer.",
-    "To-Dos: category tabs derived from data, table styled per tokens, sort/filter/add/edit, Save with webhook integration.",
-    "Ideas: category tabs with predefined options, table styled per tokens, sort/filter/add/edit, Save with webhook integration.",
-    "Time Tracking: start/stop/continue/reset timer, manual time entry, chart filtering, webhook integration.",
+    "To-Dos: category tabs derived from data, table styled per tokens, sort/filter/add/edit, Save stubbed.",
+    "Ideas: category tabs with predefined options, table styled per tokens, sort/filter/add/edit, Save stubbed.",
+    "Time Tracking: start/stop/edit/append, Submit mocked.",
     "Tab state persists across browser sessions via localStorage.",
     "Theme tokens are used consistently across modules.",
-    "A global toast system exists; any module can trigger success/error/info and it renders once via AppShell.",
-    "Caching system works across all modules for improved performance.",
-    "Full accessibility support with keyboard navigation and screen readers.",
-    "Timer state persists across tab switches and page reloads."
+    "A global toast system exists; any module can trigger success/error/info and it renders once via AppShell."
   ]
 }
+  
