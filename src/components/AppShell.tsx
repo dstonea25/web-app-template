@@ -7,6 +7,7 @@ import { MobileDrawer } from './MobileDrawer';
 import { TodosTab } from '../pages/TodosTab';
 import { IdeasTab } from '../pages/IdeasTab';
 import { TimeTrackingTab } from '../pages/TimeTrackingTab';
+import { AllocationsTab } from '../pages/AllocationsTab';
 import { tokens, cn } from '../theme/config';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
@@ -19,7 +20,7 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['todos', 'ideas', 'time_tracking'].includes(savedTab);
+      const isValidSaved = savedTab && ['todos', 'ideas', 'time_tracking', 'allocations'].includes(savedTab);
       return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'todos')) as ModuleId;
     } catch {
       return 'todos';
@@ -54,6 +55,7 @@ export const AppShell: React.FC = () => {
   const TodosTabAny = TodosTab as React.FC<any>;
   const IdeasTabAny = IdeasTab as React.FC<any>;
   const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
+  const AllocationsTabAny = AllocationsTab as React.FC<any>;
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
@@ -112,6 +114,9 @@ export const AppShell: React.FC = () => {
             <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
               <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
             </div>
+            <div className={cn(activeModule === 'allocations' ? 'block' : 'hidden')}>
+              <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+            </div>
           </main>
         </div>
       </div>
@@ -132,6 +137,9 @@ export const AppShell: React.FC = () => {
           </div>
           <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
             <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+          </div>
+          <div className={cn(activeModule === 'allocations' ? 'block' : 'hidden')}>
+            <AllocationsTabAny isVisible={activeModule === 'allocations'} />
           </div>
         </main>
         <MobileDrawer

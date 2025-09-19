@@ -5,17 +5,13 @@ import { tokens, cn } from '../../theme/config';
 const useIsBrowser = () => typeof window !== 'undefined';
 
 const variantClass = (v: ToastMessage['variant']) => {
-  if (v === 'success') return tokens.button.success;
-  if (v === 'error') return tokens.button.danger;
-  return tokens.button.secondary;
+  // All toasts use black background
+  return 'text-white bg-black border-black hover:bg-gray-900 focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950';
 };
 
 export const ToastHost: React.FC = () => {
   // SSR guard
   if (!useIsBrowser()) return null;
-  // Singleton guard (avoid double mount during HMR)
-  if ((window as any).__GERONIMO_TOAST_HOST__) return null;
-  (window as any).__GERONIMO_TOAST_HOST__ = true;
 
   const [items, setItems] = useState<ToastMessage[]>([]);
 
@@ -30,8 +26,6 @@ export const ToastHost: React.FC = () => {
     });
     return () => {
       off();
-      // release singleton on unmount (rare in prod)
-      (window as any).__GERONIMO_TOAST_HOST__ = false;
     };
   }, []);
 
@@ -45,8 +39,28 @@ export const ToastHost: React.FC = () => {
       aria-atomic="false"
     >
       {items.map((t) => (
-        <div key={t.id} className={cn('px-3 py-2 rounded-xl border', variantClass(t.variant))}>
-          {t.message}
+        <div key={t.id} className={cn('px-3 py-2 rounded-xl border flex items-center gap-2', variantClass(t.variant))}>
+          <span className="flex-1">{t.message}</span>
+          {t.actionLabel && (
+            <button
+              className={cn(tokens.button.base, tokens.button.ghost, 'text-sm px-2 py-1')}
+              onClick={async () => {
+                try { await t.onAction?.(); } catch {}
+                setItems((prev) => prev.filter((i) => i.id !== t.id));
+              }}
+            >
+              {t.actionLabel}
+            </button>
+          )}
+          {(t.dismissible ?? true) && (
+            <button
+              aria-label="Dismiss"
+              className={cn(tokens.button.base, tokens.button.ghost, 'text-sm px-2 py-1')}
+              onClick={() => setItems((prev) => prev.filter((i) => i.id !== t.id))}
+            >
+              ×
+            </button>
+          )}
         </div>
       ))}
     </div>

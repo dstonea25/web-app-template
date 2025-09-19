@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "tab": "allocations",
+  "functions": [
+    {
+      "name": "loadAllocations",
+      "description": "Loads the current year's ledger and allotments. Returns derived state: available, coming_up, and unavailable."
+    },
+    {
+      "name": "redeemAllocation",
+      "description": "Takes an item type (e.g. 'Caloric Beverage'), updates ledger with redemption, recalculates derived state."
+    },
+    {
+      "name": "addAllocation",
+      "description": "Optional. Allows manual override to add back one allocation (useful for testing or corrections)."
+    },
+    {
+      "name": "getStats",
+      "description": "Returns analytics view: usage counts, reset schedule, and percentages used this year."
+    }
+  ],
+  "mvp_notes": "Use stubbed data from allotments.json + ledger.jsonl. Persist locally for now. Later connect to n8n webhooks for real data writes."
+}
+
+
+
+

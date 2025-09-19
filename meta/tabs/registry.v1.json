@@ -6,7 +6,7 @@
     "enabled": true,
     "storage_key": "dashboard-active-tab",
     "fallback_behavior": "first_enabled_tab_or_default",
-    "validation": ["todos", "ideas", "time_tracking"]
+    "validation": ["todos", "ideas", "time_tracking", "allocations"]
   },
   "tabs": [
     {
@@ -46,6 +46,19 @@
         "scope": "/meta/tabs/time/tab_scope.v1.json",
         "functions": "/meta/tabs/time/tab_functions.v1.json",
         "styles": "/meta/tabs/time/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "allocations",
+      "title": "Allocations",
+      "route": "/allocations",
+      "icon": "check-square",
+      "order": 25,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/allocations/tab_scope.v1.json",
+        "functions": "/meta/tabs/allocations/tab_functions.v1.json",
+        "styles": "/meta/tabs/allocations/tab_styles.v1.json"
       }
     }
   ]
