@@ -3,7 +3,7 @@ import { cn, tokens } from '../theme/config';
 import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove } from '../lib/allocations';
 import { getCachedData, setCachedData } from '../lib/storage';
 import { tokens as tkn, cn as cx } from '../theme/config';
-import toast from '../lib/notifications/toast';
+import { toast } from '../lib/notifications/toast';
 
 export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [state, setState] = useState<AllocationState | null>(null);
@@ -100,14 +100,21 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   const handleRedeem = async (type: string) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      // Call redeemItem which now waits for webhook confirmation before returning
       const s = await redeemItem(type);
       setState(s);
+      
+      // Only show success toast after webhook confirms the save
       toast.success(`Redeemed: ${type}`, { ttlMs: 5000, actionLabel: 'Undo', onAction: async () => {
         const afterUndo = await addAllocation(type);
         setState(afterUndo);
       }, dismissible: true });
     } catch (e) {
+      console.error('Failed to redeem:', e);
       setError(e instanceof Error ? e.message : 'Failed to redeem');
+      toast.error(`Failed to redeem ${type}: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -116,8 +123,13 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   const handleAdmitDefeat = async (type: string) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      // Call admitDefeat which now waits for webhook confirmation before returning
       const s = await admitDefeat(type);
       setState(s);
+      
+      // Only show success toast after webhook confirms the save
       toast.success(`😅 Heads up — you went over your ${type} limit. It happens but this fuck up has been logged.`, { 
         ttlMs: 8000, 
         actionLabel: 'Undo', 
@@ -128,7 +140,9 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         dismissible: true 
       });
     } catch (e) {
+      console.error('Failed to admit defeat:', e);
       setError(e instanceof Error ? e.message : 'Failed to admit defeat');
+      toast.error(`Failed to log ${type} overage: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -136,18 +150,47 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
 
   const handleManualAdd = async () => {
     if (!newItem.trim()) return;
+    
     try {
-      const key = 'allocations.manual.additions';
-      const existing = JSON.parse(localStorage.getItem(key) || '[]');
-      const addition = { type: newItem.trim(), quota: Number(newQuota)||1, cadence: newCadence, multiplier: Number(newMultiplier)||1 };
-      localStorage.setItem(key, JSON.stringify([...existing, addition]));
-      // Reload baseline and merge
+      setLoading(true);
+      setError(null);
+      
+      // Create new allocation item
+      const newAllocation = { 
+        type: newItem.trim(), 
+        quota: Number(newQuota) || 1, 
+        cadence: newCadence, 
+        multiplier: Number(newMultiplier) || 1 
+      };
+      
+      console.log('💾 Adding new allocation:', newAllocation);
+      
+      // Add to current items
+      const updatedItems = [...(state?.items || []), newAllocation];
+      
+      // Save to webhook
+      await saveAllocationsItems(updatedItems);
+      console.log('✅ New allocation saved successfully to webhook');
+      
+      // Reload from webhook to get updated state
       const fresh = await loadLedgerAndAllotments();
-      const merged = { ...fresh, items: [...fresh.items, addition] } as AllocationState;
-      setState(merged);
-      setNewItem(''); setNewQuota('1'); setNewMultiplier('1'); setNewCadence('monthly');
+      setState(fresh);
+      
+      // Only show success toast after webhook confirms the save
+      toast.success(`Added new allocation: ${newItem.trim()}`);
+      
+      // Reset form
+      setNewItem(''); 
+      setNewQuota('1'); 
+      setNewMultiplier('1'); 
+      setNewCadence('monthly');
+      
     } catch (e) {
-      console.error(e);
+      console.error('Failed to add allocation:', e);
+      setError(e instanceof Error ? e.message : 'Failed to add allocation');
+      toast.error(`Failed to add allocation: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -169,17 +212,31 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
 
   const commitAllocations = async () => {
     if (!state) return;
+    
     try {
-      // Save to webhook
+      setLoading(true);
+      setError(null);
+      
+      console.log('💾 Saving allocations to webhook...');
+      
+      // Save to webhook and wait for confirmation
       await saveAllocationsItems(state.items);
-      toast.success('Allocations saved successfully');
-      // Recompute derived from saved items
+      console.log('✅ Allocations saved successfully to webhook');
+      
+      // Reload from webhook to get updated state
       const fresh = await loadLedgerAndAllotments();
       setState(fresh);
       clearStagedAllocationChanges();
+      
+      // Only show success toast after webhook confirms the save
+      toast.success('Allocations saved successfully');
+      
     } catch (error) {
       console.error('Failed to save allocations:', error);
-      toast.error('Failed to save allocations');
+      setError(error instanceof Error ? error.message : 'Failed to save allocations');
+      toast.error(`Failed to save allocations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -240,6 +297,19 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
 
   if (!state) return null;
 
+  // Sort items by cadence (weekly -> monthly -> yearly) then by quota (small to large)
+  const sortedItems = [...state.items].sort((a, b) => {
+    // First sort by cadence
+    const cadenceOrder = { weekly: 1, monthly: 2, yearly: 3 };
+    const cadenceDiff = (cadenceOrder[a.cadence as keyof typeof cadenceOrder] || 4) - 
+                       (cadenceOrder[b.cadence as keyof typeof cadenceOrder] || 4);
+    
+    if (cadenceDiff !== 0) return cadenceDiff;
+    
+    // Then sort by quota (small to large)
+    return a.quota - b.quota;
+  });
+
   const allTypes = state.items.map(i => i.type);
   const availableTypes = new Set(state.available.map(item => item.type));
   const comingSoon = state.coming_up;
@@ -254,7 +324,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         </h2>
         {(() => {
           // Group available items by cadence (weekly, monthly, yearly). Quarterly rolls into monthly.
-          const cadenceByType = new Map(state.items.map(it => [it.type, it.cadence as 'weekly'|'monthly'|'quarterly'|'yearly']));
+          const cadenceByType = new Map(sortedItems.map(it => [it.type, it.cadence as 'weekly'|'monthly'|'quarterly'|'yearly']));
           const groups: Record<'weekly'|'monthly'|'yearly', typeof state.available> = {
             weekly: [],
             monthly: [],
@@ -454,7 +524,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
               </tr>
             </thead>
             <tbody>
-              {state.items.map((it, idx) => (
+              {sortedItems.map((it, idx) => (
                 <tr key={it.type + idx} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
                   <td className={tokens.table.td}>
                     {editingCell?.index === idx && editingCell?.field === 'type' ? (

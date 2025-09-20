@@ -461,7 +461,13 @@ export async function loadLedgerAndAllotments(): Promise<AllocationState> {
   console.log('🔍 Debug: allotmentsRes.data.allotments:', allotmentsRes?.data?.allotments);
   
   // Check for nested data structure first (webhook format)
-  const actualData = allotmentsRes?.data || allotmentsRes;
+  let actualData = allotmentsRes?.data || allotmentsRes;
+  
+  // Handle case where data is an array (new webhook format)
+  if (Array.isArray(actualData) && actualData.length > 0) {
+    actualData = actualData[0];
+    console.log('🔍 Debug: Extracted first item from data array');
+  }
   
   if (actualData && actualData.items && Array.isArray(actualData.items)) {
     console.log('🔍 Debug: Using format A (items array)');
@@ -483,6 +489,7 @@ export async function loadLedgerAndAllotments(): Promise<AllocationState> {
     }));
   } else {
     console.log('🔍 Debug: No recognized format found, items will be empty');
+    console.log('🔍 Debug: actualData structure:', actualData);
   }
   
   console.log('🔍 Debug: Parsed items:', items);
@@ -544,19 +551,24 @@ export async function redeemItem(type: string): Promise<AllocationState> {
     throw new Error(`Cannot redeem ${type} - not available`);
   }
   
-  // Create new ledger event
-  const event: LedgerEvent = { 
-    id: crypto.randomUUID(), 
-    date: new Date().toISOString().slice(0, 10), 
-    type 
-  } as LedgerEvent;
+  // Create new ledger event in the format expected by n8n (JSONL format)
+  const event = {
+    type: "redeem",
+    item: type,
+    qty: 1,
+    ts: new Date().toISOString(),
+    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
+  };
   
-  // Save to webhook
+  console.log('💾 Creating redemption event:', event);
+  
+  // Save to webhook and wait for confirmation
   try {
     await saveLedgerToWebhook([event]);
+    console.log('✅ Redemption saved successfully to webhook');
   } catch (e) {
-    console.error('Failed to save redemption to webhook:', e);
-    throw new Error('Failed to save redemption');
+    console.error('❌ Failed to save redemption to webhook:', e);
+    throw new Error('Failed to save redemption to webhook');
   }
   
   // Reload from webhook to get updated state
@@ -572,18 +584,23 @@ export async function addAllocation(type: string): Promise<AllocationState> {
 }
 
 export async function admitDefeat(type: string): Promise<AllocationState> {
-  // Log the overage redemption (same as regular redemption but for unavailable items)
-  const event: LedgerEvent = { 
-    id: crypto.randomUUID(), 
-    date: new Date().toISOString().slice(0, 10), 
-    type 
-  } as LedgerEvent;
+  // Create failed redemption event in the format expected by n8n (JSONL format)
+  const event = {
+    type: "failed",
+    item: type,
+    qty: 1,
+    ts: new Date().toISOString(),
+    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
+  };
+  
+  console.log('💾 Creating failed redemption event:', event);
   
   try {
     await saveLedgerToWebhook([event]);
+    console.log('✅ Failed redemption saved successfully to webhook');
   } catch (e) {
-    console.error('Failed to save overage redemption to webhook:', e);
-    throw new Error('Failed to save overage redemption');
+    console.error('❌ Failed to save overage redemption to webhook:', e);
+    throw new Error('Failed to save overage redemption to webhook');
   }
   
   // Reload from webhook to get updated state
