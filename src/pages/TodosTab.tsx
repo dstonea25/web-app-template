@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Todo, Priority, TodoPatch } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
@@ -23,10 +23,11 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: null });
   const [stagedCount, setStagedCount] = useState<number>(0);
 
-  // Load initial data only on first mount
+  // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
+    if (!isVisible) return;
     loadTodos();
-  }, []); // Empty dependency array - only run once
+  }, [isVisible]);
 
   // Warn user before closing if there are unsaved changes
   useEffect(() => {

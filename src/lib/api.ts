@@ -81,6 +81,10 @@ const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas'
 const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
 const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
 const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
+const N8N_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments';
+const N8N_SAVE_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments';
+const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments-ledger';
+const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments-ledger';
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Webhook function to fetch todos
@@ -406,6 +410,161 @@ export const saveSessionsToWebhook = async (sessions: Session[]): Promise<void> 
     console.log('✅ Sessions saved successfully to webhook');
   } catch (error) {
     console.error('❌ Failed to save sessions to webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to fetch allotments
+export const fetchAllotmentsFromWebhook = async (): Promise<any> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+    console.log('🌐 Making request to:', N8N_ALLOTMENTS_WEBHOOK_URL);
+
+    const response = await fetch(N8N_ALLOTMENTS_WEBHOOK_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('❌ Allotments webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please check your VITE_N8N_WEBHOOK_TOKEN environment variable.');
+      } else if (response.status === 404) {
+        throw new Error('Webhook endpoint not found. Please check the webhook URL configuration.');
+      } else {
+        throw new Error(`Webhook error: ${response.status} - ${errorText || response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log('📦 Allotments webhook response data:', data);
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch allotments from webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to save allotments
+export const saveAllotmentsToWebhook = async (allotments: any): Promise<void> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('💾 Saving allotments to webhook...');
+    console.log('📦 Allotments to save:', allotments);
+
+    const response = await fetch(N8N_SAVE_ALLOTMENTS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(allotments),
+    });
+
+    if (!response.ok) {
+      console.error('❌ Save allotments webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    }
+
+    console.log('✅ Allotments saved successfully to webhook');
+  } catch (error) {
+    console.error('❌ Failed to save allotments to webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to fetch ledger
+export const fetchLedgerFromWebhook = async (): Promise<string> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+    console.log('🌐 Making request to:', N8N_LEDGER_WEBHOOK_URL);
+
+    const response = await fetch(N8N_LEDGER_WEBHOOK_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('❌ Ledger webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please check your VITE_N8N_WEBHOOK_TOKEN environment variable.');
+      } else if (response.status === 404) {
+        throw new Error('Webhook endpoint not found. Please check the webhook URL configuration.');
+      } else {
+        throw new Error(`Webhook error: ${response.status} - ${errorText || response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log('📦 Ledger webhook response data:', data);
+    
+    // Handle empty response or missing data property
+    if (!data || !data.data) {
+      console.log('📦 Empty response from ledger webhook - returning empty string');
+      return '';
+    }
+
+    return data.data; // Return the JSONL string
+  } catch (error) {
+    console.error('Failed to fetch ledger from webhook:', error);
+    throw error;
+  }
+};
+
+// Webhook function to save ledger
+export const saveLedgerToWebhook = async (ledgerEvents: any[]): Promise<void> => {
+  try {
+    if (!N8N_WEBHOOK_TOKEN) {
+      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+    }
+
+    console.log('💾 Saving ledger to webhook...');
+    console.log('📦 Ledger events to save:', ledgerEvents);
+
+    const response = await fetch(N8N_SAVE_LEDGER_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ledgerEvents),
+    });
+
+    if (!response.ok) {
+      console.error('❌ Save ledger webhook response error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    }
+
+    console.log('✅ Ledger saved successfully to webhook');
+  } catch (error) {
+    console.error('❌ Failed to save ledger to webhook:', error);
     throw error;
   }
 };

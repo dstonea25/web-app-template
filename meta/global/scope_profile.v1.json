@@ -253,7 +253,31 @@
         "path": "/webhook/sessions",
         "method": "POST",
         "enabled_in_mvp": true
-      }
+      },
+      {
+        "name": "fetchAllotmentsFromWebhook",
+        "path": "/webhook/allotments",
+        "method": "GET",
+        "enabled_in_mvp": true
+      },
+      {
+        "name": "saveAllotmentsToWebhook",
+        "path": "/webhook/save-allotments",
+        "method": "POST",
+        "enabled_in_mvp": true
+      },
+      {
+        "name": "fetchLedgerFromWebhook",
+        "path": "/webhook/allotments-ledger",
+        "method": "GET",
+        "enabled_in_mvp": true
+      },
+    {
+      "name": "saveLedgerToWebhook",
+      "path": "/webhook/save-allotments-ledger",
+      "method": "POST",
+      "enabled_in_mvp": true
+    }
     ]
   },
   "accessibility": {

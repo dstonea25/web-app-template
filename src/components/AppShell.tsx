@@ -105,18 +105,18 @@ export const AppShell: React.FC = () => {
         <div className={tokens.app_shell.content}>
           <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
           <main className="p-6">
-            <div className={cn(activeModule === 'todos' ? 'block' : 'hidden')}>
-              <TodosTabAny isVisible={activeModule === 'todos'} />
-            </div>
-            <div className={cn(activeModule === 'ideas' ? 'block' : 'hidden')}>
-              <IdeasTabAny isVisible={activeModule === 'ideas'} />
-            </div>
-            <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
-              <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
-            </div>
-            <div className={cn(activeModule === 'allocations' ? 'block' : 'hidden')}>
-              <AllocationsTabAny isVisible={activeModule === 'allocations'} />
-            </div>
+            {activeModule === 'todos' && (
+              <TodosTabAny isVisible={true} />
+            )}
+            {activeModule === 'ideas' && (
+              <IdeasTabAny isVisible={true} />
+            )}
+            {activeModule === 'time_tracking' && (
+              <TimeTrackingTabAny isVisible={true} />
+            )}
+            {activeModule === 'allocations' && (
+              <AllocationsTabAny isVisible={true} />
+            )}
           </main>
         </div>
       </div>
@@ -129,18 +129,18 @@ export const AppShell: React.FC = () => {
           rightSlot={<LogoutButton />}
         />
         <main className="p-4">
-          <div className={cn(activeModule === 'todos' ? 'block' : 'hidden')}>
-            <TodosTabAny isVisible={activeModule === 'todos'} />
-          </div>
-          <div className={cn(activeModule === 'ideas' ? 'block' : 'hidden')}>
-            <IdeasTabAny isVisible={activeModule === 'ideas'} />
-          </div>
-          <div className={cn(activeModule === 'time_tracking' ? 'block' : 'hidden')}>
-            <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
-          </div>
-          <div className={cn(activeModule === 'allocations' ? 'block' : 'hidden')}>
-            <AllocationsTabAny isVisible={activeModule === 'allocations'} />
-          </div>
+          {activeModule === 'todos' && (
+            <TodosTabAny isVisible={true} />
+          )}
+          {activeModule === 'ideas' && (
+            <IdeasTabAny isVisible={true} />
+          )}
+          {activeModule === 'time_tracking' && (
+            <TimeTrackingTabAny isVisible={true} />
+          )}
+          {activeModule === 'allocations' && (
+            <AllocationsTabAny isVisible={true} />
+          )}
         </main>
         <MobileDrawer
           items={navigationItems}

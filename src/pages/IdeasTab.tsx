@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
@@ -24,10 +24,11 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   });
   const [stagedCount, setStagedCount] = useState<number>(0);
 
-  // Load initial data only on first mount
+  // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
+    if (!isVisible) return;
     loadIdeas();
-  }, []); // Empty dependency array - only run once
+  }, [isVisible]);
 
   // Warn user before closing if there are unsaved changes
   useEffect(() => {

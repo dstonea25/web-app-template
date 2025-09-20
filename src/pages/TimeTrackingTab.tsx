@@ -62,10 +62,11 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   
   const intervalRef = useRef<number | null>(null);
 
-  // Initialize tab
+  // Initialize tab when it mounts (only happens when tab is active)
   useEffect(() => {
+    if (!isVisible) return;
     initializeTimeTab();
-  }, []);
+  }, [isVisible]);
 
   // Timer effect gated by visibility
   useEffect(() => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn, tokens } from '../theme/config';
 import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove } from '../lib/allocations';
+import { getCachedData, setCachedData } from '../lib/storage';
 import { tokens as tkn, cn as cx } from '../theme/config';
 import toast from '../lib/notifications/toast';
 
@@ -23,12 +24,54 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
     }, 0);
   };
 
+  // Track if data has been loaded to prevent multiple calls
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
+    if (!isVisible || hasLoadedRef.current) return;
+    
     (async () => {
       try {
+        hasLoadedRef.current = true;
         setLoading(true);
         setError(null);
+        
+        // Check if refresh was explicitly requested via URL parameter or hard refresh
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceRefresh = urlParams.get('refresh') === 'true' || 
+                            (window.performance.getEntriesByType('navigation')[0] as any)?.type === 'reload';
+        
+        if (forceRefresh) {
+          console.log('🔄 Force refresh requested via URL parameter');
+          // Remove the refresh parameter from URL without reloading
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('refresh');
+          window.history.replaceState({}, '', newUrl.toString());
+        }
+        
+        // Always check cache first - only bypass if explicitly refreshing
+        const cachedState = getCachedData<AllocationState>('allocations-cache');
+        if (cachedState && !forceRefresh) {
+          console.log('📦 Loading allocations from cache');
+          setState(cachedState);
+          setLoading(false);
+          return;
+        }
+        
+        if (forceRefresh) {
+          console.log('🔄 Force refresh requested - clearing cache and loading fresh data');
+        }
+        
+        // Clear localStorage to force fresh data load
+        localStorage.removeItem('allocations-cache');
+        
+        // Use the global loading function which handles duplicate calls
+        console.log('🌐 Loading allocations from webhook...');
         const s = await loadLedgerAndAllotments();
+        console.log('✅ Allocations loaded from webhook:', s);
+        
+        // Cache the data
+        setCachedData('allocations-cache', s);
         setState(s);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load allocations');
@@ -36,7 +79,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         setLoading(false);
       }
     })();
-  }, []);
+  }, [isVisible]);
 
   // One-time recovery: if Chocolate Strawberry Bag is missing due to a saved override,
   // clear overrides and reload from file data.
@@ -126,12 +169,18 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
 
   const commitAllocations = async () => {
     if (!state) return;
-    // Persist override locally (stub). In future: webhook.
-    saveAllocationsItems(state.items);
-    // Recompute derived from saved items
-    const fresh = await loadLedgerAndAllotments();
-    setState(fresh);
-    clearStagedAllocationChanges();
+    try {
+      // Save to webhook
+      await saveAllocationsItems(state.items);
+      toast.success('Allocations saved successfully');
+      // Recompute derived from saved items
+      const fresh = await loadLedgerAndAllotments();
+      setState(fresh);
+      clearStagedAllocationChanges();
+    } catch (error) {
+      console.error('Failed to save allocations:', error);
+      toast.error('Failed to save allocations');
+    }
   };
 
   const reloadAllocations = async () => {
@@ -152,17 +201,16 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
               onClick={async ()=>{ clearAllocationsOverrides(); const fresh = await loadLedgerAndAllotments(); setState(fresh); }}
               className={cn(tokens.button.base, tokens.button.ghost, 'text-sm')}
             >
-              Reset to File Data
+              Reset Overrides
             </button>
             <button
               onClick={async ()=>{ 
-                localStorage.removeItem('allocations.ledger.append'); 
                 const fresh = await loadLedgerAndAllotments(); 
                 setState(fresh); 
               }}
               className={cn(tokens.button.base, tokens.button.ghost, 'text-sm')}
             >
-              Clear Local Events
+              Reload from Webhook
             </button>
           </div>
         </div>
@@ -176,8 +224,8 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         <div className="flex justify-center items-center py-12">
           <div className="text-center">
             <div className="text-red-500 mb-4">⚠️</div>
-            <h3 className="text-lg font-semibold mb-2">Failed to Load Allocations</h3>
-            <p className="text-sm text-gray-400 mb-4">{error}</p>
+            <h3 className="text-lg font-semibold text-neutral-100 mb-2">Failed to Load Allocations</h3>
+            <p className="text-sm text-neutral-400 mb-4">{error}</p>
             <button
               onClick={() => window.location.reload()}
               className={cn(tokens.button.base, tokens.button.primary)}
