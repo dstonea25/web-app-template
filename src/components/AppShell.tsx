@@ -105,18 +105,18 @@ export const AppShell: React.FC = () => {
         <div className={tokens.app_shell.content}>
           <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
           <main className="p-6">
-            {activeModule === 'todos' && (
-              <TodosTabAny isVisible={true} />
-            )}
-            {activeModule === 'ideas' && (
-              <IdeasTabAny isVisible={true} />
-            )}
-            {activeModule === 'time_tracking' && (
-              <TimeTrackingTabAny isVisible={true} />
-            )}
-            {activeModule === 'allocations' && (
-              <AllocationsTabAny isVisible={true} />
-            )}
+            <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
+              <TodosTabAny isVisible={activeModule === 'todos'} />
+            </section>
+            <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
+              <IdeasTabAny isVisible={activeModule === 'ideas'} />
+            </section>
+            <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
+              <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+            </section>
+            <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
+              <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+            </section>
           </main>
         </div>
       </div>
@@ -129,18 +129,18 @@ export const AppShell: React.FC = () => {
           rightSlot={<LogoutButton />}
         />
         <main className="p-4">
-          {activeModule === 'todos' && (
-            <TodosTabAny isVisible={true} />
-          )}
-          {activeModule === 'ideas' && (
-            <IdeasTabAny isVisible={true} />
-          )}
-          {activeModule === 'time_tracking' && (
-            <TimeTrackingTabAny isVisible={true} />
-          )}
-          {activeModule === 'allocations' && (
-            <AllocationsTabAny isVisible={true} />
-          )}
+          <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
+            <TodosTabAny isVisible={activeModule === 'todos'} />
+          </section>
+          <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
+            <IdeasTabAny isVisible={activeModule === 'ideas'} />
+          </section>
+          <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
+            <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+          </section>
+          <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
+            <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+          </section>
         </main>
         <MobileDrawer
           items={navigationItems}

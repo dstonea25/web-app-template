@@ -4,7 +4,7 @@ import { tokens, cn } from '../../theme/config';
 
 const useIsBrowser = () => typeof window !== 'undefined';
 
-const variantClass = (v: ToastMessage['variant']) => {
+const variantClass = (_v: ToastMessage['variant']) => {
   // All toasts use black background
   return 'text-white bg-black border-black hover:bg-gray-900 focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950';
 };

@@ -22,10 +22,12 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [activeCategory, setActiveCategory] = useState('All');
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: null });
   const [stagedCount, setStagedCount] = useState<number>(0);
+  const hasLoadedRef = useRef(false);
 
   // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     loadTodos();
   }, [isVisible]);
 

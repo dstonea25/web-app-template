@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { cn, tokens } from '../theme/config';
 import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove } from '../lib/allocations';
 import { getCachedData, setCachedData } from '../lib/storage';
-import { tokens as tkn, cn as cx } from '../theme/config';
 import { toast } from '../lib/notifications/toast';
 
 export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
@@ -24,15 +23,14 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
     }, 0);
   };
 
-  // Track if data has been loaded to prevent multiple calls
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!isVisible || hasLoadedRef.current) return;
     
+    hasLoadedRef.current = true;
     (async () => {
       try {
-        hasLoadedRef.current = true;
         setLoading(true);
         setError(null);
         
@@ -310,8 +308,8 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
     return a.quota - b.quota;
   });
 
-  const allTypes = state.items.map(i => i.type);
-  const availableTypes = new Set(state.available.map(item => item.type));
+  // const allTypes = state.items.map(i => i.type);
+  // const availableTypes = new Set(state.available.map(item => item.type));
   const comingSoon = state.coming_up;
   const unavailableList = state.unavailable;
 
@@ -350,9 +348,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                     <div key={item.type} className="p-6 rounded-2xl border border-neutral-800 bg-neutral-900 flex flex-col items-center justify-center text-center min-h-[120px]">
                       <h4 className="font-semibold text-neutral-100 text-lg mb-2">{item.type}</h4>
                       <div className="text-neutral-400 mb-4">
-                        <span className="font-semibold text-lg">{item.remaining}</span>
-                        <span className="mx-1">/</span>
-                        <span className="text-lg">{item.total}</span>
+                        <span className="font-semibold text-lg">{item.remaining} Available</span>
                       </div>
                       <button
                         onClick={() => handleRedeem(item.type)}
@@ -524,43 +520,46 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
               </tr>
             </thead>
             <tbody>
-              {sortedItems.map((it, idx) => (
-                <tr key={it.type + idx} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
-                  <td className={tokens.table.td}>
-                    {editingCell?.index === idx && editingCell?.field === 'type' ? (
-                      <input
-                        className={cn(tokens.input.base, tokens.input.focus)}
-                        value={it.type}
-                        onChange={(e)=>updateItem(idx, { type: e.target.value })}
-                        onBlur={()=>setEditingCell(null)}
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: idx, field: 'type' })}>{it.type}</span>
-                    )}
-                  </td>
-                  <td className={tokens.table.td}>
-                    {editingCell?.index === idx && editingCell?.field === 'quota' ? (
-                      <input
-                        type="number"
-                        min={0}
-                        className={cn(tokens.input.base, tokens.input.focus, 'w-20')}
-                        value={String(it.quota)}
-                        onChange={(e)=>updateItem(idx, { quota: Number(e.target.value)||0 })}
+              {sortedItems.map((it, sortedIdx) => {
+                // Find the original index in state.items
+                const originalIdx = state.items.findIndex(item => item.type === it.type);
+                return (
+                  <tr key={it.type + sortedIdx} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
+                    <td className={tokens.table.td}>
+                      {editingCell?.index === originalIdx && editingCell?.field === 'type' ? (
+                        <input
+                          className={cn(tokens.input.base, tokens.input.focus)}
+                          value={it.type}
+                          onChange={(e)=>updateItem(originalIdx, { type: e.target.value })}
+                          onBlur={()=>setEditingCell(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'type' })}>{it.type}</span>
+                      )}
+                    </td>
+                    <td className={tokens.table.td}>
+                      {editingCell?.index === originalIdx && editingCell?.field === 'quota' ? (
+                        <input
+                          type="number"
+                          min={0}
+                          className={cn(tokens.input.base, tokens.input.focus, 'w-20')}
+                          value={String(it.quota)}
+                          onChange={(e)=>updateItem(originalIdx, { quota: Number(e.target.value)||0 })}
                         onFocus={handleSelectAll}
                         ref={(el)=>{ if (el) { setTimeout(()=>{ try { el.select(); } catch {} }, 0); } }}
                         onBlur={()=>setEditingCell(null)}
                       />
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: idx, field: 'quota' })}>{it.quota}</span>
+                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'quota' })}>{it.quota}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
-                    {editingCell?.index === idx && editingCell?.field === 'cadence' ? (
+                    {editingCell?.index === originalIdx && editingCell?.field === 'cadence' ? (
                       <select
                         className={cn(tokens.input.base, tokens.input.focus)}
                         value={it.cadence}
-                        onChange={(e)=>updateItem(idx, { cadence: e.target.value as any })}
+                        onChange={(e)=>updateItem(originalIdx, { cadence: e.target.value as any })}
                         autoFocus
                         onBlur={()=>setEditingCell(null)}
                       >
@@ -569,35 +568,36 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                         <option value="yearly">yearly</option>
                       </select>
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: idx, field: 'cadence' })}>{it.cadence}</span>
+                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'cadence' })}>{it.cadence}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
-                    {editingCell?.index === idx && editingCell?.field === 'multiplier' ? (
+                    {editingCell?.index === originalIdx && editingCell?.field === 'multiplier' ? (
                       <input
                         type="number"
                         min={1}
                         className={cn(tokens.input.base, tokens.input.focus, 'w-20')}
                         value={String(it.multiplier || 1)}
-                        onChange={(e)=>updateItem(idx, { multiplier: Math.max(1, Number(e.target.value)||1) })}
+                        onChange={(e)=>updateItem(originalIdx, { multiplier: Math.max(1, Number(e.target.value)||1) })}
                         onFocus={handleSelectAll}
                         ref={(el)=>{ if (el) { setTimeout(()=>{ try { el.select(); } catch {} }, 0); } }}
                         onBlur={()=>setEditingCell(null)}
                       />
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: idx, field: 'multiplier' })}>{it.multiplier || 1}</span>
+                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'multiplier' })}>{it.multiplier || 1}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
                     <button
                       className={cn(tokens.button.base, tokens.button.secondary, 'text-sm')}
-                      onClick={()=>removeItem(idx)}
+                      onClick={()=>removeItem(originalIdx)}
                     >
                       Remove
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

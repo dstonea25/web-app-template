@@ -343,86 +343,10 @@ function buildWindow(nowUTC: Date, cadence: AllocationCadence, m: number, tz: st
   return { start: s, end: e };
 }
 
-const addUnits = (d: Date, cadence: AllocationCadence, units: number): Date => {
-  const next = new Date(d);
-  if (cadence === 'weekly') {
-    next.setDate(next.getDate() + (7 * units));
-  } else if (cadence === 'monthly') {
-    next.setMonth(next.getMonth() + units, 1);
-  } else if (cadence === 'quarterly') {
-    next.setMonth(next.getMonth() + (3 * units), 1);
-  } else {
-    next.setFullYear(next.getFullYear() + units, 0, 1);
-  }
-  next.setHours(0, 0, 0, 0);
-  return next;
-};
-
-const startOfPeriodAfter = (date: Date, cadence: AllocationCadence, multiplier: number = 1): Date => {
-  const d = new Date(date);
-  if (cadence === 'weekly') {
-    const day = d.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    // start of this week (Mon)
-    const startThis = new Date(d);
-    startThis.setDate(d.getDate() + mondayOffset);
-    startThis.setHours(0, 0, 0, 0);
-    // next window start considering multiplier
-    return addUnits(startThis, 'weekly', multiplier);
-  }
-  if (cadence === 'monthly') {
-    const startThis = new Date(d.getFullYear(), d.getMonth(), 1);
-    startThis.setHours(0, 0, 0, 0);
-    return addUnits(startThis, 'monthly', multiplier);
-  }
-  if (cadence === 'quarterly') {
-    const month = d.getMonth();
-    const nextQuarterMonth = Math.floor(month / 3) * 3 + 3;
-    const startThis = new Date(d.getFullYear(), Math.floor(month / 3) * 3, 1);
-    startThis.setHours(0, 0, 0, 0);
-    return addUnits(startThis, 'quarterly', multiplier);
-  }
-  // yearly
-  const startThis = new Date(d.getFullYear(), 0, 1);
-  startThis.setHours(0, 0, 0, 0);
-  return addUnits(startThis, 'yearly', multiplier);
-};
-
-const startOfCurrentPeriod = (date: Date, cadence: AllocationCadence, multiplier: number = 1): Date => {
-  const d = new Date(date);
-  if (cadence === 'weekly') {
-    const day = d.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const start = new Date(d);
-    start.setDate(d.getDate() + mondayOffset);
-    start.setHours(0, 0, 0, 0);
-    // Slide back by (multiplier - 1) windows to find the true window start
-    return addUnits(start, 'weekly', 1 - multiplier);
-  }
-  if (cadence === 'monthly') {
-    // Find the block start aligned to multiplier months
-    const month = d.getMonth();
-    const baseMonth = Math.floor(month / multiplier) * multiplier;
-    const start = new Date(d.getFullYear(), baseMonth, 1);
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-  if (cadence === 'quarterly') {
-    const month = d.getMonth();
-    const quarterStartMonth = Math.floor(month / (3 * multiplier)) * (3 * multiplier);
-    const start = new Date(d.getFullYear(), quarterStartMonth, 1);
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-  const start = new Date(d.getFullYear(), 0, 1);
-  start.setHours(0, 0, 0, 0);
-  // For yearly, multiplier means multi-year windows
-  return addUnits(start, 'yearly', 0); // same year start
-};
+// Removed unused helpers startOfPeriodAfter and startOfCurrentPeriod
 
 const daysUntil = (date: Date) => {
   const now = new Date();
-  const tz = deviceTZ();
   const ms = startOfDay(date).getTime() - startOfDay(now).getTime();
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
 };
@@ -607,7 +531,7 @@ export async function admitDefeat(type: string): Promise<AllocationState> {
   return await loadLedgerAndAllotments();
 }
 
-export async function undoAdmitDefeat(type: string): Promise<AllocationState> {
+export async function undoAdmitDefeat(_type: string): Promise<AllocationState> {
   // For webhook implementation, we'll need to handle this differently
   // Since we can't easily "undo" a webhook save, we'll just reload the current state
   // In a real implementation, you might want to add a "negative" ledger event

@@ -23,10 +23,12 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     notes: '' 
   });
   const [stagedCount, setStagedCount] = useState<number>(0);
+  const hasLoadedRef = useRef(false);
 
   // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     loadIdeas();
   }, [isVisible]);
 

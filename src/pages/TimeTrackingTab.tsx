@@ -62,9 +62,12 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   
   const intervalRef = useRef<number | null>(null);
 
+  const hasInitializedRef = useRef(false);
+
   // Initialize tab when it mounts (only happens when tab is active)
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
     initializeTimeTab();
   }, [isVisible]);
 
