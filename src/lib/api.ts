@@ -87,15 +87,31 @@ const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allot
 const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments-ledger';
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
+// Global loading states to prevent duplicate webhook calls
+let isLoadingTodos = false;
+let isLoadingIdeas = false;
+let isLoadingTime = false;
+let todosLoadingPromise: Promise<Todo[]> | null = null;
+let ideasLoadingPromise: Promise<Idea[]> | null = null;
+let timeLoadingPromise: Promise<Session[]> | null = null;
+
 // Webhook function to fetch todos
 export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
+  // If already loading, return the existing promise
+  if (isLoadingTodos && todosLoadingPromise) {
+    console.log('⏳ Todos already loading, returning existing promise');
+    return todosLoadingPromise;
+  }
+  
+  isLoadingTodos = true;
+  todosLoadingPromise = (async () => {
+    try {
+      if (!N8N_WEBHOOK_TOKEN) {
+        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+      }
 
-    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-    console.log('🌐 Making request to:', N8N_WEBHOOK_URL);
+      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+      console.log('🌐 Making request to:', N8N_WEBHOOK_URL);
 
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'GET',
@@ -135,10 +151,16 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
       console.error('❌ Response format not recognized:', data);
       throw new Error('Invalid response format: expected object with data property containing todos array');
     }
-  } catch (error) {
-    console.error('Failed to fetch todos from webhook:', error);
-    throw error;
-  }
+    } catch (error) {
+      console.error('Failed to fetch todos from webhook:', error);
+      throw error;
+    } finally {
+      isLoadingTodos = false;
+      todosLoadingPromise = null;
+    }
+  })();
+  
+  return todosLoadingPromise;
 };
 
 // Webhook function to save todos
@@ -193,13 +215,21 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
 
 // Webhook function to fetch ideas
 export const fetchIdeasFromWebhook = async (): Promise<Idea[]> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
+  // If already loading, return the existing promise
+  if (isLoadingIdeas && ideasLoadingPromise) {
+    console.log('⏳ Ideas already loading, returning existing promise');
+    return ideasLoadingPromise;
+  }
+  
+  isLoadingIdeas = true;
+  ideasLoadingPromise = (async () => {
+    try {
+      if (!N8N_WEBHOOK_TOKEN) {
+        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+      }
 
-    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-    console.log('🌐 Making request to:', N8N_IDEAS_WEBHOOK_URL);
+      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+      console.log('🌐 Making request to:', N8N_IDEAS_WEBHOOK_URL);
 
     const response = await fetch(N8N_IDEAS_WEBHOOK_URL, {
       method: 'GET',
@@ -239,10 +269,16 @@ export const fetchIdeasFromWebhook = async (): Promise<Idea[]> => {
       console.error('❌ Ideas response format not recognized:', data);
       throw new Error('Invalid response format: expected object with data property containing ideas array');
     }
-  } catch (error) {
-    console.error('❌ Failed to fetch ideas from webhook:', error);
-    throw error;
-  }
+    } catch (error) {
+      console.error('❌ Failed to fetch ideas from webhook:', error);
+      throw error;
+    } finally {
+      isLoadingIdeas = false;
+      ideasLoadingPromise = null;
+    }
+  })();
+  
+  return ideasLoadingPromise;
 };
 
 // Webhook function to save ideas
@@ -297,13 +333,21 @@ export const saveIdeasToWebhook = async (ideas: Idea[]): Promise<void> => {
 
 // Webhook function to fetch time sessions
 export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
+  // If already loading, return the existing promise
+  if (isLoadingTime && timeLoadingPromise) {
+    console.log('⏳ Time sessions already loading, returning existing promise');
+    return timeLoadingPromise;
+  }
+  
+  isLoadingTime = true;
+  timeLoadingPromise = (async () => {
+    try {
+      if (!N8N_WEBHOOK_TOKEN) {
+        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
+      }
 
-    console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-    console.log('🌐 Making request to:', N8N_TIME_WEBHOOK_URL);
+      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
+      console.log('🌐 Making request to:', N8N_TIME_WEBHOOK_URL);
 
     const response = await fetch(N8N_TIME_WEBHOOK_URL, {
       method: 'GET',
@@ -366,10 +410,16 @@ export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
     
     console.log('✅ Parsed sessions from webhook:', sessions.length);
     return sessions;
-  } catch (error) {
-    console.error('❌ Failed to fetch sessions from webhook:', error);
-    throw error;
-  }
+    } catch (error) {
+      console.error('❌ Failed to fetch sessions from webhook:', error);
+      throw error;
+    } finally {
+      isLoadingTime = false;
+      timeLoadingPromise = null;
+    }
+  })();
+  
+  return timeLoadingPromise;
 };
 
 // Webhook function to save time sessions
