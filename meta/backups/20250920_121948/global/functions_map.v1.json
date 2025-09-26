@@ -142,19 +142,6 @@
       "outputs": ["UI, optimistic updates", "chart updates", "timer state"]
     },
     {
-      "name": "AllocationsPage",
-      "type": "page",
-      "responsibilities": [
-        "Load allotments and ledger via webhook and derive available, coming_up, unavailable.",
-        "Render Available, Coming Up, Unavailable sections with appropriate actions.",
-        "Provide editable table for current allocations with staging and Save.",
-        "Support manual add of new allocation items (type, quota, cadence, multiplier).",
-        "Display toast notifications and handle error/loading states."
-      ],
-      "inputs": ["allotments", "ledger JSONL", "ApiClient", "Storage"],
-      "outputs": ["UI, optimistic updates", "staged changes", "derived state"]
-    },
-    {
       "name": "IdeasCategoryTabs",
       "type": "shared_component",
       "responsibilities": [
@@ -229,15 +216,9 @@
       "responsibilities": [
         "Mock-only: delay ~300ms and return success for Save/Submit/Complete.",
         "Provide full-file API for todos: postTodosFile(payload: TodoFileItem[]).",
-        "Keep delta API available but unused by Save.",
-        "Expose webhook helpers for todos, ideas, sessions, allotments, and ledger."
+        "Keep delta API available but unused by Save."
       ],
-      "exports": [
-        "postToBackend",
-        "postComplete",
-        "postTodosBatch",
-        "postTodosFile"
-      ]
+      "exports": ["postToBackend", "postComplete", "postTodosBatch", "postTodosFile"]
     },
     {
       "name": "Storage",
@@ -290,16 +271,14 @@
     "items": [
       { "id": "todos", "label": "To-Dos", "icon": "check-square" },
       { "id": "ideas", "label": "Ideas", "icon": "lightbulb" },
-      { "id": "time_tracking", "label": "Time Tracking", "icon": "timer" },
-      { "id": "allocations", "label": "Allocations", "icon": "check-square" }
+      { "id": "time_tracking", "label": "Time Tracking", "icon": "timer" }
     ],
     "default_item_id": "todos"
   },
   "routes": [
     { "id": "todos", "surface": "module", "component": "TodosPage" },
     { "id": "ideas", "surface": "module", "component": "IdeasPage" },
-    { "id": "time_tracking", "surface": "module", "component": "TimeTrackingPage" },
-    { "id": "allocations", "surface": "module", "component": "AllocationsPage" }
+    { "id": "time_tracking", "surface": "module", "component": "TimeTrackingPage" }
   ],
   "notifications": {
     "toast_api": [
@@ -381,9 +360,8 @@
   ],
   "verification_checklist": [
     "Sidebar works (expand/collapse) on desktop with tooltip labels in collapsed mode; Mobile drawer opens/closes with focus trap and ESC.",
-    "To-Dos shows All + per-category tabs derived from dataset; default sort priority desc then created_at desc; ID generation uses uuid; table styled and interactive with keyboard editing.",
+    "To-Dos shows All + per-category tabs derived from dataset; default sort created_at desc; ID generation uses uuid; table styled and interactive with keyboard editing.",
     "Time Tracking: timer and session list work locally; Submit mocked.",
-    "Allocations: Available/Coming Up/Unavailable sections render from derived state; editable table supports staging and Save; manual add works with webhook.",
     "Theme tokens are used consistently across modules."
   ]
 }

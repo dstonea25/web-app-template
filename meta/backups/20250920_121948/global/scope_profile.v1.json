@@ -190,7 +190,7 @@
     },
     "idea": {
       "idea": "string",
-      "category": "string|null (predefined: work|projects|videos|writing|health|business|life|future|travel)",
+      "category": "string|null (predefined: work|projects|videos|writing|health|business|life|future)",
       "created_at": "string ISO-8601",
       "notes": "string|null (multiline supported)",
       "id": "string (internal-only; timestamp; never displayed)",

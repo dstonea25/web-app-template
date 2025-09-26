@@ -63,6 +63,35 @@ export class ApiClient {
     return { success: true, data: { message: 'Todo completed', ...payload } };
   }
 
+  // --- Habit tracker mock endpoints (MVP) ---
+  async loadHabitLedger(year: number): Promise<{ events: { habitId: string; date: string; complete: boolean }[]; habits: { id: string; name: string }[] }> {
+    // Simulate 250ms latency and return a small in-memory dataset
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const habits = [
+      { id: 'move', name: 'Move' },
+      { id: 'read', name: 'Read' },
+      { id: 'meditate', name: 'Meditate' },
+    ];
+    const today = new Date();
+    const events: { habitId: string; date: string; complete: boolean }[] = [];
+    for (let i = 0; i < 15; i++) {
+      const dt = new Date(today);
+      dt.setDate(today.getDate() - i);
+      if (dt.getFullYear() !== year) continue;
+      const date = `${year}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      for (const h of habits) {
+        if (i % (h.id.length + 2) === 0) events.push({ habitId: h.id, date, complete: true });
+      }
+    }
+    return { events, habits };
+  }
+
+  async saveHabitLedger(_events: { habitId: string; date: string; complete: boolean }[]): Promise<ApiResponse> {
+    // Simulate success; future will POST to webhook
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return { success: true, data: { message: 'Habit ledger saved' } };
+  }
+
   // Future webhook endpoints (disabled in MVP)
   // private async makeRequest<T>(
   //   endpoint: string,
@@ -407,7 +436,7 @@ export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
         }
       }
     }
-    
+
     console.log('✅ Parsed sessions from webhook:', sessions.length);
     return sessions;
     } catch (error) {

@@ -70,5 +70,16 @@
     "category: Dropdown with predefined options",
     "notes: Multiline textarea with dynamic height",
     "created_at: Read-only timestamp display"
+  ],
+  "category_options": [
+    "work",
+    "projects",
+    "videos",
+    "writing",
+    "health",
+    "business",
+    "life",
+    "future",
+    "travel"
   ]
 }

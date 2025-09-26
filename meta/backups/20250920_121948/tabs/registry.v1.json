@@ -1,12 +1,12 @@
 {
-  "version": "1.2.0",
-  "updated_at": "2025-09-20",
+  "version": "1.1.0",
+  "updated_at": "2025-01-15",
   "default_tab": "todos",
   "tab_persistence": {
     "enabled": true,
     "storage_key": "dashboard-active-tab",
     "fallback_behavior": "first_enabled_tab_or_default",
-    "validation": ["todos", "ideas", "time_tracking", "allocations", "habit_tracker"]
+    "validation": ["todos", "ideas", "time_tracking", "allocations"]
   },
   "tabs": [
     {
@@ -59,20 +59,6 @@
         "scope": "/meta/tabs/allocations/tab_scope.v1.json",
         "functions": "/meta/tabs/allocations/tab_functions.v1.json",
         "styles": "/meta/tabs/allocations/tab_styles.v1.json"
-      }
-    }
-    ,
-    {
-      "id": "habit_tracker",
-      "title": "Habit Tracker",
-      "route": "/habits",
-      "icon": "check-circle",
-      "order": 30,
-      "enabled": true,
-      "meta": {
-        "scope": "/meta/tabs/habit_tracker/tab_scope.v1.json",
-        "functions": "/meta/tabs/habit_tracker/tab_functions.v1.json",
-        "styles": "/meta/tabs/habit_tracker/tab_styles.v1.json"
       }
     }
   ]

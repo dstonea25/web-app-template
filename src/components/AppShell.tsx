@@ -9,6 +9,7 @@ import { IdeasTab } from '../pages/IdeasTab';
 import { TimeTrackingTab } from '../pages/TimeTrackingTab';
 import { AllocationsTab } from '../pages/AllocationsTab';
 import { tokens, cn } from '../theme/config';
+import { HabitTrackerTab } from '../pages/HabitTrackerTab';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +21,7 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['todos', 'ideas', 'time_tracking', 'allocations'].includes(savedTab);
+      const isValidSaved = savedTab && ['todos', 'ideas', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
       return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'todos')) as ModuleId;
     } catch {
       return 'todos';
@@ -56,6 +57,7 @@ export const AppShell: React.FC = () => {
   const IdeasTabAny = IdeasTab as React.FC<any>;
   const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
   const AllocationsTabAny = AllocationsTab as React.FC<any>;
+  const HabitTrackerTabAny = HabitTrackerTab as React.FC<any>;
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
@@ -117,6 +119,9 @@ export const AppShell: React.FC = () => {
             <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
               <AllocationsTabAny isVisible={activeModule === 'allocations'} />
             </section>
+            <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
+              <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
+            </section>
           </main>
         </div>
       </div>
@@ -140,6 +145,9 @@ export const AppShell: React.FC = () => {
           </section>
           <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
             <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+          </section>
+          <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
+            <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
           </section>
         </main>
         <MobileDrawer

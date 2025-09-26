@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 
-export type ModuleId = 'todos' | 'ideas' | 'time_tracking' | 'allocations';
+export type ModuleId = 'todos' | 'ideas' | 'time_tracking' | 'allocations' | 'habit_tracker';
 
 interface SidebarItem {
   id: ModuleId;

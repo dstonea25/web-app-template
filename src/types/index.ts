@@ -84,6 +84,19 @@ export interface TodoFileItem {
   created_at: string;
 }
 
+// Habit tracker minimal types
+export interface Habit {
+  id: string;
+  name: string;
+  rule?: string;
+}
+
+export interface HabitEvent {
+  habitId: string;
+  date: string; // YYYY-MM-DD
+  complete: boolean;
+}
+
 // Authentication types
 export interface AuthCredentials {
   username: string;

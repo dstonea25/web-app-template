@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "tab_id": "allocations",
+  "scope": {
+    "data": {
+      "ledger": "This year's usage events per item (from ledger.jsonl).",
+      "allotments": "Quota and cadence for each item (from allotments.json).",
+      "derived": {
+        "available": "Items with remaining quota.",
+        "coming_up": "Items next eligible for redemption with countdown in days.",
+        "unavailable": "Items exhausted until next reset window."
+      }
+    },
+    "ui_state": {
+      "loading": "true/false when fetching ledger",
+      "success_toast": "Shown when redemption or add succeeds",
+      "error_state": "Shown if ledger fails to load or save"
+    }
+  },
+  "sections": [
+    "StatusCard - shows Available, Coming Up, Unavailable",
+    "ActionBar - redeem/add buttons with quick selectors",
+    "StatsSection - shows historical usage counts, reset cadence"
+  ],
+  "mvp_notes": "All data views are year-to-date only. Include toggle/filter to switch between Available/History if needed."
+}
+
+
+
+
