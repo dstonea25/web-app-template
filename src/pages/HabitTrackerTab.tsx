@@ -43,6 +43,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [isHabitLoading, setIsHabitLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [loadedHabits, setLoadedHabits] = React.useState<Set<string>>(new Set());
+  const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const initialHabitsRef = React.useRef<Habit[]>(habits);
   const initStartRef = React.useRef<number | null>(null);
   const switchStartRef = React.useRef<number | null>(null);
@@ -341,6 +342,23 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
               role="img"
               aria-label={`${year} habit calendar`}
             >
+                <defs>
+                  <linearGradient id="btnOn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#059669" />
+                  </linearGradient>
+                  <linearGradient id="btnOff" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#111827" />
+                    <stop offset="100%" stopColor="#1f2937" />
+                  </linearGradient>
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
               {/* Month labels */}
               {months.map(({ monthLabel }, m) => {
                 const x = m * (size + gap) + size / 2;
@@ -367,25 +385,39 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const cx = m * (size + gap) + size / 2;
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
-                  const fill = complete ? '#10B981' : '#1F2937'; // emerald-500 or neutral-800
-                  const stroke = complete ? '#000000' : '#374151'; // text-black or neutral-700
-                  const textFill = complete ? '#000000' : '#D1D5DB'; // black or neutral-300
+                  const fill = complete ? 'url(#btnOn)' : 'url(#btnOff)';
+                  const stroke = hoveredDate === date ? '#6ee7b7' : (complete ? '#065f46' : '#374151');
+                  const textFill = complete ? '#002b1e' : '#cbd5e1';
                   return (
-                    <g key={date} onClick={() => !disabled && toggleDay(date)} style={{ cursor: disabled ? 'default' : 'pointer' }}>
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={size / 2}
+                    <g
+                      key={date}
+                      onClick={() => !disabled && toggleDay(date)}
+                      onMouseEnter={() => setHoveredDate(date)}
+                      onMouseLeave={() => setHoveredDate(null)}
+                      style={{ cursor: disabled ? 'default' : 'pointer' }}
+                      filter={complete ? 'url(#glow)' : undefined}
+                    >
+                      {/* Hexagon button (flat-top) */}
+                      <polygon
+                        points={`
+                          ${cx - size * 0.5},${cy}
+                          ${cx - size * 0.25},${cy - size * 0.433}
+                          ${cx + size * 0.25},${cy - size * 0.433}
+                          ${cx + size * 0.5},${cy}
+                          ${cx + size * 0.25},${cy + size * 0.433}
+                          ${cx - size * 0.25},${cy + size * 0.433}
+                        `}
                         fill={fill}
                         stroke={stroke}
-                        style={{ transition: 'fill 150ms ease' }}
+                        strokeWidth={2}
                       >
                         <title>{date}</title>
-                      </circle>
+                      </polygon>
                       <text
                         x={cx}
                         y={cy + 3}
                         fontSize={12}
+                        fontWeight={600}
                         textAnchor="middle"
                         fill={textFill}
                         pointerEvents="none"
