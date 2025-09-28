@@ -47,6 +47,21 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const [tooltip, setTooltip] = React.useState<{ x: number; y: number; text: string; visible: boolean }>({ x: 0, y: 0, text: '', visible: false });
+
+  // Color palette per habit (cycles if more habits). Colors chosen from existing theme hues.
+  const COLOR_PALETTE = React.useMemo(() => [
+    { base: '#34d399', glow: '#6ee7b7' }, // emerald
+    { base: '#2dd4bf', glow: '#99f6e4' }, // teal
+    { base: '#f59e0b', glow: '#fbbf24' }, // amber
+    { base: '#38bdf8', glow: '#7dd3fc' }, // sky
+    { base: '#a78bfa', glow: '#c4b5fd' }, // violet
+    { base: '#fb7185', glow: '#fda4af' }, // rose
+  ], []);
+  const colorForHabit = React.useCallback((habitId: string | null | undefined) => {
+    const idx = Math.max(0, habits.findIndex(h => h.id === habitId));
+    const i = (idx >= 0 ? idx : 0) % COLOR_PALETTE.length;
+    return COLOR_PALETTE[i];
+  }, [habits, COLOR_PALETTE]);
   const initialHabitsRef = React.useRef<Habit[]>(habits);
   const initStartRef = React.useRef<number | null>(null);
   const switchStartRef = React.useRef<number | null>(null);
@@ -296,20 +311,25 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   const renderPills = () => (
     <div className="flex flex-wrap gap-2 mb-2 justify-center">
-      {habits.map(h => (
-        <button
-          key={h.id}
-          onClick={() => handleSelectHabit(h.id)}
-          className={cn(
-            'px-3 py-1 rounded-full text-sm font-medium cursor-pointer',
-            selectedHabitId === h.id ? 'bg-emerald-600 text-white' : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
-          )}
-          aria-pressed={selectedHabitId === h.id}
-          title={h.rule || undefined}
-        >
-          {h.name}
-        </button>
-      ))}
+      {habits.map((h) => {
+        const { base } = colorForHabit(h.id);
+        const isActive = selectedHabitId === h.id;
+        return (
+          <button
+            key={h.id}
+            onClick={() => handleSelectHabit(h.id)}
+            className={cn(
+              'px-3 py-1 rounded-full text-sm font-medium cursor-pointer border',
+              isActive ? '' : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+            )}
+            style={isActive ? { backgroundColor: base, color: '#0b0f0e', borderColor: base } : { borderColor: '#2f343a' }}
+            aria-pressed={isActive}
+            title={h.rule || undefined}
+          >
+            {h.name}
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -332,6 +352,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     const height = headerH + rows * size + (rows - 1) * gap;
     const disabled = isInitialLoading || isHabitLoading;
 
+    const { base: activeColor, glow: hoverGlow } = colorForHabit(selectedHabitId);
     return (
       <div className="space-y-2">
         <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
@@ -350,7 +371,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                     <div
                       key={`sticky-${m}`}
                       className={cn('text-center text-neutral-400 transition-colors')}
-                      style={hoveredMonth === m ? { color: '#34d399', textShadow: '0 0 6px rgba(110,231,183,0.9), 0 0 10px rgba(52,211,153,0.8)' } : undefined}
+                      style={hoveredMonth === m ? { color: activeColor, textShadow: `0 0 6px ${hoverGlow}, 0 0 10px ${activeColor}` } : undefined}
                     >
                       {monthLabel}
                     </div>
@@ -384,9 +405,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
                   const offStroke = '#6b7280'; // neutral-500 medium gray
-                  const hoverStroke = '#a7f3d0'; // emerald-200
-                  const stroke = hoveredDate === date ? hoverStroke : (complete ? '#34d399' : offStroke);
-                  const textFill = complete ? '#34d399' : offStroke;
+                  const hoverStroke = hoverGlow;
+                  const stroke = hoveredDate === date ? hoverStroke : (complete ? activeColor : offStroke);
+                  const textFill = complete ? activeColor : offStroke;
                   const textOpacity = 1; // match off-state border exactly
                   return (
                     <g
