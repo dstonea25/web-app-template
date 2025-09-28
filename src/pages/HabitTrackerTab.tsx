@@ -46,7 +46,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
-  const [tooltip, setTooltip] = React.useState<{ x: number; y: number; text: string; visible: boolean }>({ x: 0, y: 0, text: '', visible: false });
+  const tooltipRef = React.useRef<HTMLDivElement | null>(null);
+  const rafRef = React.useRef<number | null>(null);
 
   // Color palette per habit (cycles if more habits). Colors chosen from existing theme hues.
   const COLOR_PALETTE = React.useMemo(() => [
@@ -278,12 +279,12 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     const nextVal = !prevHad;
     const t0 = performance.now();
     startTransition(() => {
-      setCalendarData(prev => {
+    setCalendarData(prev => {
         const next: Record<string, Set<string>> = { ...prev };
         const set = new Set<string>(next[habitId] || []);
         if (nextVal) set.add(dateIso); else set.delete(dateIso);
         next[habitId] = set;
-        return next;
+      return next;
       });
     });
     setIsSaving(true);
@@ -315,19 +316,19 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
         const { base } = colorForHabit(h.id);
         const isActive = selectedHabitId === h.id;
         return (
-          <button
-            key={h.id}
-            onClick={() => handleSelectHabit(h.id)}
-            className={cn(
+        <button
+          key={h.id}
+          onClick={() => handleSelectHabit(h.id)}
+          className={cn(
               'px-3 py-1 rounded-full text-sm font-medium cursor-pointer border',
               isActive ? '' : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
-            )}
+          )}
             style={isActive ? { backgroundColor: base, color: '#0b0f0e', borderColor: base } : { borderColor: '#2f343a' }}
             aria-pressed={isActive}
-            title={h.rule || undefined}
-          >
-            {h.name}
-          </button>
+          title={h.rule || undefined}
+        >
+          {h.name}
+        </button>
         );
       })}
     </div>
@@ -375,8 +376,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                     >
                       {monthLabel}
                     </div>
-                  ))}
-                </div>
+              ))}
+            </div>
               </div>
             <svg
               width={width}
@@ -444,21 +445,38 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                           const rect = wrapperRef.current?.getBoundingClientRect();
                           const rawX = (e.clientX - (rect?.left || 0)) + 8;
                           const rawY = (e.clientY - (rect?.top || 0)) - 24;
-                          const tooltipW = 32; // approx width of \"Dec\"
-                          const clampedX = Math.max(0, Math.min(rawX, (rect?.width || 0) - tooltipW));
-                          const clampedY = Math.max(0, rawY);
-                          setTooltip({ x: clampedX, y: clampedY, text: months[m].monthLabel, visible: true });
-                        }}
-                        onMouseMove={(e) => {
-                          const rect = wrapperRef.current?.getBoundingClientRect();
-                          const rawX = (e.clientX - (rect?.left || 0)) + 8;
-                          const rawY = (e.clientY - (rect?.top || 0)) - 24;
                           const tooltipW = 32;
                           const clampedX = Math.max(0, Math.min(rawX, (rect?.width || 0) - tooltipW));
                           const clampedY = Math.max(0, rawY);
-                          setTooltip(t => ({ ...t, x: clampedX, y: clampedY }));
+                          const el = tooltipRef.current;
+                          if (el) {
+                            el.style.left = `${clampedX}px`;
+                            el.style.top = `${clampedY}px`;
+                            el.textContent = months[m].monthLabel;
+                            el.style.opacity = '1';
+                          }
                         }}
-                        onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); setTooltip(t => ({ ...t, visible: false })); }}
+                        onMouseMove={(e) => {
+                          if (rafRef.current) cancelAnimationFrame(rafRef.current);
+                          rafRef.current = requestAnimationFrame(() => {
+                            const rect = wrapperRef.current?.getBoundingClientRect();
+                            const rawX = (e.clientX - (rect?.left || 0)) + 8;
+                            const rawY = (e.clientY - (rect?.top || 0)) - 24;
+                            const tooltipW = 32;
+                            const clampedX = Math.max(0, Math.min(rawX, (rect?.width || 0) - tooltipW));
+                            const clampedY = Math.max(0, rawY);
+                            const el = tooltipRef.current;
+                            if (el) {
+                              el.style.left = `${clampedX}px`;
+                              el.style.top = `${clampedY}px`;
+                            }
+                          });
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredDate(null); setHoveredMonth(null);
+                          const el = tooltipRef.current;
+                          if (el) el.style.opacity = '0';
+                        }}
                       />
                       <text
                         x={cx}
@@ -479,11 +497,10 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
             </svg>
             {/* Custom tooltip for consistent behavior across browsers */}
             <div
+              ref={tooltipRef}
               className="pointer-events-none absolute z-20 px-2 py-1 rounded bg-neutral-900/90 text-neutral-200 text-[10px] shadow"
-              style={{ left: tooltip.x, top: tooltip.y, opacity: tooltip.visible ? 1 : 0, transition: 'opacity 120ms ease' }}
-            >
-              {tooltip.text}
-            </div>
+              style={{ left: 0, top: 0, opacity: 0, transition: 'opacity 120ms ease' }}
+            />
             </div>
           </div>
         </div>
@@ -508,8 +525,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
           </div>
         ) : (
           <>
-            {renderPills()}
-            {renderRuleSubtext()}
+        {renderPills()}
+        {renderRuleSubtext()}
             {errorMessage ? (
               <div className="py-8 text-center text-sm text-red-400">{errorMessage}</div>
             ) : (
