@@ -323,7 +323,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     // Visual constants (match approximate sizing from button grid)
     const size = 28; // px diameter
     const gap = 4; // px gap
-    const headerH = 16; // px for month labels
+    const headerH = 0; // labels are in sticky header; no vertical offset needed in SVG
     const cols = 12;
     const rows = 31;
     const width = cols * size + (cols - 1) * gap;
@@ -400,9 +400,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         stroke={stroke}
                         strokeWidth={2}
                         pointerEvents="none"
-                      >
-                        <title>{`${months[m].monthLabel.toLowerCase()} ${day}`}</title>
-                      </polygon>
+                      />
                       {/* Invisible hit target for easier clicks */}
                       <circle
                         cx={cx}
@@ -412,7 +410,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         onClick={() => !disabled && toggleDay(date)}
                         onMouseEnter={() => setHoveredDate(date)}
                         onMouseLeave={() => setHoveredDate(null)}
-                      />
+                      >
+                        <title>{months[m].monthLabel.toLowerCase()}</title>
+                      </circle>
                       <text
                         x={cx}
                         y={cy + 3}
