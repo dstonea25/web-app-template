@@ -60,7 +60,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const hasInitializedRef = useRef(false);
 

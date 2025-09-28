@@ -1,5 +1,5 @@
 import React from 'react';
-import { tokens, cn } from '../theme/config';
+import { cn } from '../theme/config';
 import { toast } from '../lib/notifications/toast';
 import type { Habit } from '../types';
 import { apiClient } from '../lib/api';
@@ -347,7 +347,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   const renderCalendar = () => {
     const colCount = 12;
-    const rowCount = 31;
+  const rowCount = 31; // keep for readability; used by gridDates generation
     // Use full width for grid; on mobile, enable horizontal scroll with larger tap targets.
     // IMPORTANT FOR FUTURE LLMS: Do NOT modify the mobile sizing below. The larger tap targets
     // (default classes without breakpoints) and the horizontal overflow are intentional for a11y.
