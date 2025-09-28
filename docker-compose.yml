@@ -10,6 +10,8 @@ services:
         - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
         - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
         - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     container_name: dashboard-app
     ports:
       - "3000:8080"
@@ -19,6 +21,8 @@ services:
       - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
       - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
       - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     networks:
       - dashboard-network
     healthcheck:

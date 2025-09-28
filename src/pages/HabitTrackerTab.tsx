@@ -69,27 +69,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     return rows;
   }, [validDaysByMonth, year]);
 
-  const DayCell = React.memo(function DayCell({ valid, date, day, complete, habitName, onClick, disabled }: { valid: boolean; date: string; day: number; complete: boolean; habitName: string; onClick: () => void; disabled: boolean }) {
-    return (
-      <div className="flex items-center justify-center">
-        <button
-          onClick={() => valid && !disabled && onClick()}
-          title={valid ? date : ''}
-          disabled={!valid || disabled}
-          aria-label={valid ? `${habitName} on ${date}` : ''}
-          className={cn(
-            'rounded-full flex items-center justify-center cursor-pointer leading-none transition-all duration-150 select-none',
-            'w-8 h-8 text-[12px]',
-            'sm:w-5 sm:h-5 sm:text-[10px] md:w-6 md:h-6 lg:w-6 lg:h-6 xl:w-7 xl:h-7',
-            valid ? (complete ? 'bg-emerald-500 text-black shadow' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300') : 'opacity-20 cursor-default bg-transparent border border-transparent'
-          )}
-          aria-pressed={complete}
-        >
-          {valid ? day : ''}
-        </button>
-      </div>
-    );
-  });
+  // SVG-based calendar rendering for performance
 
   // Load habits and entries from Supabase (current year only). Fallback to defaults if not configured or empty.
   React.useEffect(() => {
@@ -339,36 +319,72 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   };
 
   const renderCalendar = () => {
-    const colCount = 12;
-    // Use full width for grid; on mobile, enable horizontal scroll with larger tap targets.
-    // IMPORTANT FOR FUTURE LLMS: Do NOT modify the mobile sizing below. The larger tap targets
-    // (default classes without breakpoints) and the horizontal overflow are intentional for a11y.
-    // Desktop and larger screens use smaller circles via sm:/md:/lg: overrides.
-    const columnTemplate = `repeat(${colCount}, minmax(0, 1fr))`;
-    const gapRem = '0.25rem';
+    // Visual constants (match approximate sizing from button grid)
+    const size = 28; // px diameter
+    const gap = 4; // px gap
+    const headerH = 16; // px for month labels
+    const cols = 12;
+    const rows = 31;
+    const width = cols * size + (cols - 1) * gap;
+    const height = headerH + rows * size + (rows - 1) * gap;
+    const disabled = isInitialLoading || isHabitLoading;
+
     return (
       <div className="space-y-2">
-        {/* Scroll container: horizontal scroll on mobile only */}
-        <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', isInitialLoading && 'opacity-50')}>
+        <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
           <div className="inline-block px-2 sm:px-0 min-w-[900px] sm:min-w-0 w-full" style={{ contentVisibility: 'auto' as any }}>
-            {/* Month header row */}
-            <div className="grid text-[10px] text-neutral-400 mb-1" style={{ gridTemplateColumns: columnTemplate, gap: gapRem }}>
-              {months.map(({ monthLabel, monthIndex }) => (
-                <div key={monthIndex} className="text-center capitalize">{monthLabel.toLowerCase()}</div>
-              ))}
-            </div>
-            {/* 31 rows by 12 columns - circles centered in each column */}
-            <div className="grid" style={{ gridTemplateColumns: columnTemplate, gap: gapRem }}>
-              {gridDates.flatMap(row =>
-                row.map(({ date, valid, monthIndex, day }) => {
-                  const complete = valid && currentHabitDaysSet.has(date);
-                  const habitName = currentHabit?.name || 'Habit';
+            <svg
+              width={width}
+              height={height}
+              viewBox={`0 0 ${width} ${height}`}
+              role="img"
+              aria-label={`${year} habit calendar`}
+            >
+              {/* Month labels */}
+              {months.map(({ monthLabel }, m) => {
+                const x = m * (size + gap) + size / 2;
+                const y = headerH - 2;
+                return (
+                  <text
+                    key={`label-${m}`}
+                    x={x}
+                    y={y}
+                    fontSize={10}
+                    textAnchor="middle"
+                    fill="#9CA3AF"
+                    dominantBaseline="ideographic"
+                  >
+                    {monthLabel.toLowerCase()}
+                  </text>
+                );
+              })}
+
+              {/* Day circles */}
+              {gridDates.flatMap((row, r) =>
+                row.map(({ date, valid }, m) => {
+                  if (!valid) return null;
+                  const cx = m * (size + gap) + size / 2;
+                  const cy = headerH + r * (size + gap) + size / 2;
+                  const complete = currentHabitDaysSet.has(date);
+                  const fill = complete ? '#10B981' : '#1F2937'; // emerald-500 or neutral-800
+                  const stroke = complete ? '#000000' : '#374151'; // text-black or neutral-700
                   return (
-                    <DayCell key={`${monthIndex}-${day}`} valid={valid} date={date} day={day} complete={complete} habitName={habitName} onClick={() => toggleDay(date)} disabled={isInitialLoading} />
+                    <circle
+                      key={date}
+                      cx={cx}
+                      cy={cy}
+                      r={size / 2}
+                      fill={fill}
+                      stroke={stroke}
+                      onClick={() => !disabled && toggleDay(date)}
+                      style={{ cursor: disabled ? 'default' : 'pointer', transition: 'fill 150ms ease' }}
+                    >
+                      <title>{date}</title>
+                    </circle>
                   );
                 })
               )}
-            </div>
+            </svg>
           </div>
         </div>
       </div>

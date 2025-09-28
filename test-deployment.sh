@@ -9,6 +9,8 @@ if [ ! -f .env ]; then
     echo "   GITHUB_REPO=your-username/your-repo-name"
     echo "   VITE_AUTH_USERNAME=admin"
     echo "   VITE_AUTH_PASSWORD=your_password"
+    echo "   VITE_SUPABASE_URL=https://xyzcompany.supabase.co"
+    echo "   VITE_SUPABASE_ANON_KEY=ey..."
     exit 1
 fi
 
@@ -45,10 +47,22 @@ if [ -z "$VITE_AUTH_PASSWORD" ]; then
     exit 1
 fi
 
+if [ -z "$VITE_SUPABASE_URL" ]; then
+    echo "❌ VITE_SUPABASE_URL not set in .env file"
+    exit 1
+fi
+
+if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+    echo "❌ VITE_SUPABASE_ANON_KEY not set in .env file"
+    exit 1
+fi
+
 echo "✅ Configuration looks good!"
 echo "   Repository: $GITHUB_REPO"
 echo "   Username: $VITE_AUTH_USERNAME"
 echo "   Password: [HIDDEN]"
+echo "   Supabase URL: $VITE_SUPABASE_URL"
+echo "   Supabase Anon Key: [HIDDEN]"
 echo "   SSH Key: $(ls -la .ssh/id_ed25519 | awk '{print $1}')"
 
 # Test Docker Compose configuration

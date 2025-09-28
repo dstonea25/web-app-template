@@ -35,6 +35,19 @@ if [ -z "$VITE_AUTH_PASSWORD" ]; then
     exit 1
 fi
 
+# Supabase envs are required for Habit tab
+if [ -z "$VITE_SUPABASE_URL" ]; then
+    echo "❌ Error: VITE_SUPABASE_URL environment variable is required for Supabase"
+    echo "   Set it in your .env file"
+    exit 1
+fi
+
+if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+    echo "❌ Error: VITE_SUPABASE_ANON_KEY environment variable is required for Supabase"
+    echo "   Set it in your .env file"
+    exit 1
+fi
+
 echo "🔗 Using GitHub repository: $GITHUB_REPO"
 
 # Build and start the application
