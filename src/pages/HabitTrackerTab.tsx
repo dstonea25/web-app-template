@@ -343,18 +343,11 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
               aria-label={`${year} habit calendar`}
             >
                 <defs>
-                  <linearGradient id="btnOn" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#34d399" />
-                    <stop offset="100%" stopColor="#059669" />
-                  </linearGradient>
-                  <linearGradient id="btnOff" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#111827" />
-                    <stop offset="100%" stopColor="#1f2937" />
-                  </linearGradient>
                   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                     <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 1 0 0 0.5  0 0 0 0 0.35  0 0 0 0.8 0"/>
                     <feMerge>
-                      <feMergeNode in="blur" />
+                      <feMergeNode />
                       <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
@@ -385,9 +378,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const cx = m * (size + gap) + size / 2;
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
-                  const fill = complete ? 'url(#btnOn)' : 'url(#btnOff)';
-                  const stroke = hoveredDate === date ? '#6ee7b7' : (complete ? '#065f46' : '#374151');
-                  const textFill = complete ? '#002b1e' : '#cbd5e1';
+                  const stroke = hoveredDate === date ? '#6ee7b7' : (complete ? '#34d399' : '#374151');
+                  const textFill = complete ? '#34d399' : '#9ca3af';
+                  const textOpacity = complete ? 1 : 0.22; // barely visible when off
                   return (
                     <g
                       key={date}
@@ -407,7 +400,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                           ${cx + size * 0.25},${cy + size * 0.433}
                           ${cx - size * 0.25},${cy + size * 0.433}
                         `}
-                        fill={fill}
+                        fill="none"
                         stroke={stroke}
                         strokeWidth={2}
                       >
@@ -420,6 +413,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         fontWeight={600}
                         textAnchor="middle"
                         fill={textFill}
+                        opacity={textOpacity}
                         pointerEvents="none"
                       >
                         {day}
