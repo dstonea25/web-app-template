@@ -382,7 +382,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const hoverStroke = '#a7f3d0'; // emerald-200
                   const stroke = hoveredDate === date ? hoverStroke : (complete ? '#34d399' : offStroke);
                   const textFill = complete ? '#34d399' : offStroke;
-                  const textOpacity = complete ? 1 : 0.22; // barely visible when off
+                  const textOpacity = 1; // match off-state border exactly
                   return (
                     <g
                       key={date}
