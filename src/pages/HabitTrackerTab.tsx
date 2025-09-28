@@ -271,13 +271,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferredSelectedHabitId, currentHabitDaysSet]);
 
-  const handleRuleChange = (habitId: string, rule: string) => {
-    setHabits(prev => {
-      const next = prev.map(h => (h.id === habitId ? { ...h, rule } : h));
-      try { localStorage.setItem('habit-tracker-habits', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
+  // No rule editing in this view; rules are read-only labels sourced from DB
 
   const toggleDay = async (dateIso: string) => {
     if (isInitialLoading || isHabitLoading || !selectedHabitId || !loadedHabits.has(selectedHabitId) || errorMessage) return;
