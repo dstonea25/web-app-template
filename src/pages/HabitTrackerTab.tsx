@@ -361,26 +361,37 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
               {/* Day circles */}
               {gridDates.flatMap((row, r) =>
-                row.map(({ date, valid }, m) => {
+                row.map(({ date, valid, day }, m) => {
                   if (!valid) return null;
                   const cx = m * (size + gap) + size / 2;
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
                   const fill = complete ? '#10B981' : '#1F2937'; // emerald-500 or neutral-800
                   const stroke = complete ? '#000000' : '#374151'; // text-black or neutral-700
+                  const textFill = complete ? '#000000' : '#D1D5DB'; // black or neutral-300
                   return (
-                    <circle
-                      key={date}
-                      cx={cx}
-                      cy={cy}
-                      r={size / 2}
-                      fill={fill}
-                      stroke={stroke}
-                      onClick={() => !disabled && toggleDay(date)}
-                      style={{ cursor: disabled ? 'default' : 'pointer', transition: 'fill 150ms ease' }}
-                    >
-                      <title>{date}</title>
-                    </circle>
+                    <g key={date} onClick={() => !disabled && toggleDay(date)} style={{ cursor: disabled ? 'default' : 'pointer' }}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={size / 2}
+                        fill={fill}
+                        stroke={stroke}
+                        style={{ transition: 'fill 150ms ease' }}
+                      >
+                        <title>{date}</title>
+                      </circle>
+                      <text
+                        x={cx}
+                        y={cy + 3}
+                        fontSize={12}
+                        textAnchor="middle"
+                        fill={textFill}
+                        pointerEvents="none"
+                      >
+                        {day}
+                      </text>
+                    </g>
                   );
                 })
               )}
