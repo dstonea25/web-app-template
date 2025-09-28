@@ -378,7 +378,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const cx = m * (size + gap) + size / 2;
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
-                  const offStroke = '#d1d5db'; // neutral-300 (light gray)
+                  const offStroke = '#6b7280'; // neutral-500 medium gray
                   const hoverStroke = '#a7f3d0'; // emerald-200
                   const stroke = hoveredDate === date ? hoverStroke : (complete ? '#34d399' : offStroke);
                   const textFill = complete ? '#34d399' : '#9ca3af';
