@@ -349,7 +349,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   {months.map(({ monthLabel }, m) => (
                     <div
                       key={`sticky-${m}`}
-                      className={cn('text-center text-neutral-400', hoveredMonth === m && 'text-emerald-400')}
+                      className={cn('text-center text-neutral-400 transition-colors')}
+                      style={hoveredMonth === m ? { color: '#34d399', textShadow: '0 0 6px rgba(110,231,183,0.9), 0 0 10px rgba(52,211,153,0.8)' } : undefined}
                     >
                       {monthLabel}
                     </div>
