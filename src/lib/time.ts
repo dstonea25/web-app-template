@@ -71,7 +71,7 @@ export const formatDateTime = (isoString: string): string => {
 };
 
 // Get date at midnight local time
-export const getDateAtMidnight = (date: Date): string => {
+export const getDateAtMidnight = (date: string | Date): string => {
   // If the input is a date string like "2025-09-18", we need to handle it as a local date
   // rather than letting JavaScript interpret it as UTC
   let localDate: Date;

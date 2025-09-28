@@ -28,6 +28,7 @@ export const AppShell: React.FC = () => {
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<Set<ModuleId>>(() => new Set<ModuleId>([activeModule]));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Save tab to localStorage whenever it changes
@@ -61,6 +62,12 @@ export const AppShell: React.FC = () => {
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
+    setVisitedTabs(prev => {
+      if (prev.has(module)) return prev;
+      const next = new Set(prev);
+      next.add(module);
+      return next;
+    });
   };
 
   const handleToggleSidebar = () => {
@@ -107,21 +114,31 @@ export const AppShell: React.FC = () => {
         <div className={tokens.app_shell.content}>
           <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
           <main className="p-6">
-            <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
-              <TodosTabAny isVisible={activeModule === 'todos'} />
-            </section>
-            <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
-              <IdeasTabAny isVisible={activeModule === 'ideas'} />
-            </section>
-            <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
-              <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
-            </section>
-            <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
-              <AllocationsTabAny isVisible={activeModule === 'allocations'} />
-            </section>
-            <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
-              <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
-            </section>
+            {visitedTabs.has('todos') && (
+              <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
+                <TodosTabAny isVisible={activeModule === 'todos'} />
+              </section>
+            )}
+            {visitedTabs.has('ideas') && (
+              <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
+                <IdeasTabAny isVisible={activeModule === 'ideas'} />
+              </section>
+            )}
+            {visitedTabs.has('time_tracking') && (
+              <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
+                <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+              </section>
+            )}
+            {visitedTabs.has('allocations') && (
+              <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
+                <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+              </section>
+            )}
+            {visitedTabs.has('habit_tracker') && (
+              <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
+                <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
+              </section>
+            )}
           </main>
         </div>
       </div>
@@ -134,21 +151,31 @@ export const AppShell: React.FC = () => {
           rightSlot={<LogoutButton />}
         />
         <main className="p-4">
-          <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
-            <TodosTabAny isVisible={activeModule === 'todos'} />
-          </section>
-          <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
-            <IdeasTabAny isVisible={activeModule === 'ideas'} />
-          </section>
-          <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
-            <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
-          </section>
-          <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
-            <AllocationsTabAny isVisible={activeModule === 'allocations'} />
-          </section>
-          <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
-            <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
-          </section>
+          {visitedTabs.has('todos') && (
+            <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
+              <TodosTabAny isVisible={activeModule === 'todos'} />
+            </section>
+          )}
+          {visitedTabs.has('ideas') && (
+            <section style={{ display: activeModule === 'ideas' ? 'block' : 'none' }}>
+              <IdeasTabAny isVisible={activeModule === 'ideas'} />
+            </section>
+          )}
+          {visitedTabs.has('time_tracking') && (
+            <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
+              <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+            </section>
+          )}
+          {visitedTabs.has('allocations') && (
+            <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
+              <AllocationsTabAny isVisible={activeModule === 'allocations'} />
+            </section>
+          )}
+          {visitedTabs.has('habit_tracker') && (
+            <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
+              <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
+            </section>
+          )}
         </main>
         <MobileDrawer
           items={navigationItems}

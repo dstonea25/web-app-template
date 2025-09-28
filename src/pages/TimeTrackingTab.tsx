@@ -53,7 +53,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const [chartCategory, setChartCategory] = useState<Category>('Gaming');
   
   // Manual add state
-  const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+  const [manualDate, setManualDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [manualCategory, setManualCategory] = useState<Category>('Gaming');
   const [manualHours, setManualHours] = useState('1');
   const [manualMinutes, setManualMinutes] = useState('0');
@@ -305,7 +305,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
     setIsSubmitting(true);
     
     try {
-      const startedAt = getDateAtMidnight(new Date(manualDate));
+      const startedAt = getDateAtMidnight(manualDate);
       const hours = Math.max(0, Math.min(23, parseInt(manualHours) || 0));
       const minutes = Math.max(0, Math.min(59, parseInt(manualMinutes) || 0));
       const totalMinutes = (hours * 60) + minutes;
@@ -346,7 +346,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       }
       
       // Reset form completely
-      setManualDate(new Date().toISOString().split('T')[0]);
+      setManualDate(new Date().toLocaleDateString('en-CA'));
       setManualHours('1');
       setManualMinutes('0');
       setManualCategory('Gaming');
@@ -557,7 +557,21 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
             {msToTimerDisplay(elapsedMs)}
           </div>
           <div className={tokens.time.timerCard.state}>
-            {activeSession ? 'Running' : pendingSession ? 'Stopped' : justSubmitted ? 'Submitted' : (timerCategory ? 'Ready' : 'Select a category to start')}
+            {activeSession ? (
+              <span className="flex items-center gap-2">
+                <span className="relative inline-flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                </span>
+                <span>
+                  Started at: {new Date(activeSession.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </span>
+            ) : pendingSession ? (
+              <span>
+                Started at: {new Date(pendingSession.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            ) : justSubmitted ? 'Submitted' : (timerCategory ? 'Ready' : 'Select a category to start')}
           </div>
           <div className={tokens.time.timerCard.actions}>
             {activeSession ? (
