@@ -335,6 +335,20 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
         <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
           <div className="flex justify-center">
             <div className="inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
+              {/* Sticky month header (HTML) */}
+              <div
+                className="sticky top-0 z-10 mb-1"
+                style={{ width, background: '#0a0a0a' }}
+              >
+                <div
+                  className="grid text-[10px] text-neutral-400 capitalize"
+                  style={{ gridTemplateColumns: `repeat(${cols}, ${size}px)`, gap }}
+                >
+                  {months.map(({ monthLabel }, m) => (
+                    <div key={`sticky-${m}`} className="text-center">{monthLabel.toLowerCase()}</div>
+                  ))}
+                </div>
+              </div>
             <svg
               width={width}
               height={height}
@@ -352,24 +366,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                     </feMerge>
                   </filter>
                 </defs>
-              {/* Month labels */}
-              {months.map(({ monthLabel }, m) => {
-                const x = m * (size + gap) + size / 2;
-                const y = headerH - 2;
-                return (
-                  <text
-                    key={`label-${m}`}
-                    x={x}
-                    y={y}
-                    fontSize={10}
-                    textAnchor="middle"
-                    fill="#9CA3AF"
-                    dominantBaseline="ideographic"
-                  >
-                    {monthLabel.toLowerCase()}
-                  </text>
-                );
-              })}
+                {/* SVG rows (no labels here, handled by sticky header) */}
 
               {/* Day circles */}
               {gridDates.flatMap((row, r) =>
@@ -386,9 +383,6 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   return (
                     <g
                       key={date}
-                      onClick={() => !disabled && toggleDay(date)}
-                      onMouseEnter={() => setHoveredDate(date)}
-                      onMouseLeave={() => setHoveredDate(null)}
                       style={{ cursor: disabled ? 'default' : 'pointer' }}
                       filter={complete ? 'url(#glow)' : undefined}
                     >
@@ -405,9 +399,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         fill="none"
                         stroke={stroke}
                         strokeWidth={2}
-                        pointerEvents="visibleStroke"
+                        pointerEvents="none"
                       >
-                        <title>{date}</title>
+                        <title>{`${months[m].monthLabel.toLowerCase()} ${day}`}</title>
                       </polygon>
                       {/* Invisible hit target for easier clicks */}
                       <circle
