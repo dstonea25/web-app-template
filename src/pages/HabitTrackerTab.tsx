@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '../theme/config';
+import { tokens, cn } from '../theme/config';
 import { toast } from '../lib/notifications/toast';
 import type { Habit } from '../types';
 import { apiClient } from '../lib/api';
@@ -292,7 +292,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   };
 
   const renderPills = () => (
-    <div className="flex flex-wrap gap-2 mb-2">
+    <div className="flex flex-wrap gap-2 mb-2 justify-center">
       {habits.map(h => (
         <button
           key={h.id}
@@ -332,7 +332,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     return (
       <div className="space-y-2">
         <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
-          <div className="inline-block px-2 sm:px-0 min-w-[900px] sm:min-w-0 w-full" style={{ contentVisibility: 'auto' as any }}>
+          <div className="flex justify-center">
+            <div className="inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
             <svg
               width={width}
               height={height}
@@ -396,6 +397,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                 })
               )}
             </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -403,10 +405,10 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   };
 
   return (
-    <div className={cn('max-w-6xl mx-auto px-4 sm:px-6 lg:px-8', !isVisible && 'hidden')}>
+    <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
-        <header className="mb-3 relative">
-          <h2 className="text-lg font-semibold text-center text-neutral-100">{year}</h2>
+        <header className="mb-4 relative">
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'text-center')}>{year}</h2>
           {(isSaving || isInitialLoading || isHabitLoading) && (
             <div className="absolute right-0 top-0 text-xs text-neutral-400">
               {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
