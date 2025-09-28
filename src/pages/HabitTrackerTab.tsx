@@ -51,13 +51,14 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   // Color palette per habit (cycles if more habits). Colors chosen from existing theme hues.
   // Earthy theme palette (no blue/purple): emerald, teal, amber, olive, terracotta, rose
+  // Brighter "on" tones for dark background (stroke/number) + matching glow
   const PALETTE = React.useMemo(() => ({
-    emerald:   { base: '#34d399', glow: '#6ee7b7' },
-    teal:      { base: '#2dd4bf', glow: '#99f6e4' },
-    amber:     { base: '#f59e0b', glow: '#fbbf24' },
-    olive:     { base: '#65a30d', glow: '#a3e635' },
-    terracotta:{ base: '#d97706', glow: '#fdba74' },
-    rose:      { base: '#fb7185', glow: '#fda4af' },
+    emerald:   { base: '#6EE7B7', glow: '#A7F3D0' },
+    teal:      { base: '#5EEAD4', glow: '#99F6E4' },
+    amber:     { base: '#FBBF24', glow: '#FDE68A' },
+    olive:     { base: '#A3E635', glow: '#D9F99D' },
+    terracotta:{ base: '#FDBA74', glow: '#FED7AA' },
+    rose:      { base: '#FDA4AF', glow: '#FECDD3' },
   }), []);
   const COLOR_CYCLE = React.useMemo(() => [PALETTE.emerald, PALETTE.teal, PALETTE.amber, PALETTE.olive, PALETTE.terracotta, PALETTE.rose], [PALETTE]);
   const HABIT_COLOR_BY_ID = React.useMemo<Record<string, { base: string; glow: string }>>(() => ({
@@ -399,9 +400,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
               aria-label={`${year} habit calendar`}
             >
                 <defs>
-                  {/* Neutral blur glow that preserves the element's own stroke color */}
-                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  {/* Neutral blur glow that preserves the stroke hue; slightly stronger for bright accents */}
+                  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+                    <feGaussianBlur stdDeviation="3.5" result="blur" />
                     <feMerge>
                       <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
@@ -443,6 +444,23 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         strokeWidth={2}
                         pointerEvents="none"
                       />
+                      {complete && (
+                        <polygon
+                          points={`
+                            ${cx - size * 0.44},${cy}
+                            ${cx - size * 0.22},${cy - size * 0.384}
+                            ${cx + size * 0.22},${cy - size * 0.384}
+                            ${cx + size * 0.44},${cy}
+                            ${cx + size * 0.22},${cy + size * 0.384}
+                            ${cx - size * 0.22},${cy + size * 0.384}
+                          `}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeOpacity={0.35}
+                          strokeWidth={1}
+                          pointerEvents="none"
+                        />
+                      )}
                       {/* Invisible hit target for easier clicks */}
                       <circle
                         cx={cx}
