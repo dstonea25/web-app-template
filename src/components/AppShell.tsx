@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Timer, Lightbulb, LogOut } from 'lucide-react';
+import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import { Sidebar, type ModuleId } from './Sidebar';
@@ -43,7 +43,9 @@ export const AppShell: React.FC = () => {
     const iconMap = {
       'check-square': <CheckSquare className={cn('w-5 h-5', tokens.icon?.default)} />,
       'lightbulb': <Lightbulb className={cn('w-5 h-5', tokens.icon?.default)} />,
-      'timer': <Timer className={cn('w-5 h-5', tokens.icon?.default)} />
+      'timer': <Timer className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'layers': <Layers className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'activity': <Activity className={cn('w-5 h-5', tokens.icon?.default)} />
     };
     
     return {
