@@ -31,7 +31,7 @@ const useMonths = (year: number) => {
 export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) => {
   const year = getCurrentYear();
   const months = useMonths(year);
-  const [isPending, startTransition] = React.useTransition();
+  const [, startTransition] = React.useTransition();
   const DEBUG = true;
   const debug = (...args: any[]) => { if (DEBUG) console.log('[HabitTracker]', ...args); };
   const [habits, setHabits] = React.useState<Habit[]>([]);
@@ -237,7 +237,6 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     startTransition(() => setSelectedHabitId(habitId));
     // Trigger fetch if we don't have entries for this habit yet
     if (isSupabaseConfigured) {
-      const hasData = calendarData[habitId] && calendarData[habitId].size > 0;
       const isLoaded = loadedHabits.has(habitId);
       if (!isLoaded) {
         setIsHabitLoading(true);
@@ -347,7 +346,6 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   const renderCalendar = () => {
     const colCount = 12;
-  const rowCount = 31; // keep for readability; used by gridDates generation
     // Use full width for grid; on mobile, enable horizontal scroll with larger tap targets.
     // IMPORTANT FOR FUTURE LLMS: Do NOT modify the mobile sizing below. The larger tap targets
     // (default classes without breakpoints) and the horizontal overflow are intentional for a11y.
