@@ -412,7 +412,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         cx={cx}
                         cy={cy}
                         r={size * 0.48}
-                        fill="transparent"
+                        fill="#000"
+                        fillOpacity={0.001}
+                        pointerEvents="all"
                         onClick={() => !disabled && toggleDay(date)}
                         onMouseEnter={() => { setHoveredDate(date); setHoveredMonth(m); }}
                         onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); }}
