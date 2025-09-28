@@ -45,6 +45,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [loadedHabits, setLoadedHabits] = React.useState<Set<string>>(new Set());
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const [tooltip, setTooltip] = React.useState<{ x: number; y: number; text: string; visible: boolean }>({ x: 0, y: 0, text: '', visible: false });
   const initialHabitsRef = React.useRef<Habit[]>(habits);
   const initStartRef = React.useRef<number | null>(null);
   const switchStartRef = React.useRef<number | null>(null);
@@ -335,7 +337,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       <div className="space-y-2">
         <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
           <div className="flex justify-center">
-            <div className="inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
+            <div ref={wrapperRef} className="relative inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
               {/* Sticky month header (HTML) */}
               <div
                 className="sticky top-0 z-10 mb-1"
@@ -416,11 +418,22 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         fillOpacity={0.001}
                         pointerEvents="all"
                         onClick={() => !disabled && toggleDay(date)}
-                        onMouseEnter={() => { setHoveredDate(date); setHoveredMonth(m); }}
-                        onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); }}
-                      >
-                        <title>{months[m].monthLabel}</title>
-                      </circle>
+                        onMouseEnter={(e) => {
+                          setHoveredDate(date); setHoveredMonth(m);
+                          const rect = wrapperRef.current?.getBoundingClientRect();
+                          setTooltip({
+                            x: (e.clientX - (rect?.left || 0)) + 8,
+                            y: (e.clientY - (rect?.top || 0)) - 24,
+                            text: months[m].monthLabel,
+                            visible: true,
+                          });
+                        }}
+                        onMouseMove={(e) => {
+                          const rect = wrapperRef.current?.getBoundingClientRect();
+                          setTooltip(t => ({ ...t, x: (e.clientX - (rect?.left || 0)) + 8, y: (e.clientY - (rect?.top || 0)) - 24 }));
+                        }}
+                        onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); setTooltip(t => ({ ...t, visible: false })); }}
+                      />
                       <text
                         x={cx}
                         y={cy + 3}
@@ -438,6 +451,13 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                 })
               )}
             </svg>
+            {/* Custom tooltip for consistent behavior across browsers */}
+            <div
+              className="pointer-events-none absolute z-20 px-2 py-1 rounded bg-neutral-900/90 text-neutral-200 text-[10px] shadow"
+              style={{ left: tooltip.x, top: tooltip.y, opacity: tooltip.visible ? 1 : 0, transition: 'opacity 120ms ease' }}
+            >
+              {tooltip.text}
+            </div>
             </div>
           </div>
         </div>
