@@ -378,7 +378,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                   const cx = m * (size + gap) + size / 2;
                   const cy = headerH + r * (size + gap) + size / 2;
                   const complete = currentHabitDaysSet.has(date);
-                  const stroke = hoveredDate === date ? '#6ee7b7' : (complete ? '#34d399' : '#374151');
+                  const offStroke = '#d1d5db'; // neutral-300 (light gray)
+                  const hoverStroke = '#a7f3d0'; // emerald-200
+                  const stroke = hoveredDate === date ? hoverStroke : (complete ? '#34d399' : offStroke);
                   const textFill = complete ? '#34d399' : '#9ca3af';
                   const textOpacity = complete ? 1 : 0.22; // barely visible when off
                   return (
@@ -403,9 +405,20 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         fill="none"
                         stroke={stroke}
                         strokeWidth={2}
+                        pointerEvents="visibleStroke"
                       >
                         <title>{date}</title>
                       </polygon>
+                      {/* Invisible hit target for easier clicks */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={size * 0.48}
+                        fill="transparent"
+                        onClick={() => !disabled && toggleDay(date)}
+                        onMouseEnter={() => setHoveredDate(date)}
+                        onMouseLeave={() => setHoveredDate(null)}
+                      />
                       <text
                         x={cx}
                         y={cy + 3}
