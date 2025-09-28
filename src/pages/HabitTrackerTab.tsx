@@ -399,11 +399,11 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
               aria-label={`${year} habit calendar`}
             >
                 <defs>
+                  {/* Neutral blur glow that preserves the element's own stroke color */}
                   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 1 0 0 0.5  0 0 0 0 0.35  0 0 0 0.8 0"/>
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
                     <feMerge>
-                      <feMergeNode />
+                      <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
