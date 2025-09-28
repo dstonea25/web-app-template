@@ -52,7 +52,6 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const switchStartRef = React.useRef<number | null>(null);
 
   // Memoized derived data to avoid recomputing and re-rendering heavy grid unnecessarily
-  const currentHabit = React.useMemo(() => habits.find(h => h.id === deferredSelectedHabitId), [habits, deferredSelectedHabitId]);
   const currentHabitDaysSet = React.useMemo(() => calendarData[deferredSelectedHabitId] || new Set<string>(), [calendarData, deferredSelectedHabitId]);
   const validDaysByMonth = React.useMemo(
     () => months.map(({ monthIndex }) => new Date(year, monthIndex + 1, 0).getDate()),
