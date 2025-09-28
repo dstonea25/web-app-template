@@ -421,16 +421,21 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         onMouseEnter={(e) => {
                           setHoveredDate(date); setHoveredMonth(m);
                           const rect = wrapperRef.current?.getBoundingClientRect();
-                          setTooltip({
-                            x: (e.clientX - (rect?.left || 0)) + 8,
-                            y: (e.clientY - (rect?.top || 0)) - 24,
-                            text: months[m].monthLabel,
-                            visible: true,
-                          });
+                          const rawX = (e.clientX - (rect?.left || 0)) + 8;
+                          const rawY = (e.clientY - (rect?.top || 0)) - 24;
+                          const tooltipW = 32; // approx width of \"Dec\"
+                          const clampedX = Math.max(0, Math.min(rawX, (rect?.width || 0) - tooltipW));
+                          const clampedY = Math.max(0, rawY);
+                          setTooltip({ x: clampedX, y: clampedY, text: months[m].monthLabel, visible: true });
                         }}
                         onMouseMove={(e) => {
                           const rect = wrapperRef.current?.getBoundingClientRect();
-                          setTooltip(t => ({ ...t, x: (e.clientX - (rect?.left || 0)) + 8, y: (e.clientY - (rect?.top || 0)) - 24 }));
+                          const rawX = (e.clientX - (rect?.left || 0)) + 8;
+                          const rawY = (e.clientY - (rect?.top || 0)) - 24;
+                          const tooltipW = 32;
+                          const clampedX = Math.max(0, Math.min(rawX, (rect?.width || 0) - tooltipW));
+                          const clampedY = Math.max(0, rawY);
+                          setTooltip(t => ({ ...t, x: clampedX, y: clampedY }));
                         }}
                         onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); setTooltip(t => ({ ...t, visible: false })); }}
                       />
