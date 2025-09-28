@@ -44,6 +44,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [loadedHabits, setLoadedHabits] = React.useState<Set<string>>(new Set());
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
   const initialHabitsRef = React.useRef<Habit[]>(habits);
   const initStartRef = React.useRef<number | null>(null);
   const switchStartRef = React.useRef<number | null>(null);
@@ -341,11 +342,16 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                 style={{ width, background: '#0a0a0a' }}
               >
                 <div
-                  className="grid text-[10px] text-neutral-400 capitalize"
+                  className="grid text-[10px] capitalize"
                   style={{ gridTemplateColumns: `repeat(${cols}, ${size}px)`, gap }}
                 >
                   {months.map(({ monthLabel }, m) => (
-                    <div key={`sticky-${m}`} className="text-center">{monthLabel.toLowerCase()}</div>
+                    <div
+                      key={`sticky-${m}`}
+                      className={cn('text-center text-neutral-400', hoveredMonth === m && 'text-emerald-400')}
+                    >
+                      {monthLabel}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -408,10 +414,10 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         r={size * 0.48}
                         fill="transparent"
                         onClick={() => !disabled && toggleDay(date)}
-                        onMouseEnter={() => setHoveredDate(date)}
-                        onMouseLeave={() => setHoveredDate(null)}
+                        onMouseEnter={() => { setHoveredDate(date); setHoveredMonth(m); }}
+                        onMouseLeave={() => { setHoveredDate(null); setHoveredMonth(null); }}
                       >
-                        <title>{months[m].monthLabel.toLowerCase()}</title>
+                        <title>{months[m].monthLabel}</title>
                       </circle>
                       <text
                         x={cx}
