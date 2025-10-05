@@ -412,6 +412,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
               <tr>
                 <th className={tokens.table.th}>Item</th>
                 <th className={tokens.table.th}>Last Redeemed</th>
+                <th className={tokens.table.th}>Next Available</th>
                 <th className={tokens.table.th}>Count This Year</th>
                 <th className={tokens.table.th}>Actions</th>
               </tr>
@@ -419,7 +420,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
             <tbody>
               {unavailableList.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className={tokens.table.empty_state}>
+                  <td colSpan={5} className={tokens.table.empty_state}>
                     No unavailable items
                   </td>
                 </tr>
@@ -431,6 +432,9 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                     </td>
                     <td className={tokens.table.td}>
                       <span className="text-neutral-400">{item.lastRedeemed}</span>
+                    </td>
+                    <td className={tokens.table.td}>
+                      <span className="text-neutral-400">{state.stats?.nextReset?.[item.type] || '-'}</span>
                     </td>
                     <td className={tokens.table.td}>
                       <span className="text-neutral-400">{item.countThisYear}</span>

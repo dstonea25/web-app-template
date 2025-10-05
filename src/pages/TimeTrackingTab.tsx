@@ -7,7 +7,9 @@ import {
   computeDurationMinutes, 
   getDateAtMidnight,
   addMinutes,
-  generateId
+  generateId,
+  MAX_TIMER_MS,
+  MAX_TIMER_MINUTES
 } from '../lib/time';
 import { fetchSessionsFromWebhook, saveSessionsToWebhook } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
@@ -61,6 +63,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStoppedRef = useRef(false);
 
   const hasInitializedRef = useRef(false);
 
@@ -123,11 +126,31 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       if (stored) {
         try {
           const active = JSON.parse(stored);
-          setActiveSession(active);
-          setCtxActive(active);
           const now = new Date();
           const startTime = new Date(active.startedAt);
-          setElapsedMs(now.getTime() - startTime.getTime());
+          const diff = now.getTime() - startTime.getTime();
+          if (diff >= MAX_TIMER_MS) {
+            // Auto-stop at cap without resuming the active session
+            const endedAt = addMinutes(active.startedAt, MAX_TIMER_MINUTES);
+            const pending: PendingSession = {
+              id: generateId(),
+              category: active.category,
+              startedAt: active.startedAt,
+              endedAt,
+              minutes: MAX_TIMER_MINUTES
+            };
+            setPendingSession(pending);
+            setActiveSession(null);
+            setElapsedMs(MAX_TIMER_MS);
+            localStorage.removeItem('geronimo.time.activeSession');
+            setCtxActive(null);
+            autoStoppedRef.current = true;
+            toast.info('Timer auto-stopped at 6h cap');
+          } else {
+            setActiveSession(active);
+            setCtxActive(active);
+            setElapsedMs(diff);
+          }
         } catch (e) {
           localStorage.removeItem('geronimo.time.activeSession');
         }
@@ -168,13 +191,17 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
     setElapsedMs(0);
     localStorage.setItem('geronimo.time.activeSession', JSON.stringify(active));
     setCtxActive(active);
+    autoStoppedRef.current = false;
   };
 
   const stopTimer = () => {
     if (!activeSession) return;
     
-    const endedAt = nowIso();
-    const minutes = computeDurationMinutes(activeSession.startedAt, endedAt);
+    const now = nowIso();
+    const rawMinutes = computeDurationMinutes(activeSession.startedAt, now);
+    const isCapped = rawMinutes > MAX_TIMER_MINUTES;
+    const minutes = Math.min(rawMinutes, MAX_TIMER_MINUTES);
+    const endedAt = isCapped ? addMinutes(activeSession.startedAt, MAX_TIMER_MINUTES) : now;
     
     const pending: PendingSession = {
       id: generateId(),
@@ -187,9 +214,10 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
     setPendingSession(pending);
     setActiveSession(null);
     // Keep the elapsed time for display - don't reset to 0
-    setElapsedMs(elapsedMs); // Keep current elapsed time
+    setElapsedMs(isCapped ? MAX_TIMER_MS : elapsedMs); // Keep current elapsed time, capped
     localStorage.removeItem('geronimo.time.activeSession');
     setCtxActive(null);
+    if (isCapped) toast.info('Timer auto-stopped at 6h cap');
   };
 
   const resetTimer = () => {
@@ -211,6 +239,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
     setPendingSession(null);
     localStorage.setItem('geronimo.time.activeSession', JSON.stringify(active));
     setCtxActive(active);
+    autoStoppedRef.current = false;
   };
 
 
@@ -357,6 +386,28 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       setIsSubmitting(false);
     }
   };
+
+  // Auto-stop when exceeding cap while ticking on the visible tab
+  useEffect(() => {
+    if (!isVisible || !activeSession) return;
+    if (elapsedMs >= MAX_TIMER_MS && !autoStoppedRef.current) {
+      autoStoppedRef.current = true;
+      const endedAt = addMinutes(activeSession.startedAt, MAX_TIMER_MINUTES);
+      const pending: PendingSession = {
+        id: generateId(),
+        category: activeSession.category,
+        startedAt: activeSession.startedAt,
+        endedAt,
+        minutes: MAX_TIMER_MINUTES
+      };
+      setPendingSession(pending);
+      setActiveSession(null);
+      setElapsedMs(MAX_TIMER_MS);
+      localStorage.removeItem('geronimo.time.activeSession');
+      setCtxActive(null);
+      toast.info('Timer auto-stopped at 6h cap');
+    }
+  }, [elapsedMs, isVisible, activeSession]);
 
   // Compute daily hours for selected category and time period
   const computeDailyStats = () => {

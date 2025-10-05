@@ -601,7 +601,7 @@ function recomputeDerived(state: AllocationState): AllocationState {
 
     let remaining = Math.max(0, item.quota - usedThisPeriod);
     // Hybrid: after first redeem in current anchored window, no remaining for rest of window
-    if (mult > 1 && item.quota === 1 && itemEvents.length > 0 && now >= periodStart && now < periodEnd) {
+    if (mult > 1 && item.quota === 1 && usedThisPeriod > 0 && now >= periodStart && now < periodEnd) {
       remaining = 0;
     }
     const pctUsed = item.quota > 0 ? Math.min(100, Math.round((usedThisPeriod / item.quota) * 100)) : 0;

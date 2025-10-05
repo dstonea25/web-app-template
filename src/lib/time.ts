@@ -3,6 +3,11 @@ export const nowIso = (): string => {
   return new Date().toISOString();
 };
 
+// Maximum allowed running timer duration
+export const MAX_TIMER_HOURS = 6;
+export const MAX_TIMER_MINUTES = MAX_TIMER_HOURS * 60;
+export const MAX_TIMER_MS = MAX_TIMER_MINUTES * 60 * 1000;
+
 // Convert minutes to HH:MM format
 export const minutesToHhMm = (minutes: number): string => {
   const hours = Math.floor(minutes / 60);

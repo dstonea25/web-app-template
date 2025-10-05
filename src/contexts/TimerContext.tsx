@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { MAX_TIMER_MS } from '../lib/time';
 
 type ActiveSession = { startedAt: string; category: string } | null;
 
@@ -27,7 +28,8 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeSession) return;
     const now = new Date();
     const startTime = new Date(activeSession.startedAt);
-    setElapsedMs(now.getTime() - startTime.getTime());
+    const diff = now.getTime() - startTime.getTime();
+    setElapsedMs(Math.min(diff, MAX_TIMER_MS));
   }, [activeSession]);
 
   // Drive ticking when an active session exists
