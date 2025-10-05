@@ -370,7 +370,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     return (
       <div className="space-y-2">
         <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
-          <div className="flex justify-center">
+          <div className="flex justify-start sm:justify-center">
             <div ref={wrapperRef} className="relative inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
               {/* Sticky month header (HTML) */}
               <div
