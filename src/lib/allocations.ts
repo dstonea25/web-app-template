@@ -1,7 +1,7 @@
 import { toast } from './notifications/toast';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-// Supabase-backed Allocations (no webhook/file fallback)
+// Database-backed Allocations (no legacy file/webhook fallback)
 // - Fetch: Supabase RPC get_allocation_state_json(_tz, target_year) returns
 //   { year, items, ledger, available, coming_up, unavailable, stats } which
 //   maps 1:1 to AllocationState consumed by the UI.
@@ -483,7 +483,7 @@ export async function deleteRedemptionById(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// ---- Webhook persistence helpers for editing allocations list ----
+// ---- Persistence helpers for editing allocations list ----
 export async function saveAllocationsItems(items: AllotmentItem[]): Promise<void> {
   // Persist the editable items table into public.allotments using an upsert-on-item,
   // and delete any rows that are no longer present locally to keep DB as source of truth.
