@@ -458,9 +458,8 @@ export async function undoAdmitDefeat(type: string): Promise<AllocationState> {
   return await loadLedgerAndAllotments();
 }
 
-export function getStats(state: AllocationState) {
-  return state.stats;
-}
+// getStats helper was used when deriving locally; with RPC it is redundant.
+// export function getStats(state: AllocationState) { return state.stats; }
 
 // ---- Recent redemptions helpers ----
 export async function fetchRecentRedemptions(limit: number = 5): Promise<RedemptionRow[]> {
@@ -526,75 +525,7 @@ export function clearAllocationsOverrides(): void {
   } catch {}
 }
 
-// Note: older helpers `calculateComingSoon` and `generateUnavailableList` were removed
-// to keep a single source of truth in `recomputeDerived`.
-
-function recomputeDerived(state: AllocationState): AllocationState {
-  const now = new Date();
-  const tz = deviceTZ();
-  const available: AvailableItem[] = [];
-  const coming_up: ComingUpItem[] = [];
-  const unavailable: UnavailableItem[] = [];
-  const usageCounts: Record<string, number> = {};
-  const percentages: Record<string, number> = {};
-  const nextReset: Record<string, string> = {};
-
-  state.ledger.forEach(ev => {
-    usageCounts[ev.type] = (usageCounts[ev.type] || 0) + 1;
-  });
-
-  state.items.forEach(item => {
-    const mult = item.multiplier || 1;
-    const itemEvents = state.ledger.filter(ev => ev.type === item.type);
-    const window = buildWindow(now, item.cadence, mult, tz, itemEvents);
-    const periodStart = window.start;
-    const periodEnd = window.end;
-    const usedThisPeriod = itemEvents.filter(ev => {
-      const d = new Date(ev.date + 'T00:00:00');
-      return d >= periodStart && d < periodEnd;
-    }).length;
-
-    let remaining = Math.max(0, item.quota - usedThisPeriod);
-    // Hybrid: after first redeem in current anchored window, no remaining for rest of window
-    if (mult > 1 && item.quota === 1 && usedThisPeriod > 0 && now >= periodStart && now < periodEnd) {
-      remaining = 0;
-    }
-    const pctUsed = item.quota > 0 ? Math.min(100, Math.round((usedThisPeriod / item.quota) * 100)) : 0;
-    percentages[item.type] = pctUsed;
-    nextReset[item.type] = toISODateTZ(periodEnd, tz);
-
-    if (remaining > 0) {
-      available.push({ type: item.type, remaining, total: item.quota });
-    }
-
-    if (remaining <= 0) {
-      // Always include in Unavailable
-      const currentYear = now.getFullYear();
-      const thisYearEvents = state.ledger
-        .filter(ev => ev.type === item.type)
-        .filter(ev => new Date(ev.date).getFullYear() === currentYear)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const lastRedeemed = thisYearEvents.length > 0 ? thisYearEvents[0].date : 'Never';
-      const countThisYear = thisYearEvents.length;
-      unavailable.push({ type: item.type, lastRedeemed, countThisYear });
-
-      // Additionally in Coming Up if within threshold
-      const days = daysUntil(periodEnd);
-      const threshold = (item.cadence === 'weekly') ? WEEKLY_COMING_UP_DAYS : NON_WEEKLY_COMING_UP_DAYS;
-      if (days <= threshold) {
-        coming_up.push({ type: item.type, daysUntil: days, quotaAvailable: item.quota });
-      }
-    }
-  });
-
-  return {
-    ...state,
-    available,
-    coming_up: coming_up.sort((a, b) => a.daysUntil - b.daysUntil),
-    unavailable: unavailable.sort((a, b) => b.countThisYear - a.countThisYear),
-    stats: { usageCounts, percentages, nextReset },
-  };
-}
+// Local recomputeDerived removed; RPC is the single source of truth for derived state.
 
 
 
