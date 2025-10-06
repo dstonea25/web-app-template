@@ -1,7 +1,19 @@
 import { toast } from './notifications/toast';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-// Global loading state to prevent duplicate webhook calls
+// Supabase-backed Allocations (no webhook/file fallback)
+// - Fetch: Supabase RPC get_allocation_state_json(_tz, target_year) returns
+//   { year, items, ledger, available, coming_up, unavailable, stats } which
+//   maps 1:1 to AllocationState consumed by the UI.
+// - Writes: direct DB writes
+//   • saveAllocationsItems -> upsert to public.allotments on conflict (item) and delete removed
+//   • redeemItem/admitDefeat -> insert rows into public.allotment_ledger
+//   • undoAdmitDefeat -> delete most recent failed row for the given item
+// Notes:
+//   • LocalStorage overrides (OVERRIDE_ITEMS_KEY / MANUAL_ADDITIONS_KEY) remain for optional dev tweaking.
+//   • All timezone computations rely on deviceTZ and server timestamptz storage.
+
+// Global loading state to prevent duplicate RPC calls
 let isLoadingAllocations = false;
 let loadingPromise: Promise<AllocationState> | null = null;
 
@@ -34,6 +46,14 @@ export interface LedgerEvent {
   date: string; // YYYY-MM-DD
   type: string; // matches AllotmentItem.type
   ts?: string;  // original timestamp if provided
+}
+
+// Lightweight shape for recent redemption rows
+export interface RedemptionRow {
+  id: string;
+  item: string;
+  ts: string; // ISO timestamp
+  qty?: number;
 }
 
 export interface AvailableItem {
@@ -358,6 +378,8 @@ const startOfDay = (d: Date) => {
 };
 
 export async function loadLedgerAndAllotments(): Promise<AllocationState> {
+  // Fetch derived allocation state from Supabase RPC. The RPC already computes
+  // available/coming_up/unavailable/stats and returns year/items/ledger.
   // If already loading, return the existing promise
   if (isLoadingAllocations && loadingPromise) {
     console.log('⏳ Allocations already loading, returning existing promise');
@@ -398,6 +420,8 @@ export async function loadLedgerAndAllotments(): Promise<AllocationState> {
 }
 
 export async function redeemItem(type: string): Promise<AllocationState> {
+  // Record a successful redemption event directly in public.allotment_ledger
+  // and then reload state from RPC.
   // First check if the item is actually available before redeeming
   const currentState = await loadLedgerAndAllotments();
   const isAvailable = currentState.available.some(item => item.type === type && item.remaining > 0);
@@ -423,6 +447,8 @@ export async function addAllocation(type: string): Promise<AllocationState> {
 }
 
 export async function admitDefeat(type: string): Promise<AllocationState> {
+  // Record an overage/failed event directly in public.allotment_ledger
+  // and then reload state from RPC.
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
   const id = `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`;
   const payload = [{ id, type: 'failed', item: type, qty: 1, ts: new Date().toISOString() }];
@@ -432,6 +458,8 @@ export async function admitDefeat(type: string): Promise<AllocationState> {
 }
 
 export async function undoAdmitDefeat(type: string): Promise<AllocationState> {
+  // Undo the most recent failed event for the item by deleting its row
+  // and then reload state from RPC.
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
   // Delete the most recent failed event for this item
   const { data: rows, error: selErr } = await supabase
@@ -457,8 +485,32 @@ export function getStats(state: AllocationState) {
   return state.stats;
 }
 
+// ---- Recent redemptions helpers ----
+export async function fetchRecentRedemptions(limit: number = 5): Promise<RedemptionRow[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const { data, error } = await supabase
+    .from('allotment_ledger')
+    .select('id, item, ts, qty, type')
+    .eq('type', 'redeem')
+    .order('ts', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data || []).map((r: any) => ({ id: String(r.id), item: String(r.item), ts: String(r.ts), qty: r.qty })) as RedemptionRow[];
+}
+
+export async function deleteRedemptionById(id: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const { error } = await supabase
+    .from('allotment_ledger')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ---- Webhook persistence helpers for editing allocations list ----
 export async function saveAllocationsItems(items: AllotmentItem[]): Promise<void> {
+  // Persist the editable items table into public.allotments using an upsert-on-item,
+  // and delete any rows that are no longer present locally to keep DB as source of truth.
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
   // Fetch existing items to compute deletions
   const { data: existing, error: selErr } = await supabase
