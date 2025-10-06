@@ -446,6 +446,30 @@ export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
   }));
 };
 
+// Webhook function to fetch recent time sessions (limit N, default 5)
+export const fetchRecentSessionsFromWebhook = async (limit: number = 5): Promise<Session[]> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
+  }
+  const { data, error } = await supabase
+    .from('time_ledger')
+    .select('id, category, started_at, ended_at, minutes')
+    .order('started_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const rows = (data || []) as { id: string; category: Session['category']; started_at: string; ended_at: string; minutes: number }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    category: r.category,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    minutes: r.minutes,
+  }));
+};
+
 // Webhook function to save time sessions
 export const saveSessionsToWebhook = async (sessions: Session[]): Promise<void> => {
   const mod = await import('./supabase');
@@ -465,6 +489,23 @@ export const saveSessionsToWebhook = async (sessions: Session[]): Promise<void> 
   const { error } = await supabase
     .from('time_ledger')
     .upsert(payload, { onConflict: 'id' });
+  if (error) throw error;
+};
+
+// Webhook function to delete time sessions by id
+export const deleteSessionsFromWebhook = async (ids: string[]): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
+  }
+  if (!ids || ids.length === 0) return;
+  const numericOrStringIds = ids.map((id) => (Number.isFinite(Number(id)) ? Number(id) : String(id)));
+  const { error } = await supabase
+    .from('time_ledger')
+    .delete()
+    .in('id', numericOrStringIds);
   if (error) throw error;
 };
 
