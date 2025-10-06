@@ -276,10 +276,11 @@ export class ApiClient {
 }
 
 // Webhook configuration
-const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
-const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
-const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
-const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
+// (Todos/Ideas webhooks removed as fallback; Supabase is required)
+// const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
+// const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
+// const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
+// const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
 const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
 const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
 const N8N_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments';
@@ -289,383 +290,136 @@ const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Global loading states to prevent duplicate webhook calls
-let isLoadingTodos = false;
-let isLoadingIdeas = false;
+// let isLoadingTodos = false; // no longer needed without webhook fallback
+// let isLoadingIdeas = false; // no longer needed without webhook fallback
 let isLoadingTime = false;
-let todosLoadingPromise: Promise<Todo[]> | null = null;
-let ideasLoadingPromise: Promise<Idea[]> | null = null;
+// let todosLoadingPromise: Promise<Todo[]> | null = null;
+// let ideasLoadingPromise: Promise<Idea[]> | null = null;
 let timeLoadingPromise: Promise<Session[]> | null = null;
 
 // Webhook function to fetch todos
 export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
-  // If Supabase is configured, read directly from DB (preferred) and bypass webhook
-  try {
-    const mod = await import('./supabase');
-    const supabase = (mod as any).supabase as any | null;
-    const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('todos')
-        .select('id, task, category, priority, created_at')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; created_at: string }[];
-      return rows.map((row) => ({
-        id: String(row.id),
-        task: row.task,
-        category: row.category ?? null,
-        priority: (row.priority === 'low' || row.priority === 'medium' || row.priority === 'high') ? (row.priority as any) : null,
-        created_at: row.created_at,
-        statusUi: 'open' as const,
-        _dirty: false,
-      }));
-    }
-  } catch (e) {
-    // fall through to webhook behavior
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Todos');
   }
-  // If already loading, return the existing promise
-  if (isLoadingTodos && todosLoadingPromise) {
-    console.log('⏳ Todos already loading, returning existing promise');
-    return todosLoadingPromise;
-  }
-  
-  isLoadingTodos = true;
-  todosLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
-
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_WEBHOOK_URL);
-
-    const response = await fetch(N8N_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    console.log('📦 Webhook response data:', data);
-    console.log('📦 Data type:', typeof data);
-    console.log('📦 Is array?', Array.isArray(data));
-    
-    // Transform the data to match our Todo interface
-    // The webhook returns an object with a 'data' property containing the todos array
-    if (data && data.data && Array.isArray(data.data)) {
-      const todos = data.data;
-      return todos.map((todo: any) => ({
-        id: String(todo.id),
-        task: todo.task,
-        category: todo.category || null,
-        priority: todo.priority || null,
-        created_at: todo.created_at,
-        statusUi: 'open' as const,
-        _dirty: false,
-      }));
-    } else {
-      console.error('❌ Response format not recognized:', data);
-      throw new Error('Invalid response format: expected object with data property containing todos array');
-    }
-    } catch (error) {
-      console.error('Failed to fetch todos from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingTodos = false;
-      todosLoadingPromise = null;
-    }
-  })();
-  
-  return todosLoadingPromise;
+  const { data, error } = await supabase
+    .from('todos')
+    .select('id, task, category, priority, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; created_at: string }[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    task: row.task,
+    category: row.category ?? null,
+    priority: (row.priority === 'low' || row.priority === 'medium' || row.priority === 'high') ? (row.priority as any) : null,
+    created_at: row.created_at,
+    statusUi: 'open' as const,
+    _dirty: false,
+  }));
 };
 
 // Webhook function to save todos
 export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
-  try {
-    // If Supabase is configured, upsert working todos and delete removed ones
-    try {
-      const mod = await import('./supabase');
-      const supabase = (mod as any).supabase as any | null;
-      const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-      if (isSupabaseConfigured && supabase) {
-        // Fetch current ids
-        const { data: existingRows, error: selErr } = await supabase
-          .from('todos')
-          .select('id');
-        if (selErr) throw selErr;
-        const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id))); 
-
-        // Prepare upsert payload (omit created_at to let DB default persist for new rows)
-        const upserts = (todos || []).map((t) => ({
-          id: Number(t.id || 0),
-          task: t.task,
-          category: t.category ?? null,
-          priority: (t.priority === 'low' || t.priority === 'medium' || t.priority === 'high') ? t.priority : null,
-          status: 'open',
-        }));
-
-        if (upserts.length > 0) {
-          const { error: upsertErr } = await supabase
-            .from('todos')
-            .upsert(upserts, { onConflict: 'id' });
-          if (upsertErr) throw upsertErr;
-        }
-
-        // Compute deletions (anything existing but not in new list)
-        const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
-        const toDelete: number[] = [];
-        existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
-        if (toDelete.length > 0) {
-          const { error: delErr } = await supabase
-            .from('todos')
-            .delete()
-            .in('id', toDelete);
-          if (delErr) throw delErr;
-        }
-        return; // done via Supabase
-      }
-    } catch (e) {
-      console.warn('Supabase save path failed or not configured, falling back to webhook', e);
-    }
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving todos to webhook...');
-    console.log('📦 Todos to save:', todos);
-
-    // Convert todos to the format expected by n8n (remove internal fields)
-    const todosToSave = todos.map(todo => ({
-      id: parseInt(todo.id || '0'),
-      task: todo.task,
-      status: todo.statusUi,
-      category: todo.category,
-      priority: todo.priority,
-      created_at: todo.created_at,
-    }));
-
-    const requestBody = { data: todosToSave };
-    console.log('📤 Request body being sent:', JSON.stringify(requestBody, null, 2));
-    console.log('📤 Request headers:', {
-      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-      'Content-Type': 'application/json',
-    });
-
-    const response = await fetch(N8N_SAVE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ data: todosToSave }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Todos saved successfully to webhook');
-  } catch (error) {
-    console.error('Failed to save todos to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Todos');
+  }
+  const { data: existingRows, error: selErr } = await supabase
+    .from('todos')
+    .select('id');
+  if (selErr) throw selErr;
+  const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
+  const upserts = (todos || []).map((t) => ({
+    id: Number(t.id || 0),
+    task: t.task,
+    category: t.category ?? null,
+    priority: (t.priority === 'low' || t.priority === 'medium' || t.priority === 'high') ? t.priority : null,
+    status: 'open',
+  }));
+  if (upserts.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from('todos')
+      .upsert(upserts, { onConflict: 'id' });
+    if (upsertErr) throw upsertErr;
+  }
+  const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
+  const toDelete: number[] = [];
+  existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('todos')
+      .delete()
+      .in('id', toDelete);
+    if (delErr) throw delErr;
   }
 };
 
 // Webhook function to fetch ideas
 export const fetchIdeasFromWebhook = async (): Promise<Idea[]> => {
-  // Prefer Supabase when configured
-  try {
-    const mod = await import('./supabase');
-    const supabase = (mod as any).supabase as any | null;
-    const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('ideas')
-        .select('id, idea, category, notes, status, created_at')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      const rows = (data || []) as { id: number; idea: string; category: string | null; notes: string | null; status: string | null; created_at: string }[];
-      return rows.map((row) => ({
-        id: String(row.id),
-        idea: row.idea,
-        category: row.category ?? null,
-        notes: row.notes ?? '',
-        created_at: row.created_at,
-        status: (row.status === 'open' || row.status === 'closed') ? row.status : 'open',
-        _dirty: false,
-      }));
-    }
-  } catch (e) {
-    // fall back to webhook
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Ideas');
   }
-  // If already loading, return the existing promise
-  if (isLoadingIdeas && ideasLoadingPromise) {
-    console.log('⏳ Ideas already loading, returning existing promise');
-    return ideasLoadingPromise;
-  }
-  
-  isLoadingIdeas = true;
-  ideasLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
-
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_IDEAS_WEBHOOK_URL);
-
-    const response = await fetch(N8N_IDEAS_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Ideas webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    console.log('📦 Ideas webhook response data:', data);
-    console.log('📦 Data type:', typeof data);
-    console.log('📦 Is array?', Array.isArray(data));
-    
-    // Transform the data to match our Idea interface
-    // The webhook returns an object with a 'data' property containing the ideas array
-    if (data && data.data && Array.isArray(data.data)) {
-      const ideas = data.data;
-      return ideas.map((idea: any) => ({
-        id: String(idea.id),
-        idea: idea.idea,
-        category: idea.category || null,
-        notes: idea.notes || '',
-        created_at: idea.created_at,
-        status: idea.status || 'open',
-        _dirty: false,
-      }));
-    } else {
-      console.error('❌ Ideas response format not recognized:', data);
-      throw new Error('Invalid response format: expected object with data property containing ideas array');
-    }
-    } catch (error) {
-      console.error('❌ Failed to fetch ideas from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingIdeas = false;
-      ideasLoadingPromise = null;
-    }
-  })();
-  
-  return ideasLoadingPromise;
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('id, idea, category, notes, status, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: number; idea: string; category: string | null; notes: string | null; status: string | null; created_at: string }[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    idea: row.idea,
+    category: row.category ?? null,
+    notes: row.notes ?? '',
+    created_at: row.created_at,
+    status: (row.status === 'open' || row.status === 'closed') ? row.status : 'open',
+    _dirty: false,
+  }));
 };
 
 // Webhook function to save ideas
 export const saveIdeasToWebhook = async (ideas: Idea[]): Promise<void> => {
-  try {
-    // Prefer Supabase when configured: upsert working ideas and delete removed
-    try {
-      const mod = await import('./supabase');
-      const supabase = (mod as any).supabase as any | null;
-      const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-      if (isSupabaseConfigured && supabase) {
-        const { data: existingRows, error: selErr } = await supabase
-          .from('ideas')
-          .select('id');
-        if (selErr) throw selErr;
-        const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
-
-        const upserts = (ideas || []).map((it) => ({
-          id: Number(it.id || 0),
-          idea: it.idea,
-          category: it.category ?? null,
-          notes: it.notes ?? '',
-          status: (it.status === 'open' || it.status === 'closed') ? it.status : 'open',
-        }));
-
-        if (upserts.length > 0) {
-          const { error: upsertErr } = await supabase
-            .from('ideas')
-            .upsert(upserts, { onConflict: 'id' });
-          if (upsertErr) throw upsertErr;
-        }
-
-        const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
-        const toDelete: number[] = [];
-        existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
-        if (toDelete.length > 0) {
-          const { error: delErr } = await supabase
-            .from('ideas')
-            .delete()
-            .in('id', toDelete);
-          if (delErr) throw delErr;
-        }
-        return; // done via Supabase
-      }
-    } catch (e) {
-      console.warn('Supabase save (ideas) failed or not configured, falling back to webhook', e);
-    }
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving ideas to webhook...');
-    console.log('📦 Ideas to save:', ideas);
-
-    // Convert ideas to the format expected by n8n (remove internal fields)
-    const ideasToSave = ideas.map(idea => ({
-      id: parseInt(idea.id || '0'),
-      idea: idea.idea,
-      status: idea.status,
-      category: idea.category,
-      notes: idea.notes,
-      created_at: idea.created_at,
-    }));
-
-    const requestBody = { data: ideasToSave };
-    console.log('📤 Ideas request body being sent:', JSON.stringify(requestBody, null, 2));
-    console.log('📤 Request headers:', {
-      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-      'Content-Type': 'application/json',
-    });
-
-    const response = await fetch(N8N_SAVE_IDEAS_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ data: ideasToSave }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save ideas webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Ideas saved successfully to webhook');
-  } catch (error) {
-    console.error('Failed to save ideas to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Ideas');
+  }
+  const { data: existingRows, error: selErr } = await supabase
+    .from('ideas')
+    .select('id');
+  if (selErr) throw selErr;
+  const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
+  const upserts = (ideas || []).map((it) => ({
+    id: Number(it.id || 0),
+    idea: it.idea,
+    category: it.category ?? null,
+    notes: it.notes ?? '',
+    status: (it.status === 'open' || it.status === 'closed') ? it.status : 'open',
+  }));
+  if (upserts.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from('ideas')
+      .upsert(upserts, { onConflict: 'id' });
+    if (upsertErr) throw upsertErr;
+  }
+  const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
+  const toDelete: number[] = [];
+  existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('ideas')
+      .delete()
+      .in('id', toDelete);
+    if (delErr) throw delErr;
   }
 };
 
