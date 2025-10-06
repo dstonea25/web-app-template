@@ -194,29 +194,7 @@ function normalizeCadence(value: string): AllocationCadence {
   return 'monthly';
 }
 
-const parseJSONL = (text: string): LedgerEvent[] => {
-  return text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => {
-      const raw = JSON.parse(line);
-      // Support both formats:
-      // 1) { id, date, type }
-      // 2) { type: 'redeem'|'failed', item, qty, ts, id }
-      if (raw && typeof raw === 'object' && raw.item && raw.ts) {
-        if (raw.type !== 'redeem') {
-          // Ignore non-redeem events in MVP
-          return null;
-        }
-        const iso = String(raw.ts);
-        const date = iso.slice(0, 10);
-        return { id: String(raw.id || crypto.randomUUID()), date, type: String(raw.item), ts: iso } as LedgerEvent;
-      }
-      return raw as LedgerEvent;
-    })
-    .filter((e): e is LedgerEvent => Boolean(e));
-};
+// (legacy JSONL parser removed; state now sourced via RPC)
 
 // ---- Device-timezone helpers (mirror backend behavior) ----
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -439,10 +417,9 @@ export async function redeemItem(type: string): Promise<AllocationState> {
 }
 
 export async function addAllocation(type: string): Promise<AllocationState> {
-  // For webhook implementation, we'll need to handle this differently
-  // Since we can't easily "undo" a webhook save, we'll just reload the current state
-  // In a real implementation, you might want to add a "negative" ledger event
-  toast.success(`Added back: ${type} (webhook reload)`);
+  // Placeholder UX action: simply reload current state.
+  // If we later support a true "undo" for redeem, handle it via a ledger row.
+  toast.success(`Added back: ${type}`);
   return await loadLedgerAndAllotments();
 }
 

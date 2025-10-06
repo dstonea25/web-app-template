@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn, tokens } from '../theme/config';
-import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove } from '../lib/allocations';
+import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove, fetchRecentRedemptions, deleteRedemptionById } from '../lib/allocations';
+import RecentRedemptionsTable from '../components/RecentRedemptionsTable';
 import { getCachedData, setCachedData } from '../lib/storage';
 import { toast } from '../lib/notifications/toast';
 
@@ -8,6 +9,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   const [state, setState] = useState<AllocationState | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [recentRows, setRecentRows] = useState<{ id: string; item: string; ts: string; qty?: number }[]>([]);
   // Manual add inputs
   const [newItem, setNewItem] = useState('');
   const [newCadence, setNewCadence] = useState<'weekly'|'monthly'|'quarterly'|'yearly'>('monthly');
@@ -52,6 +54,10 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         if (cachedState && !forceRefresh) {
           console.log('📦 Loading allocations from cache');
           setState(cachedState);
+          try {
+            const list = await fetchRecentRedemptions(5);
+            setRecentRows(list);
+          } catch {}
           setLoading(false);
           return;
         }
@@ -71,6 +77,10 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         // Cache the data
         setCachedData('allocations-cache', s);
         setState(s);
+        try {
+          const list = await fetchRecentRedemptions(5);
+          setRecentRows(list);
+        } catch {}
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load allocations');
       } finally {
@@ -103,6 +113,10 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
       // Call redeemItem which now waits for webhook confirmation before returning
       const s = await redeemItem(type);
       setState(s);
+      try {
+        const list = await fetchRecentRedemptions(5);
+        setRecentRows(list);
+      } catch {}
       
       // Only show success toast after webhook confirms the save
       toast.success(`Redeemed: ${type}`, { ttlMs: 5000, actionLabel: 'Undo', onAction: async () => {
@@ -126,6 +140,10 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
       // Call admitDefeat which now waits for webhook confirmation before returning
       const s = await admitDefeat(type);
       setState(s);
+      try {
+        const list = await fetchRecentRedemptions(5);
+        setRecentRows(list);
+      } catch {}
       
       // Only show success toast after webhook confirms the save
       toast.success(`😅 Heads up — you went over your ${type} limit. It happens but this fuck up has been logged.`, { 
@@ -265,7 +283,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
               }}
               className={cn(tokens.button.base, tokens.button.ghost, 'text-sm')}
             >
-              Reload from Webhook
+              Reload
             </button>
           </div>
         </div>
@@ -620,6 +638,27 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
           </div>
         )})()}
       </div>
+
+      {/* Recent Redemptions */}
+      <RecentRedemptionsTable
+        rows={recentRows}
+        onDelete={async (id) => {
+          try {
+            await deleteRedemptionById(id);
+            const [s, list] = await Promise.all([
+              loadLedgerAndAllotments(),
+              fetchRecentRedemptions(5),
+            ]);
+            setState(s);
+            setCachedData('allocations-cache', s);
+            setRecentRows(list);
+            toast.success('Redemption deleted');
+          } catch (err) {
+            console.error(err);
+            toast.error('Failed to delete redemption');
+          }
+        }}
+      />
     </div>
   );
 };
