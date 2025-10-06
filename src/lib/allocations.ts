@@ -1,5 +1,5 @@
 import { toast } from './notifications/toast';
-import { fetchAllotmentsFromWebhook, saveAllotmentsToWebhook, fetchLedgerFromWebhook, saveLedgerToWebhook } from './api';
+import { supabase, isSupabaseConfigured } from './supabase';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 // Global loading state to prevent duplicate webhook calls
@@ -407,27 +407,11 @@ export async function redeemItem(type: string): Promise<AllocationState> {
     throw new Error(`Cannot redeem ${type} - not available`);
   }
   
-  // Create new ledger event in the format expected by n8n (JSONL format)
-  const event = {
-    type: "redeem",
-    item: type,
-    qty: 1,
-    ts: new Date().toISOString(),
-    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('💾 Creating redemption event:', event);
-  
-  // Save to webhook and wait for confirmation
-  try {
-    await saveLedgerToWebhook([event]);
-    console.log('✅ Redemption saved successfully to webhook');
-  } catch (e) {
-    console.error('❌ Failed to save redemption to webhook:', e);
-    throw new Error('Failed to save redemption to webhook');
-  }
-  
-  // Reload from webhook to get updated state
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const id = `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`;
+  const payload = [{ id, type: 'redeem', item: type, qty: 1, ts: new Date().toISOString() }];
+  const { error } = await supabase.from('allotment_ledger').insert(payload);
+  if (error) throw error;
   return await loadLedgerAndAllotments();
 }
 
@@ -440,33 +424,33 @@ export async function addAllocation(type: string): Promise<AllocationState> {
 }
 
 export async function admitDefeat(type: string): Promise<AllocationState> {
-  // Create failed redemption event in the format expected by n8n (JSONL format)
-  const event = {
-    type: "failed",
-    item: type,
-    qty: 1,
-    ts: new Date().toISOString(),
-    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('💾 Creating failed redemption event:', event);
-  
-  try {
-    await saveLedgerToWebhook([event]);
-    console.log('✅ Failed redemption saved successfully to webhook');
-  } catch (e) {
-    console.error('❌ Failed to save overage redemption to webhook:', e);
-    throw new Error('Failed to save overage redemption to webhook');
-  }
-  
-  // Reload from webhook to get updated state
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const id = `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`;
+  const payload = [{ id, type: 'failed', item: type, qty: 1, ts: new Date().toISOString() }];
+  const { error } = await supabase.from('allotment_ledger').insert(payload);
+  if (error) throw error;
   return await loadLedgerAndAllotments();
 }
 
-export async function undoAdmitDefeat(_type: string): Promise<AllocationState> {
-  // For webhook implementation, we'll need to handle this differently
-  // Since we can't easily "undo" a webhook save, we'll just reload the current state
-  // In a real implementation, you might want to add a "negative" ledger event
+export async function undoAdmitDefeat(type: string): Promise<AllocationState> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  // Delete the most recent failed event for this item
+  const { data: rows, error: selErr } = await supabase
+    .from('allotment_ledger')
+    .select('id, ts')
+    .eq('type', 'failed')
+    .eq('item', type)
+    .order('ts', { ascending: false })
+    .limit(1);
+  if (selErr) throw selErr;
+  const targetId = rows && rows[0]?.id;
+  if (targetId) {
+    const { error: delErr } = await supabase
+      .from('allotment_ledger')
+      .delete()
+      .eq('id', targetId);
+    if (delErr) throw delErr;
+  }
   return await loadLedgerAndAllotments();
 }
 
@@ -476,23 +460,34 @@ export function getStats(state: AllocationState) {
 
 // ---- Webhook persistence helpers for editing allocations list ----
 export async function saveAllocationsItems(items: AllotmentItem[]): Promise<void> {
-  try {
-    // Convert items to the format expected by the webhook
-    const allotments = {
-      year: new Date().getFullYear(),
-      items: items.map(item => ({
-        type: item.type,
-        quota: item.quota,
-        cadence: item.cadence,
-        multiplier: item.multiplier || 1
-      }))
-    };
-    
-    await saveAllotmentsToWebhook(allotments);
-    console.log('✅ Allocations saved successfully to webhook');
-  } catch (e) {
-    console.warn('Failed to save allocation items to webhook:', e);
-    throw e;
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  // Fetch existing items to compute deletions
+  const { data: existing, error: selErr } = await supabase
+    .from('allotments')
+    .select('item');
+  if (selErr) throw selErr;
+  const existingItems = new Set<string>((existing || []).map((r: any) => String(r.item)));
+  const upserts = items.map(it => ({
+    item: it.type,
+    quota: Number(it.quota || 0),
+    cadence: it.cadence,
+    multiplier: Number(it.multiplier || 1),
+  }));
+  if (upserts.length > 0) {
+    const { error: upErr } = await supabase
+      .from('allotments')
+      .upsert(upserts, { onConflict: 'item' });
+    if (upErr) throw upErr;
+  }
+  const newSet = new Set<string>(upserts.map(u => u.item));
+  const toDelete: string[] = [];
+  existingItems.forEach(it => { if (!newSet.has(it)) toDelete.push(it); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('allotments')
+      .delete()
+      .in('item', toDelete);
+    if (delErr) throw delErr;
   }
 }
 
