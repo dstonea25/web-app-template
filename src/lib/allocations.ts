@@ -1,6 +1,5 @@
 import { toast } from './notifications/toast';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { supabase, isSupabaseConfigured } from './supabase';
 
 // Global loading state to prevent duplicate webhook calls
 let isLoadingAllocations = false;
