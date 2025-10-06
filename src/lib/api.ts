@@ -281,8 +281,8 @@ export class ApiClient {
 // const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
 // const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
 // const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
-const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
-const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
+// const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
+// const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
 const N8N_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments';
 const N8N_SAVE_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments';
 const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments-ledger';
@@ -292,10 +292,10 @@ const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 // Global loading states to prevent duplicate webhook calls
 // let isLoadingTodos = false; // no longer needed without webhook fallback
 // let isLoadingIdeas = false; // no longer needed without webhook fallback
-let isLoadingTime = false;
+// let isLoadingTime = false; // not used without webhook fallback
 // let todosLoadingPromise: Promise<Todo[]> | null = null;
 // let ideasLoadingPromise: Promise<Idea[]> | null = null;
-let timeLoadingPromise: Promise<Session[]> | null = null;
+// let timeLoadingPromise: Promise<Session[]> | null = null;
 
 // Webhook function to fetch todos
 export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
@@ -425,135 +425,47 @@ export const saveIdeasToWebhook = async (ideas: Idea[]): Promise<void> => {
 
 // Webhook function to fetch time sessions
 export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
-  // If already loading, return the existing promise
-  if (isLoadingTime && timeLoadingPromise) {
-    console.log('⏳ Time sessions already loading, returning existing promise');
-    return timeLoadingPromise;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
   }
-  
-  isLoadingTime = true;
-  timeLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
-
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_TIME_WEBHOOK_URL);
-
-    const response = await fetch(N8N_TIME_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Time webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-    console.log('📦 Time webhook response data:', responseData);
-    
-    // Handle empty response or missing data property
-    if (!responseData || !responseData.data) {
-      console.log('📦 Empty response from time webhook - returning empty array');
-      return [];
-    }
-
-    const jsonlString = responseData.data;
-    console.log('📦 JSONL string from data property:', jsonlString);
-    
-    // Handle empty JSONL string
-    if (!jsonlString.trim()) {
-      console.log('📦 Empty JSONL string - returning empty array');
-      return [];
-    }
-
-    // Parse JSONL (JSON Lines) format
-    const lines = jsonlString.trim().split('\n');
-    console.log('📦 Parsed JSONL lines:', lines.length);
-    
-    const sessions: Session[] = [];
-    
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const sessionData = JSON.parse(line);
-          // Transform the data to match our Session interface
-          const session: Session = {
-            id: String(sessionData.id),
-            category: sessionData.category,
-            startedAt: sessionData.startedAt,
-            endedAt: sessionData.endedAt,
-            minutes: sessionData.minutes,
-          };
-          sessions.push(session);
-        } catch (parseError) {
-          console.error('❌ Failed to parse JSONL line:', line, parseError);
-          // Continue processing other lines
-        }
-      }
-    }
-
-    console.log('✅ Parsed sessions from webhook:', sessions.length);
-    return sessions;
-    } catch (error) {
-      console.error('❌ Failed to fetch sessions from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingTime = false;
-      timeLoadingPromise = null;
-    }
-  })();
-  
-  return timeLoadingPromise;
+  const { data, error } = await supabase
+    .from('time_ledger')
+    .select('id, category, started_at, ended_at, minutes')
+    .order('started_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: string; category: Session['category']; started_at: string; ended_at: string; minutes: number }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    category: r.category,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    minutes: r.minutes,
+  }));
 };
 
 // Webhook function to save time sessions
 export const saveSessionsToWebhook = async (sessions: Session[]): Promise<void> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving sessions to webhook...');
-    console.log('📦 Sessions to save:', sessions);
-
-    // Convert sessions to the format expected by n8n
-    const sessionsToSave = sessions.map(session => ({
-      id: session.id,
-      category: session.category,
-      startedAt: session.startedAt,
-      endedAt: session.endedAt,
-      minutes: session.minutes,
-    }));
-
-    const response = await fetch(N8N_SAVE_TIME_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(sessionsToSave),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save sessions webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Sessions saved successfully to webhook');
-  } catch (error) {
-    console.error('❌ Failed to save sessions to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
   }
+  if (!sessions || sessions.length === 0) return;
+  const payload = sessions.map((s) => ({
+    id: String(s.id),
+    category: s.category,
+    started_at: s.startedAt,
+    ended_at: s.endedAt,
+    minutes: s.minutes,
+  }));
+  const { error } = await supabase
+    .from('time_ledger')
+    .upsert(payload, { onConflict: 'id' });
+  if (error) throw error;
 };
 
 // Webhook function to fetch allotments
