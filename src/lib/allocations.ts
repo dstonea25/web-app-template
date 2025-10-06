@@ -1,5 +1,6 @@
 import { toast } from './notifications/toast';
 import { fetchAllotmentsFromWebhook, saveAllotmentsToWebhook, fetchLedgerFromWebhook, saveLedgerToWebhook } from './api';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 // Global loading state to prevent duplicate webhook calls
 let isLoadingAllocations = false;
@@ -363,106 +364,37 @@ export async function loadLedgerAndAllotments(): Promise<AllocationState> {
     console.log('⏳ Allocations already loading, returning existing promise');
     return loadingPromise;
   }
-  
   isLoadingAllocations = true;
   loadingPromise = (async () => {
     try {
-      console.log('🌐 Loading allocations from webhook (global level)...');
-      const [allotmentsRes, ledgerRes] = await Promise.all([
-        fetchAllotmentsFromWebhook(),
-        fetchLedgerFromWebhook(),
-      ]);
-
-  // Support two shapes:
-  // A) { year, items: [{ type, quota, cadence }] }
-  // B) { allotments: { [name]: { cadence, multiplier, quota } } }
-  let year = new Date().getFullYear();
-  let items: AllotmentItem[] = [];
-  
-  console.log('🔍 Debug: allotmentsRes structure:', allotmentsRes);
-  console.log('🔍 Debug: allotmentsRes.data:', allotmentsRes?.data);
-  console.log('🔍 Debug: allotmentsRes.data.items:', allotmentsRes?.data?.items);
-  console.log('🔍 Debug: allotmentsRes.data.allotments:', allotmentsRes?.data?.allotments);
-  
-  // Check for nested data structure first (webhook format)
-  let actualData = allotmentsRes?.data || allotmentsRes;
-  
-  // Handle case where data is an array (new webhook format)
-  if (Array.isArray(actualData) && actualData.length > 0) {
-    actualData = actualData[0];
-    console.log('🔍 Debug: Extracted first item from data array');
-  }
-  
-  if (actualData && actualData.items && Array.isArray(actualData.items)) {
-    console.log('🔍 Debug: Using format A (items array)');
-    year = (actualData.year as number) || year;
-    items = (actualData.items as any[]).map(it => ({
-      type: String(it.type),
-      quota: Number(it.quota || 0),
-      cadence: normalizeCadence(it.cadence as string),
-      multiplier: Number(it.multiplier || 1),
-    }));
-  } else if (actualData && actualData.allotments) {
-    console.log('🔍 Debug: Using format B (allotments object)');
-    const map = actualData.allotments as Record<string, { cadence: AllocationCadence; multiplier?: number; quota: number }>;
-    items = Object.entries(map).map(([name, cfg]) => ({
-      type: name,
-      quota: Number(cfg.quota || 0),
-      cadence: normalizeCadence(cfg.cadence as string),
-      multiplier: Number(cfg.multiplier || 1),
-    }));
-  } else {
-    console.log('🔍 Debug: No recognized format found, items will be empty');
-    console.log('🔍 Debug: actualData structure:', actualData);
-  }
-  
-  console.log('🔍 Debug: Parsed items:', items);
-
-  // Merge manual additions and/or full override (for stub editing)
-  try {
-    const overrideRaw = localStorage.getItem(OVERRIDE_ITEMS_KEY);
-    if (overrideRaw) {
-      const overrideItems = JSON.parse(overrideRaw) as AllotmentItem[];
-      items = overrideItems.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }));
-    } else {
-      const additionsRaw = localStorage.getItem(MANUAL_ADDITIONS_KEY);
-      if (additionsRaw) {
-        const additions = JSON.parse(additionsRaw) as AllotmentItem[];
-        items = [...items, ...additions.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }))];
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error('Supabase not configured for Allocations');
       }
-    }
-  } catch { /* ignore */ }
-
-  const allotments: AllotmentsFile = { year, items };
-  const ledger = parseJSONL(ledgerRes || '');
-
-  const usageCounts: Record<string, number> = {};
-  ledger.forEach(ev => {
-    usageCounts[ev.type] = (usageCounts[ev.type] || 0) + 1;
-  });
-
-  // Use the recomputeDerived function to get the proper data structures
-  const tempState: AllocationState = {
-    year: allotments.year,
-    items: allotments.items,
-    ledger,
-    available: [],
-    coming_up: [],
-    unavailable: [],
-    stats: {
-      usageCounts: {},
-      percentages: {},
-      nextReset: {},
-    },
-  };
-  
-      return recomputeDerived(tempState);
+      const tz = deviceTZ();
+      const year = new Date().getFullYear();
+      console.log('🌐 Loading allocations from Supabase RPC...', { tz, year });
+      const { data, error } = await supabase.rpc('get_allocation_state_json', { _tz: tz, target_year: year });
+      if (error) throw error;
+      if (!data) throw new Error('No data returned from RPC');
+      const state = data as AllocationState;
+      // Optionally merge local overrides/additions for stub editing, preserving DB as source
+      try {
+        const overrideRaw = localStorage.getItem(OVERRIDE_ITEMS_KEY);
+        const additionsRaw = localStorage.getItem(MANUAL_ADDITIONS_KEY);
+        if (overrideRaw) {
+          const overrideItems = JSON.parse(overrideRaw) as AllotmentItem[];
+          state.items = overrideItems.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }));
+        } else if (additionsRaw) {
+          const additions = JSON.parse(additionsRaw) as AllotmentItem[];
+          state.items = [...state.items, ...additions.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }))];
+        }
+      } catch { /* ignore */ }
+      return state;
     } finally {
       isLoadingAllocations = false;
       loadingPromise = null;
     }
   })();
-  
   return loadingPromise;
 }
 
