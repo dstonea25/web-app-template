@@ -298,6 +298,31 @@ let timeLoadingPromise: Promise<Session[]> | null = null;
 
 // Webhook function to fetch todos
 export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
+  // If Supabase is configured, read directly from DB (preferred) and bypass webhook
+  try {
+    const mod = await import('./supabase');
+    const supabase = (mod as any).supabase as any | null;
+    const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('todos')
+        .select('id, task, category, priority, created_at')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; created_at: string }[];
+      return rows.map((row) => ({
+        id: String(row.id),
+        task: row.task,
+        category: row.category ?? null,
+        priority: (row.priority === 'low' || row.priority === 'medium' || row.priority === 'high') ? (row.priority as any) : null,
+        created_at: row.created_at,
+        statusUi: 'open' as const,
+        _dirty: false,
+      }));
+    }
+  } catch (e) {
+    // fall through to webhook behavior
+  }
   // If already loading, return the existing promise
   if (isLoadingTodos && todosLoadingPromise) {
     console.log('⏳ Todos already loading, returning existing promise');
@@ -367,6 +392,51 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
 // Webhook function to save todos
 export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
   try {
+    // If Supabase is configured, upsert working todos and delete removed ones
+    try {
+      const mod = await import('./supabase');
+      const supabase = (mod as any).supabase as any | null;
+      const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+      if (isSupabaseConfigured && supabase) {
+        // Fetch current ids
+        const { data: existingRows, error: selErr } = await supabase
+          .from('todos')
+          .select('id');
+        if (selErr) throw selErr;
+        const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id))); 
+
+        // Prepare upsert payload (omit created_at to let DB default persist for new rows)
+        const upserts = (todos || []).map((t) => ({
+          id: Number(t.id || 0),
+          task: t.task,
+          category: t.category ?? null,
+          priority: (t.priority === 'low' || t.priority === 'medium' || t.priority === 'high') ? t.priority : null,
+          status: 'open',
+        }));
+
+        if (upserts.length > 0) {
+          const { error: upsertErr } = await supabase
+            .from('todos')
+            .upsert(upserts, { onConflict: 'id' });
+          if (upsertErr) throw upsertErr;
+        }
+
+        // Compute deletions (anything existing but not in new list)
+        const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
+        const toDelete: number[] = [];
+        existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
+        if (toDelete.length > 0) {
+          const { error: delErr } = await supabase
+            .from('todos')
+            .delete()
+            .in('id', toDelete);
+          if (delErr) throw delErr;
+        }
+        return; // done via Supabase
+      }
+    } catch (e) {
+      console.warn('Supabase save path failed or not configured, falling back to webhook', e);
+    }
     if (!N8N_WEBHOOK_TOKEN) {
       throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
     }
