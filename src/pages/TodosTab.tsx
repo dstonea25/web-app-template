@@ -85,10 +85,10 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Clear localStorage to force fresh data load
       StorageManager.clearAll();
       
-      // Load from webhook
-      console.log('🌐 Loading todos from webhook...');
+      // Load from backend
+      console.log('🌐 Loading todos...');
       const webhookTodos = await fetchTodosFromWebhook();
-      console.log('✅ Webhook todos loaded:', webhookTodos);
+      console.log('✅ Todos loaded:', webhookTodos);
       
       // Cache the data
       setCachedData('todos-cache', webhookTodos);
@@ -96,15 +96,15 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Ensure transforms on load (priority/id/status handling) by saving then reloading
       StorageManager.saveTodos(webhookTodos);
       
-      // Apply staged changes to the webhook data directly
+      // Apply staged changes to the backend data directly
       const workingTodos = applyStagedChangesToTodos(webhookTodos);
       setTodos(workingTodos);
       
       const staged = getStagedChanges();
       setStagedCount(staged.fieldChangeCount);
     } catch (error) {
-      console.error('Failed to load todos from webhook:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load todos from webhook');
+      console.error('Failed to load todos:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load todos');
       setTodos([]); // Clear todos on error
     } finally {
       setLoading(false);
@@ -124,11 +124,11 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Get the updated todos after applying changes
       const updatedTodos = getWorkingTodos();
       
-      // Save to n8n webhook
+      // Save to backend
       await saveTodosToWebhook(updatedTodos);
       
-      // Refresh data from webhook to get the latest state
-      console.log('🔄 Refreshing data from webhook after save...');
+      // Refresh data to get the latest state
+      console.log('🔄 Refreshing data after save...');
       const freshTodos = await fetchTodosFromWebhook();
       
       // Update local state with fresh data
@@ -230,7 +230,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         <div className="flex justify-center items-center py-12">
           <div className="flex flex-col items-center gap-2">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <div className={tokens.palette.dark.text_muted}>Loading todos from webhook...</div>
+            <div className={tokens.palette.dark.text_muted}>Loading todos...</div>
           </div>
         </div>
       </div>
@@ -328,7 +328,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
                 onClick={() => {
                   clearStagedChanges();
                   setStagedCount(0);
-                  // Reload data from webhook to get fresh state
+                  // Reload data to get fresh state
                   loadTodos();
                 }}
                 disabled={loading}

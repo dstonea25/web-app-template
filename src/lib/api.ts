@@ -276,12 +276,13 @@ export class ApiClient {
 }
 
 // Webhook configuration
-const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
-const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
-const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
-const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
-const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
-const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
+// (Todos/Ideas webhooks removed as fallback; Supabase is required)
+// const N8N_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/todo';
+// const N8N_SAVE_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-todo';
+// const N8N_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/ideas';
+// const N8N_SAVE_IDEAS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-ideas';
+// const N8N_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/time';
+// const N8N_SAVE_TIME_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-time';
 const N8N_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments';
 const N8N_SAVE_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments';
 const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments-ledger';
@@ -289,380 +290,223 @@ const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Global loading states to prevent duplicate webhook calls
-let isLoadingTodos = false;
-let isLoadingIdeas = false;
-let isLoadingTime = false;
-let todosLoadingPromise: Promise<Todo[]> | null = null;
-let ideasLoadingPromise: Promise<Idea[]> | null = null;
-let timeLoadingPromise: Promise<Session[]> | null = null;
+// let isLoadingTodos = false; // no longer needed without webhook fallback
+// let isLoadingIdeas = false; // no longer needed without webhook fallback
+// let isLoadingTime = false; // not used without webhook fallback
+// let todosLoadingPromise: Promise<Todo[]> | null = null;
+// let ideasLoadingPromise: Promise<Idea[]> | null = null;
+// let timeLoadingPromise: Promise<Session[]> | null = null;
 
 // Webhook function to fetch todos
 export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
-  // If already loading, return the existing promise
-  if (isLoadingTodos && todosLoadingPromise) {
-    console.log('⏳ Todos already loading, returning existing promise');
-    return todosLoadingPromise;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Todos');
   }
-  
-  isLoadingTodos = true;
-  todosLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
-
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_WEBHOOK_URL);
-
-    const response = await fetch(N8N_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    console.log('📦 Webhook response data:', data);
-    console.log('📦 Data type:', typeof data);
-    console.log('📦 Is array?', Array.isArray(data));
-    
-    // Transform the data to match our Todo interface
-    // The webhook returns an object with a 'data' property containing the todos array
-    if (data && data.data && Array.isArray(data.data)) {
-      const todos = data.data;
-      return todos.map((todo: any) => ({
-        id: String(todo.id),
-        task: todo.task,
-        category: todo.category || null,
-        priority: todo.priority || null,
-        created_at: todo.created_at,
-        statusUi: 'open' as const,
-        _dirty: false,
-      }));
-    } else {
-      console.error('❌ Response format not recognized:', data);
-      throw new Error('Invalid response format: expected object with data property containing todos array');
-    }
-    } catch (error) {
-      console.error('Failed to fetch todos from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingTodos = false;
-      todosLoadingPromise = null;
-    }
-  })();
-  
-  return todosLoadingPromise;
+  const { data, error } = await supabase
+    .from('todos')
+    .select('id, task, category, priority, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; created_at: string }[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    task: row.task,
+    category: row.category ?? null,
+    priority: (row.priority === 'low' || row.priority === 'medium' || row.priority === 'high') ? (row.priority as any) : null,
+    created_at: row.created_at,
+    statusUi: 'open' as const,
+    _dirty: false,
+  }));
 };
 
 // Webhook function to save todos
 export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving todos to webhook...');
-    console.log('📦 Todos to save:', todos);
-
-    // Convert todos to the format expected by n8n (remove internal fields)
-    const todosToSave = todos.map(todo => ({
-      id: parseInt(todo.id || '0'),
-      task: todo.task,
-      status: todo.statusUi,
-      category: todo.category,
-      priority: todo.priority,
-      created_at: todo.created_at,
-    }));
-
-    const requestBody = { data: todosToSave };
-    console.log('📤 Request body being sent:', JSON.stringify(requestBody, null, 2));
-    console.log('📤 Request headers:', {
-      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-      'Content-Type': 'application/json',
-    });
-
-    const response = await fetch(N8N_SAVE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ data: todosToSave }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Todos saved successfully to webhook');
-  } catch (error) {
-    console.error('Failed to save todos to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Todos');
+  }
+  const { data: existingRows, error: selErr } = await supabase
+    .from('todos')
+    .select('id');
+  if (selErr) throw selErr;
+  const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
+  const upserts = (todos || []).map((t) => ({
+    id: Number(t.id || 0),
+    task: t.task,
+    category: t.category ?? null,
+    priority: (t.priority === 'low' || t.priority === 'medium' || t.priority === 'high') ? t.priority : null,
+    status: 'open',
+  }));
+  if (upserts.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from('todos')
+      .upsert(upserts, { onConflict: 'id' });
+    if (upsertErr) throw upsertErr;
+  }
+  const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
+  const toDelete: number[] = [];
+  existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('todos')
+      .delete()
+      .in('id', toDelete);
+    if (delErr) throw delErr;
   }
 };
 
 // Webhook function to fetch ideas
 export const fetchIdeasFromWebhook = async (): Promise<Idea[]> => {
-  // If already loading, return the existing promise
-  if (isLoadingIdeas && ideasLoadingPromise) {
-    console.log('⏳ Ideas already loading, returning existing promise');
-    return ideasLoadingPromise;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Ideas');
   }
-  
-  isLoadingIdeas = true;
-  ideasLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
-
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_IDEAS_WEBHOOK_URL);
-
-    const response = await fetch(N8N_IDEAS_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Ideas webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    console.log('📦 Ideas webhook response data:', data);
-    console.log('📦 Data type:', typeof data);
-    console.log('📦 Is array?', Array.isArray(data));
-    
-    // Transform the data to match our Idea interface
-    // The webhook returns an object with a 'data' property containing the ideas array
-    if (data && data.data && Array.isArray(data.data)) {
-      const ideas = data.data;
-      return ideas.map((idea: any) => ({
-        id: String(idea.id),
-        idea: idea.idea,
-        category: idea.category || null,
-        notes: idea.notes || '',
-        created_at: idea.created_at,
-        status: idea.status || 'open',
-        _dirty: false,
-      }));
-    } else {
-      console.error('❌ Ideas response format not recognized:', data);
-      throw new Error('Invalid response format: expected object with data property containing ideas array');
-    }
-    } catch (error) {
-      console.error('❌ Failed to fetch ideas from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingIdeas = false;
-      ideasLoadingPromise = null;
-    }
-  })();
-  
-  return ideasLoadingPromise;
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('id, idea, category, notes, status, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: number; idea: string; category: string | null; notes: string | null; status: string | null; created_at: string }[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    idea: row.idea,
+    category: row.category ?? null,
+    notes: row.notes ?? '',
+    created_at: row.created_at,
+    status: (row.status === 'open' || row.status === 'closed') ? row.status : 'open',
+    _dirty: false,
+  }));
 };
 
 // Webhook function to save ideas
 export const saveIdeasToWebhook = async (ideas: Idea[]): Promise<void> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving ideas to webhook...');
-    console.log('📦 Ideas to save:', ideas);
-
-    // Convert ideas to the format expected by n8n (remove internal fields)
-    const ideasToSave = ideas.map(idea => ({
-      id: parseInt(idea.id || '0'),
-      idea: idea.idea,
-      status: idea.status,
-      category: idea.category,
-      notes: idea.notes,
-      created_at: idea.created_at,
-    }));
-
-    const requestBody = { data: ideasToSave };
-    console.log('📤 Ideas request body being sent:', JSON.stringify(requestBody, null, 2));
-    console.log('📤 Request headers:', {
-      'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-      'Content-Type': 'application/json',
-    });
-
-    const response = await fetch(N8N_SAVE_IDEAS_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ data: ideasToSave }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save ideas webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Ideas saved successfully to webhook');
-  } catch (error) {
-    console.error('Failed to save ideas to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Ideas');
+  }
+  const { data: existingRows, error: selErr } = await supabase
+    .from('ideas')
+    .select('id');
+  if (selErr) throw selErr;
+  const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
+  const upserts = (ideas || []).map((it) => ({
+    id: Number(it.id || 0),
+    idea: it.idea,
+    category: it.category ?? null,
+    notes: it.notes ?? '',
+    status: (it.status === 'open' || it.status === 'closed') ? it.status : 'open',
+  }));
+  if (upserts.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from('ideas')
+      .upsert(upserts, { onConflict: 'id' });
+    if (upsertErr) throw upsertErr;
+  }
+  const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
+  const toDelete: number[] = [];
+  existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('ideas')
+      .delete()
+      .in('id', toDelete);
+    if (delErr) throw delErr;
   }
 };
 
 // Webhook function to fetch time sessions
 export const fetchSessionsFromWebhook = async (): Promise<Session[]> => {
-  // If already loading, return the existing promise
-  if (isLoadingTime && timeLoadingPromise) {
-    console.log('⏳ Time sessions already loading, returning existing promise');
-    return timeLoadingPromise;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
   }
-  
-  isLoadingTime = true;
-  timeLoadingPromise = (async () => {
-    try {
-      if (!N8N_WEBHOOK_TOKEN) {
-        throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-      }
+  const { data, error } = await supabase
+    .from('time_ledger')
+    .select('id, category, started_at, ended_at, minutes')
+    .order('started_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { id: string; category: Session['category']; started_at: string; ended_at: string; minutes: number }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    category: r.category,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    minutes: r.minutes,
+  }));
+};
 
-      console.log('🔑 Using token:', N8N_WEBHOOK_TOKEN);
-      console.log('🌐 Making request to:', N8N_TIME_WEBHOOK_URL);
-
-    const response = await fetch(N8N_TIME_WEBHOOK_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('❌ Time webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-    console.log('📦 Time webhook response data:', responseData);
-    
-    // Handle empty response or missing data property
-    if (!responseData || !responseData.data) {
-      console.log('📦 Empty response from time webhook - returning empty array');
-      return [];
-    }
-
-    const jsonlString = responseData.data;
-    console.log('📦 JSONL string from data property:', jsonlString);
-    
-    // Handle empty JSONL string
-    if (!jsonlString.trim()) {
-      console.log('📦 Empty JSONL string - returning empty array');
-      return [];
-    }
-
-    // Parse JSONL (JSON Lines) format
-    const lines = jsonlString.trim().split('\n');
-    console.log('📦 Parsed JSONL lines:', lines.length);
-    
-    const sessions: Session[] = [];
-    
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const sessionData = JSON.parse(line);
-          // Transform the data to match our Session interface
-          const session: Session = {
-            id: String(sessionData.id),
-            category: sessionData.category,
-            startedAt: sessionData.startedAt,
-            endedAt: sessionData.endedAt,
-            minutes: sessionData.minutes,
-          };
-          sessions.push(session);
-        } catch (parseError) {
-          console.error('❌ Failed to parse JSONL line:', line, parseError);
-          // Continue processing other lines
-        }
-      }
-    }
-
-    console.log('✅ Parsed sessions from webhook:', sessions.length);
-    return sessions;
-    } catch (error) {
-      console.error('❌ Failed to fetch sessions from webhook:', error);
-      throw error;
-    } finally {
-      isLoadingTime = false;
-      timeLoadingPromise = null;
-    }
-  })();
-  
-  return timeLoadingPromise;
+// Webhook function to fetch recent time sessions (limit N, default 5)
+export const fetchRecentSessionsFromWebhook = async (limit: number = 5): Promise<Session[]> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
+  }
+  const { data, error } = await supabase
+    .from('time_ledger')
+    .select('id, category, started_at, ended_at, minutes')
+    .order('started_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const rows = (data || []) as { id: string; category: Session['category']; started_at: string; ended_at: string; minutes: number }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    category: r.category,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    minutes: r.minutes,
+  }));
 };
 
 // Webhook function to save time sessions
 export const saveSessionsToWebhook = async (sessions: Session[]): Promise<void> => {
-  try {
-    if (!N8N_WEBHOOK_TOKEN) {
-      throw new Error('N8N webhook token not configured. Please set VITE_N8N_WEBHOOK_TOKEN in your environment.');
-    }
-
-    console.log('💾 Saving sessions to webhook...');
-    console.log('📦 Sessions to save:', sessions);
-
-    // Convert sessions to the format expected by n8n
-    const sessionsToSave = sessions.map(session => ({
-      id: session.id,
-      category: session.category,
-      startedAt: session.startedAt,
-      endedAt: session.endedAt,
-      minutes: session.minutes,
-    }));
-
-    const response = await fetch(N8N_SAVE_TIME_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(sessionsToSave),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Save sessions webhook response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-    }
-
-    console.log('✅ Sessions saved successfully to webhook');
-  } catch (error) {
-    console.error('❌ Failed to save sessions to webhook:', error);
-    throw error;
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
   }
+  if (!sessions || sessions.length === 0) return;
+  const payload = sessions.map((s) => ({
+    id: String(s.id),
+    category: s.category,
+    started_at: s.startedAt,
+    ended_at: s.endedAt,
+    minutes: s.minutes,
+  }));
+  const { error } = await supabase
+    .from('time_ledger')
+    .upsert(payload, { onConflict: 'id' });
+  if (error) throw error;
+};
+
+// Webhook function to delete time sessions by id
+export const deleteSessionsFromWebhook = async (ids: string[]): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Time Tracking');
+  }
+  if (!ids || ids.length === 0) return;
+  const numericOrStringIds = ids.map((id) => (Number.isFinite(Number(id)) ? Number(id) : String(id)));
+  const { error } = await supabase
+    .from('time_ledger')
+    .delete()
+    .in('id', numericOrStringIds);
+  if (error) throw error;
 };
 
 // Webhook function to fetch allotments

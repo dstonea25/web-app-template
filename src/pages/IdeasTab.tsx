@@ -94,11 +94,11 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Clear localStorage to force fresh data load
       StorageManager.clearAll();
       
-      // Load from webhook
-      console.log('🌐 Loading ideas from webhook...');
+      // Load from backend
+      console.log('🌐 Loading ideas...');
       const webhookIdeas = await fetchIdeasFromWebhook();
-      console.log('✅ Webhook ideas loaded:', webhookIdeas);
-      console.log('🔍 Debug: webhook ideas length:', webhookIdeas?.length || 0);
+      console.log('✅ Ideas loaded:', webhookIdeas);
+      console.log('🔍 Debug: ideas length:', webhookIdeas?.length || 0);
       
       // Cache the data
       setCachedData('ideas-cache', webhookIdeas);
@@ -106,17 +106,17 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Ensure transforms on load by saving then reloading
       StorageManager.saveIdeas(webhookIdeas);
       
-      // Apply staged changes to the webhook data directly
+      // Apply staged changes to the backend data directly
       const workingIdeas = applyStagedChangesToIdeas(webhookIdeas);
-      console.log('🔍 Debug: working ideas from webhook after staged changes:', workingIdeas);
+      console.log('🔍 Debug: working ideas after staged changes:', workingIdeas);
       setIdeas(workingIdeas);
       
       const staged = getStagedIdeaChanges();
-      console.log('🔍 Debug: staged changes from webhook:', staged);
+      console.log('🔍 Debug: staged changes:', staged);
       setStagedCount(staged.fieldChangeCount);
     } catch (error) {
-      console.error('Failed to load ideas from webhook:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load ideas from webhook');
+      console.error('Failed to load ideas:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load ideas');
       setIdeas([]); // Clear ideas on error
       // Clear cache on error to prevent stale data
       setCachedData('ideas-cache', null);
@@ -138,11 +138,11 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       // Get the updated ideas after applying changes
       const updatedIdeas = getWorkingIdeas();
       
-      // Save to n8n webhook
+      // Save to backend
       await saveIdeasToWebhook(updatedIdeas);
       
-      // Refresh data from webhook to get the latest state
-      console.log('🔄 Refreshing data from webhook after save...');
+      // Refresh data to get the latest state
+      console.log('🔄 Refreshing data after save...');
       const freshIdeas = await fetchIdeasFromWebhook();
       
       // Update local state with fresh data
@@ -257,7 +257,7 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         <div className="flex justify-center items-center py-12">
           <div className="flex flex-col items-center gap-2">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <div className={tokens.palette.dark.text_muted}>Loading ideas from webhook...</div>
+            <div className={tokens.palette.dark.text_muted}>Loading ideas...</div>
           </div>
         </div>
       </div>
@@ -360,7 +360,7 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
                 onClick={() => {
                   clearStagedIdeaChanges();
                   setStagedCount(0);
-                  // Reload data from webhook to get fresh state
+                  // Reload data to get fresh state
                   loadIdeas();
                 }}
                 disabled={loading}

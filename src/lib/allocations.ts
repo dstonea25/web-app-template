@@ -1,7 +1,19 @@
 import { toast } from './notifications/toast';
-import { fetchAllotmentsFromWebhook, saveAllotmentsToWebhook, fetchLedgerFromWebhook, saveLedgerToWebhook } from './api';
+import { supabase, isSupabaseConfigured } from './supabase';
 
-// Global loading state to prevent duplicate webhook calls
+// Database-backed Allocations (no legacy file/webhook fallback)
+// - Fetch: Supabase RPC get_allocation_state_json(_tz, target_year) returns
+//   { year, items, ledger, available, coming_up, unavailable, stats } which
+//   maps 1:1 to AllocationState consumed by the UI.
+// - Writes: direct DB writes
+//   • saveAllocationsItems -> upsert to public.allotments on conflict (item) and delete removed
+//   • redeemItem/admitDefeat -> insert rows into public.allotment_ledger
+//   • undoAdmitDefeat -> delete most recent failed row for the given item
+// Notes:
+//   • LocalStorage overrides (OVERRIDE_ITEMS_KEY / MANUAL_ADDITIONS_KEY) remain for optional dev tweaking.
+//   • All timezone computations rely on deviceTZ and server timestamptz storage.
+
+// Global loading state to prevent duplicate RPC calls
 let isLoadingAllocations = false;
 let loadingPromise: Promise<AllocationState> | null = null;
 
@@ -34,6 +46,14 @@ export interface LedgerEvent {
   date: string; // YYYY-MM-DD
   type: string; // matches AllotmentItem.type
   ts?: string;  // original timestamp if provided
+}
+
+// Lightweight shape for recent redemption rows
+export interface RedemptionRow {
+  id: string;
+  item: string;
+  ts: string; // ISO timestamp
+  qty?: number;
 }
 
 export interface AvailableItem {
@@ -174,29 +194,7 @@ function normalizeCadence(value: string): AllocationCadence {
   return 'monthly';
 }
 
-const parseJSONL = (text: string): LedgerEvent[] => {
-  return text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => {
-      const raw = JSON.parse(line);
-      // Support both formats:
-      // 1) { id, date, type }
-      // 2) { type: 'redeem'|'failed', item, qty, ts, id }
-      if (raw && typeof raw === 'object' && raw.item && raw.ts) {
-        if (raw.type !== 'redeem') {
-          // Ignore non-redeem events in MVP
-          return null;
-        }
-        const iso = String(raw.ts);
-        const date = iso.slice(0, 10);
-        return { id: String(raw.id || crypto.randomUUID()), date, type: String(raw.item), ts: iso } as LedgerEvent;
-      }
-      return raw as LedgerEvent;
-    })
-    .filter((e): e is LedgerEvent => Boolean(e));
-};
+// (legacy JSONL parser removed; state now sourced via RPC)
 
 // ---- Device-timezone helpers (mirror backend behavior) ----
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -358,115 +356,50 @@ const startOfDay = (d: Date) => {
 };
 
 export async function loadLedgerAndAllotments(): Promise<AllocationState> {
+  // Fetch derived allocation state from Supabase RPC. The RPC already computes
+  // available/coming_up/unavailable/stats and returns year/items/ledger.
   // If already loading, return the existing promise
   if (isLoadingAllocations && loadingPromise) {
     console.log('⏳ Allocations already loading, returning existing promise');
     return loadingPromise;
   }
-  
   isLoadingAllocations = true;
   loadingPromise = (async () => {
     try {
-      console.log('🌐 Loading allocations from webhook (global level)...');
-      const [allotmentsRes, ledgerRes] = await Promise.all([
-        fetchAllotmentsFromWebhook(),
-        fetchLedgerFromWebhook(),
-      ]);
-
-  // Support two shapes:
-  // A) { year, items: [{ type, quota, cadence }] }
-  // B) { allotments: { [name]: { cadence, multiplier, quota } } }
-  let year = new Date().getFullYear();
-  let items: AllotmentItem[] = [];
-  
-  console.log('🔍 Debug: allotmentsRes structure:', allotmentsRes);
-  console.log('🔍 Debug: allotmentsRes.data:', allotmentsRes?.data);
-  console.log('🔍 Debug: allotmentsRes.data.items:', allotmentsRes?.data?.items);
-  console.log('🔍 Debug: allotmentsRes.data.allotments:', allotmentsRes?.data?.allotments);
-  
-  // Check for nested data structure first (webhook format)
-  let actualData = allotmentsRes?.data || allotmentsRes;
-  
-  // Handle case where data is an array (new webhook format)
-  if (Array.isArray(actualData) && actualData.length > 0) {
-    actualData = actualData[0];
-    console.log('🔍 Debug: Extracted first item from data array');
-  }
-  
-  if (actualData && actualData.items && Array.isArray(actualData.items)) {
-    console.log('🔍 Debug: Using format A (items array)');
-    year = (actualData.year as number) || year;
-    items = (actualData.items as any[]).map(it => ({
-      type: String(it.type),
-      quota: Number(it.quota || 0),
-      cadence: normalizeCadence(it.cadence as string),
-      multiplier: Number(it.multiplier || 1),
-    }));
-  } else if (actualData && actualData.allotments) {
-    console.log('🔍 Debug: Using format B (allotments object)');
-    const map = actualData.allotments as Record<string, { cadence: AllocationCadence; multiplier?: number; quota: number }>;
-    items = Object.entries(map).map(([name, cfg]) => ({
-      type: name,
-      quota: Number(cfg.quota || 0),
-      cadence: normalizeCadence(cfg.cadence as string),
-      multiplier: Number(cfg.multiplier || 1),
-    }));
-  } else {
-    console.log('🔍 Debug: No recognized format found, items will be empty');
-    console.log('🔍 Debug: actualData structure:', actualData);
-  }
-  
-  console.log('🔍 Debug: Parsed items:', items);
-
-  // Merge manual additions and/or full override (for stub editing)
-  try {
-    const overrideRaw = localStorage.getItem(OVERRIDE_ITEMS_KEY);
-    if (overrideRaw) {
-      const overrideItems = JSON.parse(overrideRaw) as AllotmentItem[];
-      items = overrideItems.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }));
-    } else {
-      const additionsRaw = localStorage.getItem(MANUAL_ADDITIONS_KEY);
-      if (additionsRaw) {
-        const additions = JSON.parse(additionsRaw) as AllotmentItem[];
-        items = [...items, ...additions.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }))];
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error('Supabase not configured for Allocations');
       }
-    }
-  } catch { /* ignore */ }
-
-  const allotments: AllotmentsFile = { year, items };
-  const ledger = parseJSONL(ledgerRes || '');
-
-  const usageCounts: Record<string, number> = {};
-  ledger.forEach(ev => {
-    usageCounts[ev.type] = (usageCounts[ev.type] || 0) + 1;
-  });
-
-  // Use the recomputeDerived function to get the proper data structures
-  const tempState: AllocationState = {
-    year: allotments.year,
-    items: allotments.items,
-    ledger,
-    available: [],
-    coming_up: [],
-    unavailable: [],
-    stats: {
-      usageCounts: {},
-      percentages: {},
-      nextReset: {},
-    },
-  };
-  
-      return recomputeDerived(tempState);
+      const tz = deviceTZ();
+      const year = new Date().getFullYear();
+      console.log('🌐 Loading allocations from Supabase RPC...', { tz, year });
+      const { data, error } = await supabase.rpc('get_allocation_state_json', { _tz: tz, target_year: year });
+      if (error) throw error;
+      if (!data) throw new Error('No data returned from RPC');
+      const state = data as AllocationState;
+      // Optionally merge local overrides/additions for stub editing, preserving DB as source
+      try {
+        const overrideRaw = localStorage.getItem(OVERRIDE_ITEMS_KEY);
+        const additionsRaw = localStorage.getItem(MANUAL_ADDITIONS_KEY);
+        if (overrideRaw) {
+          const overrideItems = JSON.parse(overrideRaw) as AllotmentItem[];
+          state.items = overrideItems.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }));
+        } else if (additionsRaw) {
+          const additions = JSON.parse(additionsRaw) as AllotmentItem[];
+          state.items = [...state.items, ...additions.map(i => ({ ...i, cadence: normalizeCadence(i.cadence as unknown as string), multiplier: Number(i.multiplier || 1), quota: Number(i.quota || 0) }))];
+        }
+      } catch { /* ignore */ }
+      return state;
     } finally {
       isLoadingAllocations = false;
       loadingPromise = null;
     }
   })();
-  
   return loadingPromise;
 }
 
 export async function redeemItem(type: string): Promise<AllocationState> {
+  // Record a successful redemption event directly in public.allotment_ledger
+  // and then reload state from RPC.
   // First check if the item is actually available before redeeming
   const currentState = await loadLedgerAndAllotments();
   const isAvailable = currentState.available.some(item => item.type === type && item.remaining > 0);
@@ -475,92 +408,113 @@ export async function redeemItem(type: string): Promise<AllocationState> {
     throw new Error(`Cannot redeem ${type} - not available`);
   }
   
-  // Create new ledger event in the format expected by n8n (JSONL format)
-  const event = {
-    type: "redeem",
-    item: type,
-    qty: 1,
-    ts: new Date().toISOString(),
-    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('💾 Creating redemption event:', event);
-  
-  // Save to webhook and wait for confirmation
-  try {
-    await saveLedgerToWebhook([event]);
-    console.log('✅ Redemption saved successfully to webhook');
-  } catch (e) {
-    console.error('❌ Failed to save redemption to webhook:', e);
-    throw new Error('Failed to save redemption to webhook');
-  }
-  
-  // Reload from webhook to get updated state
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const id = `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`;
+  const payload = [{ id, type: 'redeem', item: type, qty: 1, ts: new Date().toISOString() }];
+  const { error } = await supabase.from('allotment_ledger').insert(payload);
+  if (error) throw error;
   return await loadLedgerAndAllotments();
 }
 
 export async function addAllocation(type: string): Promise<AllocationState> {
-  // For webhook implementation, we'll need to handle this differently
-  // Since we can't easily "undo" a webhook save, we'll just reload the current state
-  // In a real implementation, you might want to add a "negative" ledger event
-  toast.success(`Added back: ${type} (webhook reload)`);
+  // Placeholder UX action: simply reload current state.
+  // If we later support a true "undo" for redeem, handle it via a ledger row.
+  toast.success(`Added back: ${type}`);
   return await loadLedgerAndAllotments();
 }
 
 export async function admitDefeat(type: string): Promise<AllocationState> {
-  // Create failed redemption event in the format expected by n8n (JSONL format)
-  const event = {
-    type: "failed",
-    item: type,
-    qty: 1,
-    ts: new Date().toISOString(),
-    id: `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('💾 Creating failed redemption event:', event);
-  
-  try {
-    await saveLedgerToWebhook([event]);
-    console.log('✅ Failed redemption saved successfully to webhook');
-  } catch (e) {
-    console.error('❌ Failed to save overage redemption to webhook:', e);
-    throw new Error('Failed to save overage redemption to webhook');
+  // Record an overage/failed event directly in public.allotment_ledger
+  // and then reload state from RPC.
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const id = `evt_${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_')}_${Math.random().toString(36).substr(2, 9)}`;
+  const payload = [{ id, type: 'failed', item: type, qty: 1, ts: new Date().toISOString() }];
+  const { error } = await supabase.from('allotment_ledger').insert(payload);
+  if (error) throw error;
+  return await loadLedgerAndAllotments();
+}
+
+export async function undoAdmitDefeat(type: string): Promise<AllocationState> {
+  // Undo the most recent failed event for the item by deleting its row
+  // and then reload state from RPC.
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  // Delete the most recent failed event for this item
+  const { data: rows, error: selErr } = await supabase
+    .from('allotment_ledger')
+    .select('id, ts')
+    .eq('type', 'failed')
+    .eq('item', type)
+    .order('ts', { ascending: false })
+    .limit(1);
+  if (selErr) throw selErr;
+  const targetId = rows && rows[0]?.id;
+  if (targetId) {
+    const { error: delErr } = await supabase
+      .from('allotment_ledger')
+      .delete()
+      .eq('id', targetId);
+    if (delErr) throw delErr;
   }
-  
-  // Reload from webhook to get updated state
   return await loadLedgerAndAllotments();
 }
 
-export async function undoAdmitDefeat(_type: string): Promise<AllocationState> {
-  // For webhook implementation, we'll need to handle this differently
-  // Since we can't easily "undo" a webhook save, we'll just reload the current state
-  // In a real implementation, you might want to add a "negative" ledger event
-  return await loadLedgerAndAllotments();
+// getStats helper was used when deriving locally; with RPC it is redundant.
+// export function getStats(state: AllocationState) { return state.stats; }
+
+// ---- Recent redemptions helpers ----
+export async function fetchRecentRedemptions(limit: number = 5): Promise<RedemptionRow[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const { data, error } = await supabase
+    .from('allotment_ledger')
+    .select('id, item, ts, qty, type')
+    .eq('type', 'redeem')
+    .order('ts', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data || []).map((r: any) => ({ id: String(r.id), item: String(r.item), ts: String(r.ts), qty: r.qty })) as RedemptionRow[];
 }
 
-export function getStats(state: AllocationState) {
-  return state.stats;
+export async function deleteRedemptionById(id: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  const { error } = await supabase
+    .from('allotment_ledger')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
-// ---- Webhook persistence helpers for editing allocations list ----
+// ---- Persistence helpers for editing allocations list ----
 export async function saveAllocationsItems(items: AllotmentItem[]): Promise<void> {
-  try {
-    // Convert items to the format expected by the webhook
-    const allotments = {
-      year: new Date().getFullYear(),
-      items: items.map(item => ({
-        type: item.type,
-        quota: item.quota,
-        cadence: item.cadence,
-        multiplier: item.multiplier || 1
-      }))
-    };
-    
-    await saveAllotmentsToWebhook(allotments);
-    console.log('✅ Allocations saved successfully to webhook');
-  } catch (e) {
-    console.warn('Failed to save allocation items to webhook:', e);
-    throw e;
+  // Persist the editable items table into public.allotments using an upsert-on-item,
+  // and delete any rows that are no longer present locally to keep DB as source of truth.
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured for Allocations');
+  // Fetch existing items to compute deletions
+  const { data: existing, error: selErr } = await supabase
+    .from('allotments')
+    .select('item');
+  if (selErr) throw selErr;
+  const existingItems = new Set<string>((existing || []).map((r: any) => String(r.item)));
+  const upserts = items.map(it => ({
+    item: it.type,
+    quota: Number(it.quota || 0),
+    cadence: it.cadence,
+    multiplier: Number(it.multiplier || 1),
+  }));
+  if (upserts.length > 0) {
+    const { error: upErr } = await supabase
+      .from('allotments')
+      .upsert(upserts, { onConflict: 'item' });
+    if (upErr) throw upErr;
+  }
+  const newSet = new Set<string>(upserts.map(u => u.item));
+  const toDelete: string[] = [];
+  existingItems.forEach(it => { if (!newSet.has(it)) toDelete.push(it); });
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('allotments')
+      .delete()
+      .in('item', toDelete);
+    if (delErr) throw delErr;
   }
 }
 
@@ -571,75 +525,7 @@ export function clearAllocationsOverrides(): void {
   } catch {}
 }
 
-// Note: older helpers `calculateComingSoon` and `generateUnavailableList` were removed
-// to keep a single source of truth in `recomputeDerived`.
-
-function recomputeDerived(state: AllocationState): AllocationState {
-  const now = new Date();
-  const tz = deviceTZ();
-  const available: AvailableItem[] = [];
-  const coming_up: ComingUpItem[] = [];
-  const unavailable: UnavailableItem[] = [];
-  const usageCounts: Record<string, number> = {};
-  const percentages: Record<string, number> = {};
-  const nextReset: Record<string, string> = {};
-
-  state.ledger.forEach(ev => {
-    usageCounts[ev.type] = (usageCounts[ev.type] || 0) + 1;
-  });
-
-  state.items.forEach(item => {
-    const mult = item.multiplier || 1;
-    const itemEvents = state.ledger.filter(ev => ev.type === item.type);
-    const window = buildWindow(now, item.cadence, mult, tz, itemEvents);
-    const periodStart = window.start;
-    const periodEnd = window.end;
-    const usedThisPeriod = itemEvents.filter(ev => {
-      const d = new Date(ev.date + 'T00:00:00');
-      return d >= periodStart && d < periodEnd;
-    }).length;
-
-    let remaining = Math.max(0, item.quota - usedThisPeriod);
-    // Hybrid: after first redeem in current anchored window, no remaining for rest of window
-    if (mult > 1 && item.quota === 1 && usedThisPeriod > 0 && now >= periodStart && now < periodEnd) {
-      remaining = 0;
-    }
-    const pctUsed = item.quota > 0 ? Math.min(100, Math.round((usedThisPeriod / item.quota) * 100)) : 0;
-    percentages[item.type] = pctUsed;
-    nextReset[item.type] = toISODateTZ(periodEnd, tz);
-
-    if (remaining > 0) {
-      available.push({ type: item.type, remaining, total: item.quota });
-    }
-
-    if (remaining <= 0) {
-      // Always include in Unavailable
-      const currentYear = now.getFullYear();
-      const thisYearEvents = state.ledger
-        .filter(ev => ev.type === item.type)
-        .filter(ev => new Date(ev.date).getFullYear() === currentYear)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const lastRedeemed = thisYearEvents.length > 0 ? thisYearEvents[0].date : 'Never';
-      const countThisYear = thisYearEvents.length;
-      unavailable.push({ type: item.type, lastRedeemed, countThisYear });
-
-      // Additionally in Coming Up if within threshold
-      const days = daysUntil(periodEnd);
-      const threshold = (item.cadence === 'weekly') ? WEEKLY_COMING_UP_DAYS : NON_WEEKLY_COMING_UP_DAYS;
-      if (days <= threshold) {
-        coming_up.push({ type: item.type, daysUntil: days, quotaAvailable: item.quota });
-      }
-    }
-  });
-
-  return {
-    ...state,
-    available,
-    coming_up: coming_up.sort((a, b) => a.daysUntil - b.daysUntil),
-    unavailable: unavailable.sort((a, b) => b.countThisYear - a.countThisYear),
-    stats: { usageCounts, percentages, nextReset },
-  };
-}
+// Local recomputeDerived removed; RPC is the single source of truth for derived state.
 
 
 

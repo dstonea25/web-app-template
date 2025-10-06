@@ -11,9 +11,10 @@ import {
   MAX_TIMER_MS,
   MAX_TIMER_MINUTES
 } from '../lib/time';
-import { fetchSessionsFromWebhook, saveSessionsToWebhook } from '../lib/api';
+import { fetchSessionsFromWebhook, saveSessionsToWebhook, fetchRecentSessionsFromWebhook, deleteSessionsFromWebhook } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
 import { useTimer } from '../contexts/TimerContext';
+import RecentSessionsTable from '../components/RecentSessionsTable';
 
 // Mock data from the scope
 const MOCK_DATA = {
@@ -49,6 +50,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const [activeSession, setActiveSession] = useState<{ startedAt: string; category: Category } | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [pendingSession, setPendingSession] = useState<PendingSession | null>(null);
+  const [recentSessions, setRecentSessions] = useState<Session[]>([]);
   
   // Chart state
   const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'ytd'>('week');
@@ -63,6 +65,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const manualHoursRef = useRef<HTMLInputElement | null>(null);
   const autoStoppedRef = useRef(false);
 
   const hasInitializedRef = useRef(false);
@@ -115,11 +118,29 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       setLoading(true);
       setError(null);
       
-      // Load sessions from webhook
-      console.log('🌐 Loading sessions from webhook...');
-      const webhookSessions = await fetchSessionsFromWebhook();
-      console.log('✅ Webhook sessions loaded:', webhookSessions);
-      setSessions(webhookSessions as Session[]);
+      // Load sessions from backend
+      console.log('🌐 Loading sessions...');
+      const loaded = await fetchSessionsFromWebhook();
+      console.log('✅ Sessions loaded:', loaded);
+      setSessions(loaded as Session[]);
+      // Set chart to most recently updated category
+      try {
+        if (Array.isArray(loaded) && loaded.length > 0) {
+          const latest = [...loaded].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+          if (latest && (['Gaming','Personal Projects','Work'] as const).includes(latest.category as any)) {
+            setChartCategory(latest.category as Category);
+            // Also default manual add category to latest
+            setManualCategory(latest.category as Category);
+          }
+        }
+      } catch {}
+      // Load recent sessions (limit 5)
+      try {
+        const recent = await fetchRecentSessionsFromWebhook(5);
+        setRecentSessions(recent);
+      } catch (e) {
+        // non-fatal
+      }
       
       // Restore active session from localStorage
       const stored = localStorage.getItem('geronimo.time.activeSession');
@@ -162,11 +183,19 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
         setTimerCategory(lastCategory as Category);
       }
     } catch (error) {
-      console.error('Failed to load sessions from webhook:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load sessions from webhook');
+      console.error('Failed to load sessions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load sessions');
       // Fall back to mock data on error
       console.log('🔄 Falling back to mock data');
-      setSessions(MOCK_DATA.sessions as Session[]);
+      const mock = MOCK_DATA.sessions as Session[];
+      setSessions(mock);
+      setRecentSessions(mock.slice(-5).reverse());
+      // Set chart to most recently updated category from mock
+      if (mock.length > 0) {
+        const latest = [...mock].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+        setChartCategory(latest.category as Category);
+        setManualCategory(latest.category as Category);
+      }
     } finally {
       setLoading(false);
     }
@@ -260,12 +289,16 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       const updatedSessions = [...sessions, newSession];
     setSessions(updatedSessions);
       
-      // Save to webhook
+      // Save to backend
       await saveSessionsToWebhook([newSession]);
       
-      // Refresh data from webhook to get latest
-      const webhookSessions = await fetchSessionsFromWebhook();
-      setSessions(webhookSessions as Session[]);
+      // Refresh data to get latest
+      const [all, recent] = await Promise.all([
+        fetchSessionsFromWebhook(),
+        fetchRecentSessionsFromWebhook(5),
+      ]);
+      setSessions(all as Session[]);
+      setRecentSessions(recent as Session[]);
       
       // Show success toast
       toast.success(`Session submitted: ${pendingSession.minutes} minutes of ${pendingSession.category}`);
@@ -358,12 +391,16 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       // Add to local sessions first
       setSessions(prev => [...prev, session]);
       
-      // Save to webhook
+      // Save to backend
       await saveSessionsToWebhook([session]);
       
-      // Refresh data from webhook to get latest
-      const webhookSessions = await fetchSessionsFromWebhook();
-      setSessions(webhookSessions as Session[]);
+      // Refresh data to get latest
+      const [all, recent] = await Promise.all([
+        fetchSessionsFromWebhook(),
+        fetchRecentSessionsFromWebhook(5),
+      ]);
+      setSessions(all as Session[]);
+      setRecentSessions(recent as Session[]);
       
       // Show success toast
       const timeDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
@@ -374,16 +411,57 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
         setChartCategory(manualCategory);
       }
       
-      // Reset form completely
-      setManualDate(new Date().toLocaleDateString('en-CA'));
-      setManualHours('1');
+      // Keep selected date and category; reset duration to 0h 0m and focus hours
+      setManualHours('0');
       setManualMinutes('0');
-      setManualCategory('Gaming');
+      setTimeout(() => {
+        manualHoursRef.current?.focus();
+        manualHoursRef.current?.select();
+      }, 0);
     } catch (error) {
       console.error('Failed to add manual session:', error);
       toast.error('Failed to add time session');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await deleteSessionsFromWebhook([id]);
+      const [all, recent] = await Promise.all([
+        fetchSessionsFromWebhook(),
+        fetchRecentSessionsFromWebhook(5),
+      ]);
+      setSessions(all as Session[]);
+      setRecentSessions(recent as Session[]);
+      // After delete, set chart to most recent remaining session's category if available
+      if (Array.isArray(all) && (all as Session[]).length > 0) {
+        const latest = [...(all as Session[])].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+        setChartCategory(latest.category as Category);
+      }
+      toast.success('Session deleted');
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      toast.error('Failed to delete session');
+    }
+  };
+
+  const handleUpsertSession = async (updated: Session) => {
+    try {
+      await saveSessionsToWebhook([updated]);
+      const [all, recent] = await Promise.all([
+        fetchSessionsFromWebhook(),
+        fetchRecentSessionsFromWebhook(5),
+      ]);
+      setSessions(all as Session[]);
+      setRecentSessions(recent as Session[]);
+      // Immediately reflect the edited session's category in chart
+      setChartCategory(updated.category as Category);
+      toast.success('Session updated');
+    } catch (error) {
+      console.error('Failed to update session:', error);
+      toast.error('Failed to update session');
     }
   };
 
@@ -736,6 +814,8 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
                   type="number"
                   value={manualHours}
                   onChange={(e) => handleHoursChange(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && isFormValid()) addManualSession(); }}
+                  ref={(el) => { manualHoursRef.current = el; }}
                   className={cn(tokens.input.base, "w-16")}
                   placeholder="1"
                   min="0"
@@ -748,6 +828,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
                   type="number"
                   value={manualMinutes}
                   onChange={(e) => handleMinutesChange(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && isFormValid()) addManualSession(); }}
                   className={cn(tokens.input.base, "w-16")}
                   placeholder="0"
                   min="0"
@@ -950,6 +1031,14 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
           </div>
         </div>
       </div>
+
+      {/* Recent Sessions Table */}
+      <RecentSessionsTable
+        sessions={recentSessions}
+        categories={CATEGORIES as unknown as Session['category'][]}
+        onUpsert={handleUpsertSession}
+        onDelete={handleDeleteSession}
+      />
     </div>
   );
 };
