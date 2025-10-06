@@ -70,9 +70,9 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         localStorage.removeItem('allocations-cache');
         
         // Use the global loading function which handles duplicate calls
-        console.log('🌐 Loading allocations from webhook...');
+        console.log('🌐 Loading allocations...');
         const s = await loadLedgerAndAllotments();
-        console.log('✅ Allocations loaded from webhook:', s);
+        console.log('✅ Allocations loaded:', s);
         
         // Cache the data
         setCachedData('allocations-cache', s);
@@ -186,7 +186,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
       
       // Save to webhook
       await saveAllocationsItems(updatedItems);
-      console.log('✅ New allocation saved successfully to webhook');
+      console.log('✅ New allocation saved successfully');
       
       // Reload from webhook to get updated state
       const fresh = await loadLedgerAndAllotments();
@@ -233,11 +233,11 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
       setLoading(true);
       setError(null);
       
-      console.log('💾 Saving allocations to webhook...');
+      console.log('💾 Saving allocations...');
       
       // Save to webhook and wait for confirmation
       await saveAllocationsItems(state.items);
-      console.log('✅ Allocations saved successfully to webhook');
+      console.log('✅ Allocations saved successfully');
       
       // Reload from webhook to get updated state
       const fresh = await loadLedgerAndAllotments();
