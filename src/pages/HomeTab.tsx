@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Todo, TodoPatch } from '../types';
+import type { Todo } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
-import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
+import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
@@ -115,12 +115,11 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     }
   };
 
-  const updateTodo = (_id: string, _updates: Partial<Todo>) => {};
+  // no edit functions needed on Home
 
-  const completeTodo = (_id: string) => {};
+  // no separate complete handler; using completeImmediately
 
-  const handleEditStart = (_id: string) => {};
-  const handleEditEnd = () => {};
+  // no inline edit state on Home
 
   const priorityFiltered = todos.filter(t => t.priority === 'crucial' || t.priority === 'high');
 
