@@ -47,9 +47,52 @@ export const HomeTodosTable: React.FC<HomeTodosTableProps> = ({
         <table className={tokens.table.table}>
           <thead className={tokens.table.thead}>
             <tr>
-              <th className={tokens.table.th} aria-sort="none">Task</th>
-              <th className={tokens.table.th} aria-sort="none">Category</th>
-              <th className={tokens.table.th} aria-sort={sortBy === 'priority' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'task' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Task"
+                  aria-pressed={sortBy === 'task'}
+                  onClick={() => {
+                    if (sortBy === 'task') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('task');
+                      onSortOrderChange('asc');
+                    }
+                  }}
+                >
+                  Task
+                </button>
+              </th>
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'category' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Category"
+                  aria-pressed={sortBy === 'category'}
+                  onClick={() => {
+                    if (sortBy === 'category') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('category');
+                      onSortOrderChange('asc');
+                    }
+                  }}
+                >
+                  Category
+                </button>
+              </th>
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'priority' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 <button
                   type="button"
                   className={tokens.button.ghost}
@@ -67,8 +110,48 @@ export const HomeTodosTable: React.FC<HomeTodosTableProps> = ({
                   Priority
                 </button>
               </th>
-              <th className={tokens.table.th} aria-sort="none">Effort</th>
-              <th className={tokens.table.th} aria-sort="none">Due Date</th>
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'effort' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Effort"
+                  aria-pressed={sortBy === 'effort'}
+                  onClick={() => {
+                    if (sortBy === 'effort') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('effort');
+                      onSortOrderChange('asc');
+                    }
+                  }}
+                >
+                  Effort
+                </button>
+              </th>
+              <th
+                className={tokens.table.th}
+                aria-sort={sortBy === 'due_date' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className={tokens.button.ghost}
+                  aria-label="Sort by Due Date"
+                  aria-pressed={sortBy === 'due_date'}
+                  onClick={() => {
+                    if (sortBy === 'due_date') {
+                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      onSortChange('due_date');
+                      onSortOrderChange('asc');
+                    }
+                  }}
+                >
+                  Due Date
+                </button>
+              </th>
               <th className={tokens.table.th}>Actions</th>
             </tr>
           </thead>
