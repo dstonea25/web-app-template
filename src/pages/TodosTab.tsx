@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Todo, Priority, TodoPatch, Effort } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
-import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
-import { fetchTodosFromWebhook, saveTodosToWebhook, saveTodosBatchToWebhook } from '../lib/api';
+import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { tokens, cn } from '../theme/config';
 import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
@@ -23,7 +22,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [quickTask, setQuickTask] = useState<string>('');
   const [quickPriority, setQuickPriority] = useState<Priority>('medium');
   const [quickEffort, setQuickEffort] = useState<Effort>('S');
-  const [stagedCount, setStagedCount] = useState<number>(0);
+  const [/* stagedCount */, setStagedCount] = useState<number>(0);
   const commitTimerRef = useRef<number | null>(null);
   const UNDO_WINDOW_MS = 2500;
   const prevEditRef = useRef<Todo | null>(null);
@@ -136,43 +135,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     }
   };
 
-  const saveBatch = async () => {
-    try {
-      setLoading(true);
-      
-      // Get staged updates and completes directly and perform batch save
-      const staged = getStagedChanges();
-      // If nothing to save, bail
-      if ((staged.updates.length + staged.completes.length) === 0) {
-        setLoading(false);
-        return;
-      }
-      await saveTodosBatchToWebhook(staged.updates, staged.completes);
-      
-      // Refresh data to get the latest state
-      console.log('🔄 Refreshing data after save...');
-      const freshTodos = await fetchTodosFromWebhook();
-      
-      // Update local state with fresh data
-      StorageManager.saveTodos(freshTodos);
-      const transformed = StorageManager.loadTodos();
-      setTodos(transformed);
-      
-      // Update cache with fresh data
-      setCachedData('todos-cache', freshTodos);
-      
-      // Clear staged changes
-      clearStagedChanges();
-      setStagedCount(0);
-      
-      console.log('✅ Save completed successfully');
-    } catch (error) {
-      console.error('Failed to save:', error);
-      alert(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // legacy save removed; auto-commit is used
 
   
 

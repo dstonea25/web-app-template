@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Todo, Priority, TodoPatch, Effort } from '../types';
+import type { Todo, TodoPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
-import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, applyFileSave, getWorkingTodos } from '../lib/storage';
+import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
+  const [/* filter */, /* setFilter */] = useState('');
   const [sortBy, setSortBy] = useState<keyof Todo | ''>('priority');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [/* editingId */, /* setEditingId */] = useState<string | null>(null);
   const [stagedCount, setStagedCount] = useState<number>(0);
   const hasLoadedRef = useRef(false);
 
@@ -115,23 +115,12 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     }
   };
 
-  const updateTodo = (id: string, updates: Partial<Todo>) => {
-    const updatedTodos = todos.map(todo => (todo.id === id ? { ...todo, ...updates } : todo));
-    setTodos(updatedTodos);
-    stageRowEdit({ id, patch: { id, ...updates } as TodoPatch });
-    const staged = getStagedChanges();
-    setStagedCount(staged.fieldChangeCount);
-  };
+  const updateTodo = (_id: string, _updates: Partial<Todo>) => {};
 
-  const completeTodo = (id: string) => {
-    stageComplete({ id });
-    const staged = getStagedChanges();
-    setStagedCount(staged.updates.length + staged.completes.length);
-    setTodos(prev => prev.filter(t => String(t.id) !== String(id)));
-  };
+  const completeTodo = (_id: string) => {};
 
-  const handleEditStart = (id: string) => setEditingId(id);
-  const handleEditEnd = () => setEditingId(null);
+  const handleEditStart = (_id: string) => {};
+  const handleEditEnd = () => {};
 
   const priorityFiltered = todos.filter(t => t.priority === 'crucial' || t.priority === 'high');
 

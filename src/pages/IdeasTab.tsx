@@ -18,7 +18,7 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [newIdea, setNewIdea] = useState<Partial<Idea>>({ idea: '', category: '', notes: '' });
-  const [stagedCount, setStagedCount] = useState<number>(0);
+  const [/* stagedCount */, setStagedCount] = useState<number>(0);
   const commitTimerRef = useRef<number | null>(null);
   const UNDO_WINDOW_MS = 2500;
   const prevEditRef = useRef<Idea | null>(null);

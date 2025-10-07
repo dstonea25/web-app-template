@@ -336,7 +336,7 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
   if (!Array.isArray(todos) || todos.length === 0) {
     throw new Error('Refusing to save empty todos list');
   }
-  const { data: existingRows, error: selErr } = await supabase
+  const { error: selErr } = await supabase
     .from('todos')
     .select('id');
   if (selErr) throw selErr;
