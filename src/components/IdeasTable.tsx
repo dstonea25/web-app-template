@@ -103,6 +103,10 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
     }
   };
 
+  const handleBlurCommit = (ideaObj: Idea) => {
+    onCommitRowEdit(String(ideaObj.id!), { id: String(ideaObj.id!), idea: ideaObj.idea, category: ideaObj.category ?? null, notes: ideaObj.notes });
+  };
+
 
   return (
     <div className="space-y-4">
@@ -144,7 +148,6 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
           <thead className={tokens.table.thead}>
             <tr>
               <th className={tokens.table.th} aria-sort="none">Idea</th>
-              <th className={tokens.table.th} aria-sort="none">Category</th>
               <th className={tokens.table.th} aria-sort="none">Notes</th>
               {/* Created sortable header */}
               <th
@@ -200,7 +203,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
           <tbody>
             {filteredAndSortedIdeas.length === 0 ? (
               <tr>
-                <td colSpan={5} className={tokens.table.empty_state}>
+                <td colSpan={4} className={tokens.table.empty_state}>
                   No ideas found. Add one above!
                 </td>
               </tr>
@@ -216,6 +219,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                           value={idea.idea || ''}
                           onChange={(e) => onIdeaUpdate(String(idea.id!), { idea: e.target.value })}
                           className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus)}
+                          onBlur={() => handleBlurCommit(idea)}
                           onKeyDown={(e) => handleKeyDown(e, idea)}
                           autoFocus
                         />
@@ -230,26 +234,7 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td className={tokens.table.td}>
-                    <select
-                      value={idea.category || ''}
-                      onChange={(e) => { onIdeaUpdate(String(idea.id!), { category: e.target.value || null, _dirty: true }); }}
-                      className={cn(tokens.input.base, tokens.input.focus, !idea.category && 'text-neutral-400')}
-                      style={!idea.category ? { color: '#9ca3af' } : {}}
-                      aria-label="Set category"
-                    >
-                      <option value="" style={{ color: '#9ca3af' }}>No category</option>
-                      <option value="work">work</option>
-                      <option value="projects">projects</option>
-                      <option value="videos">videos</option>
-                      <option value="writing">writing</option>
-                      <option value="health">health</option>
-                      <option value="business">business</option>
-                      <option value="life">life</option>
-                      <option value="future">future</option>
-                      <option value="travel">travel</option>
-                    </select>
-                  </td>
+                  
                   <td className={tokens.table.td}>
                     <div className={cn(tokens.editable?.cell, 'rounded-none')}>
                       {editingId === idea.id ? (
@@ -257,9 +242,10 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
                           ref={(el) => { editingCellRef.current = el; }}
                           value={idea.notes || ''}
                           onChange={(e) => onIdeaUpdate(String(idea.id!), { notes: e.target.value })}
-                          className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus, 'resize-none min-h-[60px]')}
+                          className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus, 'resize-none min-h-[100px]')}
+                          onBlur={() => handleBlurCommit(idea)}
                           onKeyDown={(e) => handleKeyDown(e, idea)}
-                          rows={idea.notes && idea.notes.length > 50 ? 3 : 1}
+                          rows={idea.notes && idea.notes.length > 50 ? 5 : 3}
                         />
                       ) : (
                         <span

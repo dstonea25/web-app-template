@@ -1,4 +1,4 @@
-import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, Session, Habit } from '../types';
+import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, IdeaPatch, Session, Habit } from '../types';
 
 // Mocked API client for MVP - all saves are stubbed
 export class ApiClient {
@@ -409,6 +409,52 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
     const numericOrStringIds = completes.map((id) => (Number.isFinite(Number(id)) ? Number(id) : String(id)));
     const { error } = await supabase
       .from('todos')
+      .delete()
+      .in('id', numericOrStringIds);
+    if (error) throw error;
+  }
+};
+
+// Batch save for Ideas: upsert changed/new rows and delete explicitly completed (removed) ids
+export const saveIdeasBatchToWebhook = async (updates: IdeaPatch[], completes: string[]): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Ideas');
+  }
+
+  // Upserts for updates/new rows
+  if (Array.isArray(updates) && updates.length > 0) {
+    const upserts = updates.map((p) => {
+      const numericId = Number(p.id || 0);
+      if (numericId == null || Number.isNaN(numericId)) return null;
+      const row: any = { id: numericId };
+      const changed = new Set((p._changedFields || []).filter(Boolean));
+      const isNew = (p as any)._isNew === true;
+      // Only include fields that were explicitly changed, or all for new rows
+      const include = (key: string) => isNew || changed.has(key);
+      let hasUpdateField = false;
+      if (include('idea') && Object.prototype.hasOwnProperty.call(p, 'idea')) { row.idea = p.idea; hasUpdateField = true; }
+      if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) { row.category = p.category ?? null; hasUpdateField = true; }
+      if (include('notes') && Object.prototype.hasOwnProperty.call(p, 'notes')) { row.notes = p.notes ?? ''; hasUpdateField = true; }
+      if (include('status') && Object.prototype.hasOwnProperty.call(p, 'status')) { row.status = (p as any).status ?? 'open'; hasUpdateField = true; }
+      return hasUpdateField ? row : null;
+    }).filter(Boolean);
+
+    if (upserts.length > 0) {
+      const { error } = await supabase
+        .from('ideas')
+        .upsert(upserts, { onConflict: 'id' });
+      if (error) throw error;
+    }
+  }
+
+  // Deletes for explicit completes (removals)
+  if (Array.isArray(completes) && completes.length > 0) {
+    const numericOrStringIds = completes.map((id) => (Number.isFinite(Number(id)) ? Number(id) : String(id)));
+    const { error } = await supabase
+      .from('ideas')
       .delete()
       .in('id', numericOrStringIds);
     if (error) throw error;

@@ -13,12 +13,14 @@ export const IdeasCategoryTabs: React.FC<IdeasCategoryTabsProps> = ({
   activeCategory,
   onCategoryChange,
 }) => {
-  // Derive unique categories from ideas data
+  // Static categories list: show all even if empty, plus any ad-hoc ones in data
   const categories = React.useMemo(() => {
-    const uniqueCategories = Array.from(
+    const staticCats = ['work','projects','videos','writing','health','business','life','future','travel'];
+    const dynamicCats = Array.from(
       new Set(ideas.map(idea => idea.category).filter((cat): cat is string => Boolean(cat)))
     ).sort();
-    return ['All', ...uniqueCategories];
+    const merged = Array.from(new Set([...staticCats, ...dynamicCats]));
+    return ['All', ...merged];
   }, [ideas]);
 
   return (

@@ -4,9 +4,9 @@ import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
 import { IdeasCategoryTabs } from '../components/IdeasCategoryTabs';
 import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges, clearStagedIdeaChanges, getCachedData, setCachedData, applyStagedChangesToIdeas } from '../lib/storage';
-import { applyIdeaFileSave, getWorkingIdeas } from '../lib/storage';
 import { addIdea as storageAddIdea } from '../lib/storage';
-import { fetchIdeasFromWebhook, saveIdeasToWebhook } from '../lib/api';
+import { fetchIdeasFromWebhook, saveIdeasBatchToWebhook } from '../lib/api';
+import { toast } from '../lib/notifications/toast';
 
 export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -17,12 +17,11 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [newIdea, setNewIdea] = useState<Partial<Idea>>({ 
-    idea: '', 
-    category: '', 
-    notes: '' 
-  });
+  const [newIdea, setNewIdea] = useState<Partial<Idea>>({ idea: '', category: '', notes: '' });
   const [stagedCount, setStagedCount] = useState<number>(0);
+  const commitTimerRef = useRef<number | null>(null);
+  const UNDO_WINDOW_MS = 2500;
+  const prevEditRef = useRef<Idea | null>(null);
   const hasLoadedRef = useRef(false);
 
   // Load initial data when tab mounts (only happens when tab is active)
@@ -32,19 +31,29 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     loadIdeas();
   }, [isVisible]);
 
-  // Warn user before closing if there are unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (stagedCount > 0) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return e.returnValue;
+  // Auto-commit staged changes after a short undo window
+  const scheduleCommit = () => {
+    if (commitTimerRef.current) {
+      window.clearTimeout(commitTimerRef.current);
+    }
+    commitTimerRef.current = window.setTimeout(async () => {
+      try {
+        const staged = getStagedIdeaChanges();
+        if ((staged.updates.length + staged.completes.length) === 0) return;
+        await saveIdeasBatchToWebhook(staged.updates, staged.completes);
+        const fresh = await fetchIdeasFromWebhook();
+        StorageManager.saveIdeas(fresh);
+        const transformed = StorageManager.loadIdeas();
+        setIdeas(transformed);
+        setCachedData('ideas-cache', fresh);
+        clearStagedIdeaChanges();
+        setStagedCount(0);
+      } catch (err) {
+        console.error('Auto-save (ideas) failed:', err);
+        toast.error('Auto-save failed');
       }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [stagedCount]);
+    }, UNDO_WINDOW_MS);
+  };
 
   const loadIdeas = async () => {
     try {
@@ -91,8 +100,7 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         console.log('🔄 Force refresh requested - clearing cache and loading fresh data');
       }
       
-      // Clear localStorage to force fresh data load
-      StorageManager.clearAll();
+      // Do not clear all storage; preserve other tabs' data
       
       // Load from backend
       console.log('🌐 Loading ideas...');
@@ -125,45 +133,7 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     }
   };
 
-  const saveBatch = async () => {
-    try {
-      setLoading(true);
-      
-      // Apply staged changes to get the final state
-      const result = await applyIdeaFileSave();
-      if (!result.ok) {
-        throw new Error('Failed to apply staged changes');
-      }
-      
-      // Get the updated ideas after applying changes
-      const updatedIdeas = getWorkingIdeas();
-      
-      // Save to backend
-      await saveIdeasToWebhook(updatedIdeas);
-      
-      // Refresh data to get the latest state
-      console.log('🔄 Refreshing data after save...');
-      const freshIdeas = await fetchIdeasFromWebhook();
-      
-      // Update local state with fresh data
-      StorageManager.saveIdeas(freshIdeas);
-      const transformed = StorageManager.loadIdeas();
-      setIdeas(transformed);
-      
-      // Update cache with fresh data
-      setCachedData('ideas-cache', freshIdeas);
-      
-      // Clear staged changes
-      setStagedCount(0);
-      
-      console.log('✅ Save completed successfully');
-    } catch (error) {
-      console.error('Failed to save:', error);
-      alert(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Remove explicit save flow; commits happen automatically via scheduleCommit
 
   const addIdea = () => {
     if (!newIdea.idea?.trim()) return;
@@ -177,74 +147,84 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     // Stage the new idea for saving (get the last added idea)
     const newIdeaItem = updatedIdeas[updatedIdeas.length - 1];
     if (newIdeaItem) {
-      stageIdeaEdit({ 
-        id: newIdeaItem.id || '', 
-        patch: { 
-          id: newIdeaItem.id || '', 
-          idea: newIdeaItem.idea, 
-          category: newIdeaItem.category, 
-          notes: newIdeaItem.notes,
-          status: newIdeaItem.status,
-          _isNew: true // Mark as new idea - counts as 1 change
-        } 
-      });
-      
-      // Update staged count
+      stageIdeaEdit({ id: newIdeaItem.id || '', patch: { id: newIdeaItem.id || '', idea: newIdeaItem.idea, category: newIdeaItem.category, notes: newIdeaItem.notes, status: newIdeaItem.status, _isNew: true } });
       const staged = getStagedIdeaChanges();
       setStagedCount(staged.fieldChangeCount);
+      scheduleCommit();
     }
     
     setNewIdea({ idea: '', category: '', notes: '' });
   };
 
   const updateIdea = (id: string, updates: Partial<Idea>) => {
-    console.log('🔄 updateIdea called:', { id, updates });
-    
-    // Local working copy update
-    const updatedIdeas = ideas.map(idea =>
-      idea.id === id ? { ...idea, ...updates } : idea
-    );
-    setIdeas(updatedIdeas);
-    
-    // Stage the change for saving
-    stageIdeaEdit({ 
-      id, 
-      patch: { 
-        id, 
-        ...updates 
-      } as IdeaPatch 
-    });
-    
-    // Update staged count
+    const prev = ideas.find(i => i.id === id);
+    setIdeas(is => is.map(i => (i.id === id ? { ...i, ...updates } : i)));
+    // If editing free-text idea/notes, defer actual stage until commit end
+    if (Object.prototype.hasOwnProperty.call(updates, 'idea') || Object.prototype.hasOwnProperty.call(updates, 'notes')) {
+      return;
+    }
+    stageIdeaEdit({ id, patch: { id, ...updates } as IdeaPatch });
     const staged = getStagedIdeaChanges();
-    console.log('📊 Staged changes:', staged);
     setStagedCount(staged.fieldChangeCount);
+    toast.info('Updated idea', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        if (!prev) return;
+        setIdeas(ts => ts.map(t => (t.id === id ? { ...t, ...prev } : t)));
+        stageIdeaEdit({ id, patch: { id, idea: prev.idea, category: prev.category ?? null, notes: prev.notes, status: prev.status } as IdeaPatch });
+        const s = getStagedIdeaChanges();
+        setStagedCount(s.fieldChangeCount);
+      }
+    });
+    scheduleCommit();
   };
 
   const commitRowEdit = (id: string, patch: IdeaPatch) => {
-    // Mark the row as having staged changes for batch saving
-    console.log('Staging edit for idea:', id, patch);
-    
-    // Update the ideas state to reflect the final values
-    const updatedIdeas = ideas.map(idea =>
-      idea.id === id ? { ...idea, ...patch, _dirty: true } : idea
-    );
-    setIdeas(updatedIdeas);
-    
-    // Mark as not editing
+    // Stage and schedule auto-commit once editing finishes
+    stageIdeaEdit({ id, patch });
+    const staged = getStagedIdeaChanges();
+    setStagedCount(staged.fieldChangeCount);
+    const prev = prevEditRef.current;
+    toast.info('Updated idea', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        if (!prev) return;
+        setIdeas(ts => ts.map(t => (t.id === id ? { ...t, ...prev } : t)));
+        stageIdeaEdit({ id, patch: { id, idea: prev.idea, category: prev.category ?? null, notes: prev.notes, status: prev.status } as IdeaPatch });
+        const s = getStagedIdeaChanges();
+        setStagedCount(s.fieldChangeCount);
+      }
+    });
+    scheduleCommit();
     setEditingId(null);
   };
 
   const removeIdea = (id: string) => {
+    const removed = ideas.find(i => String(i.id) === String(id));
     stageIdeaComplete({ id });
     const staged = getStagedIdeaChanges();
     setStagedCount(staged.fieldChangeCount);
-    // Hide row from current view
     setIdeas(prev => prev.filter(i => String(i.id) !== String(id)));
+    toast.info('Removed idea', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        // Unstage completion by staging a no-op edit
+        stageIdeaEdit({ id, patch: { id } as IdeaPatch });
+        if (removed) setIdeas(prev => [...prev, removed].sort((a, b) => (a.id! < b.id! ? -1 : 1)));
+        const s = getStagedIdeaChanges();
+        setStagedCount(s.fieldChangeCount);
+      }
+    });
+    scheduleCommit();
   };
 
   const handleEditStart = (id: string) => {
     setEditingId(id);
+    const snapshot = ideas.find(t => t.id === id) || null;
+    prevEditRef.current = snapshot ? { ...snapshot } : null;
   };
 
   const handleEditEnd = () => {
@@ -295,81 +275,14 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
-      {/* Add new idea form - moved to top as separate section */}
-      <div className={cn(tokens.card.base, 'mb-6')}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
-          Add New Idea
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="Idea description"
-            value={newIdea.idea}
-            onChange={(e) => setNewIdea({ ...newIdea, idea: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <select
-            value={(newIdea.category as string) || ''}
-            onChange={(e) => setNewIdea({ ...newIdea, category: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus, !newIdea.category && 'text-neutral-400')}
-            style={!newIdea.category ? { color: '#9ca3af' } : {}}
-          >
-            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
-            <option value="work">work</option>
-            <option value="projects">projects</option>
-            <option value="videos">videos</option>
-            <option value="writing">writing</option>
-            <option value="health">health</option>
-            <option value="business">business</option>
-            <option value="life">life</option>
-            <option value="future">future</option>
-            <option value="travel">travel</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Notes (optional)"
-            value={(newIdea.notes as string) || ''}
-            onChange={(e) => setNewIdea({ ...newIdea, notes: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <button
-            onClick={addIdea}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-            Add Idea
-          </button>
-        </div>
-      </div>
+      {/* Removed top manual add; inline add exists in filtered category views */}
 
-      {/* Main ideas section - separate from add new idea */}
+      {/* Main ideas section */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             Ideas ({filteredIdeas.length})
           </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={saveBatch}
-              disabled={stagedCount === 0 || loading}
-              className={cn(tokens.button.base, tokens.button.primary, (stagedCount === 0 || loading) && 'opacity-50 cursor-not-allowed')}
-            >
-              {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
-            </button>
-            {stagedCount > 0 && (
-              <button
-                onClick={() => {
-                  clearStagedIdeaChanges();
-                  setStagedCount(0);
-                  // Reload data to get fresh state
-                  loadIdeas();
-                }}
-                disabled={loading}
-                className={cn(tokens.button.base, tokens.button.ghost, 'border border-gray-500 text-gray-500 hover:bg-gray-500 hover:text-white')}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
@@ -381,6 +294,41 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
           onCategoryChange={setActiveCategory}
         />
       </div>
+
+      {/* Inline quick add when filtered by a specific category (mirrors Todos) */}
+      {activeCategory !== 'All' && (
+        <div className="mb-4">
+          <div className={cn(tokens.card.base, 'p-3')}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center w-full">
+              <input
+                type="text"
+                placeholder={`Add to ${activeCategory}...`}
+                value={(newIdea.idea as string) || ''}
+                onChange={(e) => setNewIdea({ ...newIdea, idea: e.target.value, category: activeCategory })}
+                onKeyDown={(e) => { if (e.key === 'Enter') addIdea(); }}
+                className={cn(tokens.input.base, tokens.input.focus, 'w-full sm:col-span-2 lg:col-span-7')}
+              />
+              <input
+                type="text"
+                placeholder="Notes (optional)"
+                value={(newIdea.notes as string) || ''}
+                onChange={(e) => setNewIdea({ ...newIdea, notes: e.target.value, category: activeCategory })}
+                onKeyDown={(e) => { if (e.key === 'Enter') addIdea(); }}
+                className={cn(tokens.input.base, tokens.input.focus, 'w-full lg:col-span-4')}
+              />
+              <div className="sm:col-span-2 lg:col-span-1 flex justify-end">
+                <button
+                  onClick={addIdea}
+                  className={cn(tokens.button.base, tokens.button.primary, 'w-full sm:w-auto')}
+                  disabled={!String(newIdea.idea || '').trim()}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ideas table */}
       <IdeasTable
