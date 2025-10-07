@@ -419,16 +419,16 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       {activeCategory !== 'All' && (
         <div className="mb-4">
           <div className={cn(tokens.card.base, 'p-3')}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center w-full">
               <input
                 type="text"
                 placeholder={`Add to ${activeCategory}...`}
                 value={quickTask}
                 onChange={(e) => setQuickTask(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addQuickTodo(); }}
-                className={cn(tokens.input.base, tokens.input.focus)}
+                className={cn(tokens.input.base, tokens.input.focus, 'w-full sm:col-span-2 lg:col-span-7')}
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 lg:col-span-2">
                 <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Priority</span>
                 <SelectPriority
                   value={quickPriority as Priority}
@@ -436,7 +436,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
                   ariaLabel="Set quick add priority"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 lg:col-span-2">
                 <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Effort</span>
                 <select
                   value={quickEffort || ''}
