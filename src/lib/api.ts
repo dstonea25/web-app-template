@@ -373,19 +373,22 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
       const numericId = Number(p.id || 0);
       if (numericId == null || Number.isNaN(numericId)) return null;
       const row: any = { id: numericId };
-      // Only include fields present in the patch to avoid overwriting with null
-      if (Object.prototype.hasOwnProperty.call(p, 'task')) row.task = p.task;
-      if (Object.prototype.hasOwnProperty.call(p, 'category')) row.category = p.category ?? null;
-      if (Object.prototype.hasOwnProperty.call(p, 'priority')) {
+      const changed = new Set((p._changedFields || []).filter(Boolean));
+      const isNew = (p as any)._isNew === true;
+      // Only include fields that were explicitly changed, or all for new rows
+      const include = (key: string) => isNew || changed.has(key);
+      if (include('task') && Object.prototype.hasOwnProperty.call(p, 'task')) row.task = p.task;
+      if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) row.category = p.category ?? null;
+      if (include('priority') && Object.prototype.hasOwnProperty.call(p, 'priority')) {
         row.priority = (p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low') ? p.priority : null;
       }
-      if (Object.prototype.hasOwnProperty.call(p, 'effort')) {
+      if (include('effort') && Object.prototype.hasOwnProperty.call(p, 'effort')) {
         row.effort = (p.effort === 'S' || p.effort === 'M' || p.effort === 'L') ? p.effort : null;
       }
-      if (Object.prototype.hasOwnProperty.call(p, 'due_date')) row.due_date = p.due_date ?? null;
+      if (include('due_date') && Object.prototype.hasOwnProperty.call(p, 'due_date')) row.due_date = p.due_date ?? null;
       // Keep status open for all active items
       row.status = 'open';
-      if ((p as any)._isNew && (p as any).created_at) row.created_at = (p as any).created_at;
+      if (isNew && (p as any).created_at) row.created_at = (p as any).created_at;
       return row;
     }).filter(Boolean) as any[];
     if (upserts.length > 0) {
