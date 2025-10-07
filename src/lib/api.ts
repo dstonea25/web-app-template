@@ -369,26 +369,25 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
 
   // Upserts for updates/new rows
   if (Array.isArray(updates) && updates.length > 0) {
-    const rows = updates.map((p) => {
+    const upserts = updates.map((p) => {
       const numericId = Number(p.id || 0);
-      const isValidPriority = p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low' ? p.priority : null;
-      const isValidEffort = p.effort === 'S' || p.effort === 'M' || p.effort === 'L' ? p.effort : null;
-      const row: any = {
-        id: numericId,
-        task: p.task,
-        category: p.category ?? null,
-        priority: isValidPriority,
-        effort: isValidEffort,
-        due_date: p.due_date ?? null,
-        status: 'open',
-      };
-      // For inserts, provide created_at if known; else let DB default handle it
-      if ((p as any)._isNew && (p as any).created_at) {
-        row.created_at = (p as any).created_at;
+      if (numericId == null || Number.isNaN(numericId)) return null;
+      const row: any = { id: numericId };
+      // Only include fields present in the patch to avoid overwriting with null
+      if (Object.prototype.hasOwnProperty.call(p, 'task')) row.task = p.task;
+      if (Object.prototype.hasOwnProperty.call(p, 'category')) row.category = p.category ?? null;
+      if (Object.prototype.hasOwnProperty.call(p, 'priority')) {
+        row.priority = (p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low') ? p.priority : null;
       }
+      if (Object.prototype.hasOwnProperty.call(p, 'effort')) {
+        row.effort = (p.effort === 'S' || p.effort === 'M' || p.effort === 'L') ? p.effort : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(p, 'due_date')) row.due_date = p.due_date ?? null;
+      // Keep status open for all active items
+      row.status = 'open';
+      if ((p as any)._isNew && (p as any).created_at) row.created_at = (p as any).created_at;
       return row;
-    });
-    const upserts = rows.filter(r => r.id != null && !Number.isNaN(r.id));
+    }).filter(Boolean) as any[];
     if (upserts.length > 0) {
       const { error } = await supabase
         .from('todos')
