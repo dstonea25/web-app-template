@@ -21,6 +21,8 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [activeCategory, setActiveCategory] = useState('All');
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: 'medium', effort: 'S' });
   const [quickTask, setQuickTask] = useState<string>('');
+  const [quickPriority, setQuickPriority] = useState<Priority>('medium');
+  const [quickEffort, setQuickEffort] = useState<Effort>('S');
   const [stagedCount, setStagedCount] = useState<number>(0);
   const commitTimerRef = useRef<number | null>(null);
   const UNDO_WINDOW_MS = 2500;
@@ -214,8 +216,8 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     const updatedTodos = storageAddTodo(todos, {
       task,
       category: activeCategory,
-      priority: null,
-      effort: null,
+      priority: quickPriority || null,
+      effort: quickEffort || null,
     });
     setTodos(updatedTodos);
     const newTodoItem = updatedTodos[updatedTodos.length - 1];
@@ -237,6 +239,8 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       scheduleCommit();
     }
     setQuickTask('');
+    setQuickPriority('medium');
+    setQuickEffort('S');
   };
 
   const updateTodo = (id: string, updates: Partial<Todo>) => {
@@ -414,24 +418,47 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       {/* Inline quick add when filtered by a specific category */}
       {activeCategory !== 'All' && (
         <div className="mb-4">
-          <div className={cn(tokens.card.base, 'p-3')}
-          >
-            <div className="flex items-center gap-2">
+          <div className={cn(tokens.card.base, 'p-3')}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-center">
               <input
                 type="text"
                 placeholder={`Add to ${activeCategory}...`}
                 value={quickTask}
                 onChange={(e) => setQuickTask(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addQuickTodo(); }}
-                className={cn(tokens.input.base, tokens.input.focus, 'flex-1')}
+                className={cn(tokens.input.base, tokens.input.focus)}
               />
-              <button
-                onClick={addQuickTodo}
-                className={cn(tokens.button.base, tokens.button.primary)}
-                disabled={!quickTask.trim()}
-              >
-                Add
-              </button>
+              <div className="flex items-center gap-2">
+                <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Priority</span>
+                <SelectPriority
+                  value={quickPriority as Priority}
+                  onChange={(p) => setQuickPriority((p || 'medium') as Priority)}
+                  ariaLabel="Set quick add priority"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Effort</span>
+                <select
+                  value={quickEffort || ''}
+                  onChange={(e) => setQuickEffort((e.target.value || null) as Effort)}
+                  className={cn(tokens.input.base, tokens.input.focus, !quickEffort && 'text-neutral-400')}
+                  style={!quickEffort ? { color: '#9ca3af' } : {}}
+                  aria-label="Set quick add effort"
+                >
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-1 flex justify-end">
+                <button
+                  onClick={addQuickTodo}
+                  className={cn(tokens.button.base, tokens.button.primary, 'w-full sm:w-auto')}
+                  disabled={!quickTask.trim()}
+                >
+                  Add
+                </button>
+              </div>
             </div>
           </div>
         </div>
