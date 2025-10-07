@@ -385,9 +385,18 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         onSortOrderChange={setSortOrder}
         onEditStart={handleEditStart}
         onEditEnd={handleEditEnd}
-        onTodoUpdate={updateTodo}
+        onTodoUpdate={(id, updates) => {
+          // Update UI only; defer staging to onCommitRowEdit to avoid per-keystroke saves
+          setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...updates } : t)));
+        }}
         onTodoComplete={completeTodo}
-        onCommitRowEdit={() => {}} // No longer used
+        onCommitRowEdit={(id, patch) => {
+          // Stage and schedule auto-commit once editing finishes
+          stageRowEdit({ id, patch });
+          const staged = getStagedChanges();
+          setStagedCount(staged.fieldChangeCount);
+          scheduleCommit();
+        }}
       />
     </div>
   );

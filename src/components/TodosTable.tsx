@@ -111,8 +111,8 @@ export const TodosTable: React.FC<TodosTableProps> = ({
   };
 
   const handleBlurCommit = (todoObj: Todo) => {
-    // Stage the change for saving when editing ends
-    onTodoUpdate(String(todoObj.id!), { task: todoObj.task });
+    // Commit edits when leaving the input
+    onCommitRowEdit(String(todoObj.id!), { id: String(todoObj.id!), task: todoObj.task, category: todoObj.category ?? null, priority: todoObj.priority, effort: todoObj.effort, due_date: todoObj.due_date, statusUi: todoObj.statusUi });
   };
 
   return (
