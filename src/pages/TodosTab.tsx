@@ -428,12 +428,13 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
                 onKeyDown={(e) => { if (e.key === 'Enter') addQuickTodo(); }}
                 className={cn(tokens.input.base, tokens.input.focus, 'w-full sm:col-span-2 lg:col-span-7')}
               />
-              <div className="flex items-center gap-2 lg:col-span-2">
+              <div className="flex items-center gap-2 lg:col-span-3">
                 <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Priority</span>
                 <SelectPriority
                   value={quickPriority as Priority}
                   onChange={(p) => setQuickPriority((p || 'medium') as Priority)}
                   ariaLabel="Set quick add priority"
+                  className="w-full min-w-[10rem]"
                 />
               </div>
               <div className="flex items-center gap-2 lg:col-span-2">

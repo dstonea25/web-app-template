@@ -7,12 +7,13 @@ export interface SelectPriorityProps {
   onChange: (value: Priority | null) => void;
   ariaLabel?: string;
   placeholderLabel?: string;
+  className?: string;
 }
 
-const SelectPriority: React.FC<SelectPriorityProps> = ({ value, onChange, ariaLabel, placeholderLabel }) => {
+const SelectPriority: React.FC<SelectPriorityProps> = ({ value, onChange, ariaLabel, placeholderLabel, className }) => {
   return (
     <select
-      className={cn(tokens.input.base, tokens.input.focus, value == null && 'text-neutral-400')}
+      className={cn(tokens.input.base, tokens.input.focus, className, value == null && 'text-neutral-400')}
       aria-label={ariaLabel ?? 'Set priority'}
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value ? (e.target.value as Priority) : null)}
