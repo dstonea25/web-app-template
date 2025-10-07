@@ -20,6 +20,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: 'medium', effort: 'S' });
+  const [quickTask, setQuickTask] = useState<string>('');
   const [stagedCount, setStagedCount] = useState<number>(0);
   const commitTimerRef = useRef<number | null>(null);
   const UNDO_WINDOW_MS = 2500;
@@ -205,6 +206,39 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     setNewTodo({ task: '', category: (newTodo.category as string) || '', priority: 'medium', effort: 'S' });
   };
 
+  // Inline quick-add when filtered by a specific category
+  const addQuickTodo = () => {
+    if (activeCategory === 'All') return;
+    const task = quickTask.trim();
+    if (!task) return;
+    const updatedTodos = storageAddTodo(todos, {
+      task,
+      category: activeCategory,
+      priority: null,
+      effort: null,
+    });
+    setTodos(updatedTodos);
+    const newTodoItem = updatedTodos[updatedTodos.length - 1];
+    if (newTodoItem) {
+      stageRowEdit({
+        id: newTodoItem.id || '',
+        patch: {
+          id: newTodoItem.id || '',
+          task: newTodoItem.task,
+          category: newTodoItem.category,
+          priority: newTodoItem.priority,
+          effort: newTodoItem.effort,
+          statusUi: newTodoItem.statusUi,
+          _isNew: true
+        } as TodoPatch,
+      });
+      const staged = getStagedChanges();
+      setStagedCount(staged.fieldChangeCount);
+      scheduleCommit();
+    }
+    setQuickTask('');
+  };
+
   const updateTodo = (id: string, updates: Partial<Todo>) => {
     // Update UI
     const prev = todos.find(t => t.id === id);
@@ -376,6 +410,32 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
           onCategoryChange={setActiveCategory}
         />
       </div>
+
+      {/* Inline quick add when filtered by a specific category */}
+      {activeCategory !== 'All' && (
+        <div className="mb-4">
+          <div className={cn(tokens.card.base, 'p-3')}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder={`Add to ${activeCategory}...`}
+                value={quickTask}
+                onChange={(e) => setQuickTask(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addQuickTodo(); }}
+                className={cn(tokens.input.base, tokens.input.focus, 'flex-1')}
+              />
+              <button
+                onClick={addQuickTodo}
+                className={cn(tokens.button.base, tokens.button.primary)}
+                disabled={!quickTask.trim()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Todos table */}
       <TodosTable
