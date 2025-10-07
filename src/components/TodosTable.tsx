@@ -205,7 +205,7 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                   {sortBy === 'priority' ? `Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : 'Not sorted'}
                 </span>
               </th>
-              <th className={tokens.table.th} aria-sort="none">Effort</th>
+              <th className={cn(tokens.table.th, 'w-24 min-w-[6rem]')} aria-sort="none">Effort</th>
               <th className={tokens.table.th} aria-sort="none">Due Date</th>
               <th className={tokens.table.th}>Actions</th>
             </tr>
@@ -276,11 +276,11 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                       ariaLabel="Set priority"
                     />
                   </td>
-                  <td className={tokens.table.td}>
+                  <td className={cn(tokens.table.td, 'w-24 min-w-[6rem]')}>
                     <select
                       value={todo.effort || ''}
                       onChange={(e) => { onTodoUpdate(String(todo.id!), { effort: (e.target.value || null) as Effort, _dirty: true }); }}
-                      className={cn(tokens.input.base, tokens.input.focus, !todo.effort && 'text-neutral-400')}
+                      className={cn(tokens.input.base, tokens.input.focus, 'w-full', !todo.effort && 'text-neutral-400')}
                       style={!todo.effort ? { color: '#9ca3af' } : {}}
                       aria-label="Set effort"
                     >
