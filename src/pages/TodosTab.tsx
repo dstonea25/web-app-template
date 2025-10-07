@@ -23,6 +23,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [stagedCount, setStagedCount] = useState<number>(0);
   const commitTimerRef = useRef<number | null>(null);
   const UNDO_WINDOW_MS = 2500;
+  const prevEditRef = useRef<Todo | null>(null);
   const hasLoadedRef = useRef(false);
 
   // Load initial data when tab mounts (only happens when tab is active)
@@ -204,29 +205,28 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   };
 
   const updateTodo = (id: string, updates: Partial<Todo>) => {
-    // Keep previous snapshot for undo
+    // Update UI
     const prev = todos.find(t => t.id === id);
-    const updatedTodos = todos.map(todo => (todo.id === id ? { ...todo, ...updates } : todo));
-    setTodos(updatedTodos);
-    // Stage the change for auto-save
+    setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...updates } : t)));
+    // If this is a task text change, defer staging until commit
+    if (Object.prototype.hasOwnProperty.call(updates, 'task')) {
+      return;
+    }
+    // Stage non-text changes immediately and show undo
     stageRowEdit({ id, patch: { id, ...updates } as TodoPatch });
     const staged = getStagedChanges();
     setStagedCount(staged.fieldChangeCount);
-    // Show undo toast for edits
     toast.info('Updated todo', {
       ttlMs: UNDO_WINDOW_MS,
       actionLabel: 'Undo',
       onAction: () => {
         if (!prev) return;
-        // Revert local state
         setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...prev } : t)));
-        // Revert staged change back to previous values
         stageRowEdit({ id, patch: { id, task: prev.task, category: prev.category ?? null, priority: prev.priority, effort: prev.effort, due_date: prev.due_date } as TodoPatch });
         const s = getStagedChanges();
         setStagedCount(s.fieldChangeCount);
       }
     });
-    // Schedule auto-commit
     scheduleCommit();
   };
 
@@ -254,6 +254,9 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
 
   const handleEditStart = (id: string) => {
     setEditingId(id);
+    // Capture snapshot at start of editing for undo on commit
+    const snapshot = todos.find(t => t.id === id) || null;
+    prevEditRef.current = snapshot ? { ...snapshot } : null;
   };
 
   const handleEditEnd = () => {
@@ -385,16 +388,26 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         onSortOrderChange={setSortOrder}
         onEditStart={handleEditStart}
         onEditEnd={handleEditEnd}
-        onTodoUpdate={(id, updates) => {
-          // Update UI only; defer staging to onCommitRowEdit to avoid per-keystroke saves
-          setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...updates } : t)));
-        }}
+        onTodoUpdate={updateTodo}
         onTodoComplete={completeTodo}
         onCommitRowEdit={(id, patch) => {
           // Stage and schedule auto-commit once editing finishes
           stageRowEdit({ id, patch });
           const staged = getStagedChanges();
           setStagedCount(staged.fieldChangeCount);
+          // Undo toast based on snapshot
+          const prev = prevEditRef.current;
+          toast.info('Updated todo', {
+            ttlMs: UNDO_WINDOW_MS,
+            actionLabel: 'Undo',
+            onAction: () => {
+              if (!prev) return;
+              setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...prev } : t)));
+              stageRowEdit({ id, patch: { id, task: prev.task, category: prev.category ?? null, priority: prev.priority, effort: prev.effort, due_date: prev.due_date } as TodoPatch });
+              const s = getStagedChanges();
+              setStagedCount(s.fieldChangeCount);
+            }
+          });
           scheduleCommit();
         }}
       />
