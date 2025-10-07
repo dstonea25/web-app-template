@@ -8,8 +8,7 @@ import { tokens, cn } from '../theme/config';
 import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
 import { CategoryTabs } from '../components/CategoryTabs';
-// Example only: toast.success('Saved N items')
-// import { toast } from '../lib/notifications/toast';
+import { toast } from '../lib/notifications/toast';
 
 export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -22,6 +21,8 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [activeCategory, setActiveCategory] = useState('All');
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: 'medium', effort: 'S' });
   const [stagedCount, setStagedCount] = useState<number>(0);
+  const commitTimerRef = useRef<number | null>(null);
+  const UNDO_WINDOW_MS = 2500;
   const hasLoadedRef = useRef(false);
 
   // Load initial data when tab mounts (only happens when tab is active)
@@ -31,19 +32,29 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     loadTodos();
   }, [isVisible]);
 
-  // Warn user before closing if there are unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (stagedCount > 0) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return e.returnValue;
+  // Auto-commit staged changes after a short undo window
+  const scheduleCommit = () => {
+    if (commitTimerRef.current) {
+      window.clearTimeout(commitTimerRef.current);
+    }
+    commitTimerRef.current = window.setTimeout(async () => {
+      try {
+        const staged = getStagedChanges();
+        if ((staged.updates.length + staged.completes.length) === 0) return;
+        await saveTodosBatchToWebhook(staged.updates, staged.completes);
+        const freshTodos = await fetchTodosFromWebhook();
+        StorageManager.saveTodos(freshTodos);
+        const transformed = StorageManager.loadTodos();
+        setTodos(transformed);
+        setCachedData('todos-cache', freshTodos);
+        clearStagedChanges();
+        setStagedCount(0);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        toast.error('Auto-save failed');
       }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [stagedCount]);
+    }, UNDO_WINDOW_MS);
+  };
 
   const loadTodos = async () => {
     try {
@@ -183,36 +194,52 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   };
 
   const updateTodo = (id: string, updates: Partial<Todo>) => {
-    console.log('🔄 updateTodo called:', { id, updates });
-    
-    // Local working copy update
-    const updatedTodos = todos.map(todo =>
-      todo.id === id ? { ...todo, ...updates } : todo
-    );
+    // Keep previous snapshot for undo
+    const prev = todos.find(t => t.id === id);
+    const updatedTodos = todos.map(todo => (todo.id === id ? { ...todo, ...updates } : todo));
     setTodos(updatedTodos);
-    
-    // Stage the change for saving
-    stageRowEdit({ 
-      id, 
-      patch: { 
-        id, 
-        ...updates 
-      } as TodoPatch 
-    });
-    
-    // Update staged count
+    // Stage the change for auto-save
+    stageRowEdit({ id, patch: { id, ...updates } as TodoPatch });
     const staged = getStagedChanges();
-    console.log('📊 Staged changes:', staged);
     setStagedCount(staged.fieldChangeCount);
+    // Show undo toast for edits
+    toast.info('Updated todo', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        if (!prev) return;
+        // Revert local state
+        setTodos(ts => ts.map(t => (t.id === id ? { ...t, ...prev } : t)));
+        // Revert staged change back to previous values
+        stageRowEdit({ id, patch: { id, task: prev.task, category: prev.category ?? null, priority: prev.priority, effort: prev.effort, due_date: prev.due_date } as TodoPatch });
+        const s = getStagedChanges();
+        setStagedCount(s.fieldChangeCount);
+      }
+    });
+    // Schedule auto-commit
+    scheduleCommit();
   };
 
 
   const completeTodo = (id: string) => {
+    const removed = todos.find(t => String(t.id) === String(id));
     stageComplete({ id });
     const staged = getStagedChanges();
     setStagedCount(staged.updates.length + staged.completes.length);
-    // Hide row from current view
     setTodos(prev => prev.filter(t => String(t.id) !== String(id)));
+    toast.info('Completed todo', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        // Unstage completion by staging a no-op edit
+        stageRowEdit({ id, patch: { id } as TodoPatch });
+        // Restore locally
+        if (removed) setTodos(prev => [...prev, removed].sort((a, b) => (a.id! < b.id! ? -1 : 1)));
+        const s = getStagedChanges();
+        setStagedCount(s.fieldChangeCount);
+      }
+    });
+    scheduleCommit();
   };
 
   const handleEditStart = (id: string) => {
@@ -318,35 +345,12 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         </div>
       </div>
 
-      {/* Main todos section - separate from add new todo */}
+      {/* Main todos section */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             To-Dos ({filteredTodos.length})
           </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={saveBatch}
-              disabled={stagedCount === 0 || loading}
-              className={cn(tokens.button.base, tokens.button.primary, (stagedCount === 0 || loading) && 'opacity-50 cursor-not-allowed')}
-            >
-              {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
-            </button>
-            {stagedCount > 0 && (
-              <button
-                onClick={() => {
-                  clearStagedChanges();
-                  setStagedCount(0);
-                  // Reload data to get fresh state
-                  loadTodos();
-                }}
-                disabled={loading}
-                className={cn(tokens.button.base, tokens.button.ghost, 'border border-gray-500 text-gray-500 hover:bg-gray-500 hover:text-white')}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
