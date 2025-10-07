@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity } from 'lucide-react';
+import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import { Sidebar, type ModuleId } from './Sidebar';
 import { MobileDrawer } from './MobileDrawer';
 import { TodosTab } from '../pages/TodosTab';
+import { HomeTab } from '../pages/HomeTab';
 import { IdeasTab } from '../pages/IdeasTab';
 import { TimeTrackingTab } from '../pages/TimeTrackingTab';
 import { AllocationsTab } from '../pages/AllocationsTab';
@@ -21,10 +22,10 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['todos', 'ideas', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
-      return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'todos')) as ModuleId;
+      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
+      return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'home')) as ModuleId;
     } catch {
-      return 'todos';
+      return 'home';
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -41,6 +42,7 @@ export const AppShell: React.FC = () => {
   
   const navigationItems = enabledTabs.map(tab => {
     const iconMap = {
+      'home': <Home className={cn('w-5 h-5', tokens.icon?.default)} />,
       'check-square': <CheckSquare className={cn('w-5 h-5', tokens.icon?.default)} />,
       'lightbulb': <Lightbulb className={cn('w-5 h-5', tokens.icon?.default)} />,
       'timer': <Timer className={cn('w-5 h-5', tokens.icon?.default)} />,
@@ -57,6 +59,7 @@ export const AppShell: React.FC = () => {
 
   // Helper casts for passing visibility prop to tab components
   const TodosTabAny = TodosTab as React.FC<any>;
+  const HomeTabAny = HomeTab as React.FC<any>;
   const IdeasTabAny = IdeasTab as React.FC<any>;
   const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
   const AllocationsTabAny = AllocationsTab as React.FC<any>;
@@ -116,6 +119,11 @@ export const AppShell: React.FC = () => {
         <div className={tokens.app_shell.content}>
           <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
           <main className="p-6">
+            {visitedTabs.has('home') && (
+              <section style={{ display: activeModule === 'home' ? 'block' : 'none' }}>
+                <HomeTabAny isVisible={activeModule === 'home'} />
+              </section>
+            )}
             {visitedTabs.has('todos') && (
               <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
                 <TodosTabAny isVisible={activeModule === 'todos'} />
@@ -153,6 +161,11 @@ export const AppShell: React.FC = () => {
           rightSlot={<LogoutButton />}
         />
         <main className="p-4">
+          {visitedTabs.has('home') && (
+            <section style={{ display: activeModule === 'home' ? 'block' : 'none' }}>
+              <HomeTabAny isVisible={activeModule === 'home'} />
+            </section>
+          )}
           {visitedTabs.has('todos') && (
             <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
               <TodosTabAny isVisible={activeModule === 'todos'} />

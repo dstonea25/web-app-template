@@ -307,15 +307,17 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
   }
   const { data, error } = await supabase
     .from('todos')
-    .select('id, task, category, priority, created_at')
+    .select('id, task, category, priority, effort, due_date, created_at')
     .order('created_at', { ascending: true });
   if (error) throw error;
-  const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; created_at: string }[];
+  const rows = (data || []) as { id: number; task: string; category: string | null; priority: string | null; effort: 'S' | 'M' | 'L' | null; due_date: string | null; created_at: string }[];
   return rows.map((row) => ({
     id: String(row.id),
     task: row.task,
     category: row.category ?? null,
-    priority: (row.priority === 'low' || row.priority === 'medium' || row.priority === 'high') ? (row.priority as any) : null,
+    priority: (row.priority === 'crucial' || row.priority === 'high' || row.priority === 'medium' || row.priority === 'low') ? (row.priority as any) : null,
+    effort: (row.effort === 'S' || row.effort === 'M' || row.effort === 'L') ? row.effort : null,
+    due_date: row.due_date ?? null,
     created_at: row.created_at,
     statusUi: 'open' as const,
     _dirty: false,
@@ -330,17 +332,23 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Supabase not configured for Todos');
   }
+  // Safety guard: never allow destructive empty saves
+  if (!Array.isArray(todos) || todos.length === 0) {
+    throw new Error('Refusing to save empty todos list');
+  }
   const { data: existingRows, error: selErr } = await supabase
     .from('todos')
     .select('id');
   if (selErr) throw selErr;
-  const existingIds = new Set<number>((existingRows || []).map((r: any) => Number(r.id)));
   const upserts = (todos || []).map((t) => ({
     id: Number(t.id || 0),
     task: t.task,
     category: t.category ?? null,
-    priority: (t.priority === 'low' || t.priority === 'medium' || t.priority === 'high') ? t.priority : null,
+    priority: (t.priority === 'crucial' || t.priority === 'high' || t.priority === 'medium' || t.priority === 'low') ? t.priority : null,
+    effort: (t.effort === 'S' || t.effort === 'M' || t.effort === 'L') ? t.effort : null,
+    due_date: t.due_date ?? null,
     status: 'open',
+    created_at: t.created_at,
   }));
   if (upserts.length > 0) {
     const { error: upsertErr } = await supabase
@@ -348,15 +356,55 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
       .upsert(upserts, { onConflict: 'id' });
     if (upsertErr) throw upsertErr;
   }
-  const newIds = new Set<number>(upserts.map((u) => Number(u.id)));
-  const toDelete: number[] = [];
-  existingIds.forEach((id) => { if (!newIds.has(id)) toDelete.push(id); });
-  if (toDelete.length > 0) {
-    const { error: delErr } = await supabase
+};
+
+// Batch save: upsert only changed/added rows and delete only explicitly completed ids
+export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: string[]): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase not configured for Todos');
+  }
+
+  // Upserts for updates/new rows
+  if (Array.isArray(updates) && updates.length > 0) {
+    const rows = updates.map((p) => {
+      const numericId = Number(p.id || 0);
+      const isValidPriority = p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low' ? p.priority : null;
+      const isValidEffort = p.effort === 'S' || p.effort === 'M' || p.effort === 'L' ? p.effort : null;
+      const row: any = {
+        id: numericId,
+        task: p.task,
+        category: p.category ?? null,
+        priority: isValidPriority,
+        effort: isValidEffort,
+        due_date: p.due_date ?? null,
+        status: 'open',
+      };
+      // For inserts, provide created_at if known; else let DB default handle it
+      if ((p as any)._isNew && (p as any).created_at) {
+        row.created_at = (p as any).created_at;
+      }
+      return row;
+    });
+    const upserts = rows.filter(r => r.id != null && !Number.isNaN(r.id));
+    if (upserts.length > 0) {
+      const { error } = await supabase
+        .from('todos')
+        .upsert(upserts, { onConflict: 'id' });
+      if (error) throw error;
+    }
+  }
+
+  // Deletes for explicit completes
+  if (Array.isArray(completes) && completes.length > 0) {
+    const numericOrStringIds = completes.map((id) => (Number.isFinite(Number(id)) ? Number(id) : String(id)));
+    const { error } = await supabase
       .from('todos')
       .delete()
-      .in('id', toDelete);
-    if (delErr) throw delErr;
+      .in('id', numericOrStringIds);
+    if (error) throw error;
   }
 };
 

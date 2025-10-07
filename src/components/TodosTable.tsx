@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Todo, Priority, TodoPatch } from '../types';
+import type { Todo, Priority, TodoPatch, Effort } from '../types';
 import { tokens, cn } from '../theme/config';
 // Removed unused import: stageRowEdit
 import SelectPriority from './SelectPriority';
@@ -19,6 +19,7 @@ interface TodosTableProps {
   onTodoUpdate: (id: string, updates: Partial<Todo>) => void;
   onTodoComplete: (id: string) => void;
   onCommitRowEdit: (id: string, patch: TodoPatch) => void;
+  showCategory?: boolean;
 }
 
 export const TodosTable: React.FC<TodosTableProps> = ({
@@ -35,12 +36,14 @@ export const TodosTable: React.FC<TodosTableProps> = ({
   onTodoUpdate,
   onTodoComplete,
   onCommitRowEdit,
+  showCategory = false,
 }) => {
   const tableRef = useRef<HTMLTableElement>(null);
   const editingCellRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
   const priorityRank = (p: Priority | undefined) => {
     switch (p) {
+      case 'crucial': return 4;
       case 'high': return 3;
       case 'medium': return 2;
       case 'low': return 1;
@@ -116,7 +119,7 @@ export const TodosTable: React.FC<TodosTableProps> = ({
     <div className="space-y-4">
       {/* Live region for announcing sort changes */}
       <div className="sr-only" role="status" aria-live="polite">
-        {sortBy ? `Sorted by ${sortBy === 'created_at' ? 'Created' : sortBy === 'priority' ? 'Priority' : String(sortBy)}, ${sortOrder === 'asc' ? 'ascending' : 'descending'}. ${filteredAndSortedTodos.length} items.` : `${filteredAndSortedTodos.length} items.`}
+        {sortBy ? `Sorted by ${sortBy === 'priority' ? 'Priority' : String(sortBy)}, ${sortOrder === 'asc' ? 'ascending' : 'descending'}. ${filteredAndSortedTodos.length} items.` : `${filteredAndSortedTodos.length} items.`}
       </div>
       {/* Filter and Sort Controls */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -136,8 +139,6 @@ export const TodosTable: React.FC<TodosTableProps> = ({
           <option value="" style={{ color: '#9ca3af' }}>Sort by...</option>
           <option value="task">Sort by Task</option>
           <option value="priority">Sort by Priority</option>
-          <option value="category">Sort by Category</option>
-          <option value="created_at">Sort by Created</option>
         </select>
         <button
           onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -153,6 +154,9 @@ export const TodosTable: React.FC<TodosTableProps> = ({
           <thead className={tokens.table.thead}>
             <tr>
               <th className={tokens.table.th} aria-sort="none">Task</th>
+              {showCategory && (
+                <th className={tokens.table.th} aria-sort="none">Category</th>
+              )}
               {/* Priority sortable header */}
               <th
                 className={tokens.table.th}
@@ -201,62 +205,15 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                   {sortBy === 'priority' ? `Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : 'Not sorted'}
                 </span>
               </th>
-              <th className={tokens.table.th} aria-sort="none">Category</th>
-              {/* Created sortable header */}
-              <th
-                className={tokens.table.th}
-                aria-sort={sortBy === 'created_at' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-              >
-                <button
-                  type="button"
-                  className={tokens.button.ghost}
-                  aria-label="Sort by Created"
-                  aria-pressed={sortBy === 'created_at'}
-                  aria-describedby="created-sort-description"
-                  onClick={() => {
-                    if (sortBy === 'created_at') {
-                      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
-                    } else {
-                      onSortChange('created_at');
-                      onSortOrderChange('desc');
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      if (sortBy === 'created_at') {
-                        onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc');
-                      } else {
-                        onSortChange('created_at');
-                        onSortOrderChange('desc');
-                      }
-                    }
-                  }}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    Created
-                    {sortBy === 'created_at' ? (
-                      sortOrder === 'asc' ? (
-                        <ChevronUp className={tokens.icon.default} />
-                      ) : (
-                        <ChevronDown className={tokens.icon.default} />
-                      )
-                    ) : (
-                      <ChevronsUpDown className={tokens.icon.default} />
-                    )}
-                  </span>
-                </button>
-                <span id="created-sort-description" className="sr-only">
-                  {sortBy === 'created_at' ? `Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : 'Not sorted'}
-                </span>
-              </th>
+              <th className={tokens.table.th} aria-sort="none">Effort</th>
+              <th className={tokens.table.th} aria-sort="none">Due Date</th>
               <th className={tokens.table.th}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredAndSortedTodos.length === 0 ? (
               <tr>
-                <td colSpan={6} className={tokens.table.empty_state}>
+                <td colSpan={showCategory ? 6 : 5} className={tokens.table.empty_state}>
                   No todos found. Add one above!
                 </td>
               </tr>
@@ -287,6 +244,30 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                       )}
                     </div>
                   </td>
+                  {showCategory && (
+                    <td className={tokens.table.td}>
+                      <div className={cn(tokens.editable?.cell, 'rounded-none')}>
+                        {editingId === todo.id ? (
+                          <input
+                            ref={(el) => { editingCellRef.current = el; }}
+                            type="text"
+                            value={todo.category || ''}
+                            onChange={(e) => onTodoUpdate(String(todo.id!), { category: e.target.value || null })}
+                            className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus)}
+                            onKeyDown={(e) => handleKeyDown(e, todo)}
+                          />
+                        ) : (
+                          <span
+                            className={cn('cursor-pointer', tokens.accent.text_hover)}
+                            onClick={() => onEditStart(String(todo.id!))}
+                            aria-label="Edit category"
+                          >
+                            {todo.category || ''}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {/* Status column removed per request */}
                   <td className={tokens.table.td}>
                     <SelectPriority
@@ -297,22 +278,27 @@ export const TodosTable: React.FC<TodosTableProps> = ({
                   </td>
                   <td className={tokens.table.td}>
                     <select
-                      value={todo.category || ''}
-                      onChange={(e) => { onTodoUpdate(String(todo.id!), { category: e.target.value || null, _dirty: true }); }}
-                      className={cn(tokens.input.base, tokens.input.focus, !todo.category && 'text-neutral-400')}
-                      style={!todo.category ? { color: '#9ca3af' } : {}}
-                      aria-label="Set category"
+                      value={todo.effort || ''}
+                      onChange={(e) => { onTodoUpdate(String(todo.id!), { effort: (e.target.value || null) as Effort, _dirty: true }); }}
+                      className={cn(tokens.input.base, tokens.input.focus, !todo.effort && 'text-neutral-400')}
+                      style={!todo.effort ? { color: '#9ca3af' } : {}}
+                      aria-label="Set effort"
                     >
-                      <option value="" style={{ color: '#9ca3af' }}>No category</option>
-                      <option value="work">work</option>
-                      <option value="n8n">n8n</option>
-                      <option value="content">content</option>
-                      <option value="research">research</option>
-                      <option value="personal">personal</option>
+                      <option value="" style={{ color: '#9ca3af' }}></option>
+                      <option value="S">S</option>
+                      <option value="M">M</option>
+                      <option value="L">L</option>
                     </select>
                   </td>
                   <td className={tokens.table.td}>
-                    {todo.created_at ? new Date(todo.created_at).toLocaleDateString() : '—'}
+                    <input
+                      type="date"
+                      value={todo.due_date || ''}
+                      onChange={(e) => { onTodoUpdate(String(todo.id!), { due_date: e.target.value || null, _dirty: true }); }}
+                      className={cn(tokens.input.base, tokens.input.focus, !todo.due_date && 'date-empty')}
+                      onClick={(e) => { const el = e.currentTarget as HTMLInputElement; (el as any).showPicker && (el as any).showPicker(); }}
+                      aria-label="Set due date"
+                    />
                   </td>
                   <td className={tokens.table.td}>
                     <button

@@ -19,6 +19,7 @@ const SelectPriority: React.FC<SelectPriorityProps> = ({ value, onChange, ariaLa
       style={value == null ? { color: '#9ca3af' } : {}}
     >
       <option value="" style={{ color: '#9ca3af' }}>{placeholderLabel ?? 'Priority'}</option>
+      <option value="crucial">Crucial</option>
       <option value="high">High</option>
       <option value="medium">Medium</option>
       <option value="low">Low</option>

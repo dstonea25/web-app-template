@@ -1,6 +1,7 @@
 // Data models based on the specification
 export type StatusUi = 'open' | 'paused' | 'blocked';
-export type Priority = 'low' | 'medium' | 'high' | null;
+export type Priority = 'crucial' | 'high' | 'medium' | 'low' | null;
+export type Effort = 'S' | 'M' | 'L' | null;
 
 export interface Todo {
   id?: string; // internal; generate uuid if missing
@@ -8,6 +9,8 @@ export interface Todo {
   category?: string | null;
   created_at: string;
   priority?: Priority; // default null
+  due_date?: string | null; // YYYY-MM-DD
+  effort?: Effort; // S | M | L
   // status?: string; // present in files but ignored
   // UI-only status for display; not persisted
   statusUi?: StatusUi; // default 'open'
@@ -19,6 +22,8 @@ export interface TodoPatch {
   task?: string;
   category?: string | null;
   priority?: Priority;
+  due_date?: string | null;
+  effort?: Effort;
   statusUi?: StatusUi;
   // Track which fields have been changed for counting
   _changedFields?: string[];
@@ -81,6 +86,8 @@ export interface TodoFileItem {
   status: 'open';
   category: string | null;
   priority: Priority;
+  effort?: Effort | null;
+  due_date?: string | null;
   created_at: string;
 }
 

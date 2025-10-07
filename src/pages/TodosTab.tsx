@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Todo, Priority, TodoPatch } from '../types';
+import type { Todo, Priority, TodoPatch, Effort } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos } from '../lib/storage';
 import { applyFileSave, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
-import { fetchTodosFromWebhook, saveTodosToWebhook } from '../lib/api';
+import { fetchTodosFromWebhook, saveTodosToWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { tokens, cn } from '../theme/config';
 import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
@@ -20,7 +20,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: null });
+  const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: 'medium', effort: 'S' });
   const [stagedCount, setStagedCount] = useState<number>(0);
   const hasLoadedRef = useRef(false);
 
@@ -82,8 +82,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         console.log('🔄 Force refresh requested - clearing cache and loading fresh data');
       }
       
-      // Clear localStorage to force fresh data load
-      StorageManager.clearAll();
+      // Do not clear localStorage pre-fetch; only update cache after successful fetch
       
       // Load from backend
       console.log('🌐 Loading todos...');
@@ -115,17 +114,14 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     try {
       setLoading(true);
       
-      // Apply staged changes to get the final state
-      const result = await applyFileSave();
-      if (!result.ok) {
-        throw new Error('Failed to apply staged changes');
+      // Get staged updates and completes directly and perform batch save
+      const staged = getStagedChanges();
+      // If nothing to save, bail
+      if ((staged.updates.length + staged.completes.length) === 0) {
+        setLoading(false);
+        return;
       }
-      
-      // Get the updated todos after applying changes
-      const updatedTodos = getWorkingTodos();
-      
-      // Save to backend
-      await saveTodosToWebhook(updatedTodos);
+      await saveTodosBatchToWebhook(staged.updates, staged.completes);
       
       // Refresh data to get the latest state
       console.log('🔄 Refreshing data after save...');
@@ -140,6 +136,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       setCachedData('todos-cache', freshTodos);
       
       // Clear staged changes
+      clearStagedChanges();
       setStagedCount(0);
       
       console.log('✅ Save completed successfully');
@@ -157,6 +154,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       task: newTodo.task!,
       category: (newTodo.category as string | null) ?? null,
       priority: (newTodo.priority as Priority) ?? null,
+      effort: (newTodo.effort as Effort) ?? null,
     });
     setTodos(updatedTodos);
     
@@ -170,6 +168,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
           task: newTodoItem.task, 
           category: newTodoItem.category, 
           priority: newTodoItem.priority,
+          effort: newTodoItem.effort,
           statusUi: newTodoItem.statusUi,
           _isNew: true // Mark as new todo - counts as 1 change
         } 
@@ -180,7 +179,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       setStagedCount(staged.fieldChangeCount);
     }
     
-    setNewTodo({ task: '', category: '', priority: null });
+    setNewTodo({ task: '', category: (newTodo.category as string) || '', priority: 'medium', effort: 'S' });
   };
 
   const updateTodo = (id: string, updates: Partial<Todo>) => {
@@ -273,7 +272,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
           Add New Todo
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <input
             type="text"
             placeholder="Todo task"
@@ -295,11 +294,21 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
             <option value="personal">personal</option>
           </select>
           <SelectPriority
-            value={(newTodo.priority as Priority) ?? null}
-            onChange={(p) => setNewTodo({ ...newTodo, priority: p })}
+            value={(newTodo.priority as Priority) ?? 'medium'}
+            onChange={(p) => setNewTodo({ ...newTodo, priority: p || 'medium' })}
             ariaLabel="Set priority"
             placeholderLabel="Priority"
           />
+          <select
+            value={(newTodo.effort as Effort) || 'S'}
+            onChange={(e) => setNewTodo({ ...newTodo, effort: (e.target.value as Effort) })}
+            className={cn(tokens.input.base, tokens.input.focus, !newTodo.effort && 'text-neutral-400')}
+            style={!newTodo.effort ? { color: '#9ca3af' } : {}}
+          >
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+          </select>
           <button
             onClick={addTodo}
             className={cn(tokens.button.base, tokens.button.primary)}

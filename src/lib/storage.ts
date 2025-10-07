@@ -1,4 +1,4 @@
-import type { Todo, Session, Priority, TodoPatch, StatusUi, TodoFileItem, Idea, IdeaPatch } from '../types';
+import type { Todo, Session, Priority, TodoPatch, StatusUi, TodoFileItem, Idea, IdeaPatch, Effort } from '../types';
 import { postTodosFile, saveIdeasToWebhook } from './api';
 import { nowIso } from './time';
 
@@ -43,7 +43,8 @@ export class StorageManager {
       // Transform: ensure priority exists (null), ignore status, ensure id string, default statusUi
       return parsed.map((item) => {
         const id: string = item.id ? String(item.id) : generateId();
-        const priority: Priority = (item.priority === 'low' || item.priority === 'medium' || item.priority === 'high') ? item.priority : null;
+        const priority: Priority = (item.priority === 'crucial' || item.priority === 'high' || item.priority === 'medium' || item.priority === 'low') ? item.priority : null;
+        const effort: Effort = (item.effort === 'S' || item.effort === 'M' || item.effort === 'L') ? item.effort : null;
         const statusUi: StatusUi = (item.statusUi === 'open' || item.statusUi === 'paused' || item.statusUi === 'blocked') ? item.statusUi : 'open';
         return {
           id,
@@ -51,6 +52,8 @@ export class StorageManager {
           category: item.category ?? null,
           created_at: String(item.created_at ?? nowIso()),
           priority,
+          effort,
+          due_date: item.due_date ? String(item.due_date) : null,
           statusUi,
         } as Todo;
       });
@@ -126,7 +129,7 @@ export const getSessions = (): Session[] => StorageManager.loadSessions();
 export const setSessions = (sessions: Session[]): void => StorageManager.saveSessions(sessions);
 
 // Add a new todo with defaults
-export const addTodo = (todos: Todo[], input: { task: string; category?: string | null; priority?: Priority }): Todo[] => {
+export const addTodo = (todos: Todo[], input: { task: string; category?: string | null; priority?: Priority; effort?: Effort | null; due_date?: string | null }): Todo[] => {
   // Generate sequential ID based on existing todos
   const maxId = todos.reduce((max, todo) => {
     const id = parseInt(todo.id || '0');
@@ -140,6 +143,8 @@ export const addTodo = (todos: Todo[], input: { task: string; category?: string 
     category: input.category ?? null,
     created_at: nowIso(),
     priority: input.priority ?? null,
+    effort: input.effort ?? null,
+    due_date: input.due_date ?? null,
     statusUi: 'open',
   };
   const updated = [...todos, newTodo];
@@ -381,6 +386,8 @@ export const serializeTodosForExport = (todos: Todo[]): TodoFileItem[] => {
     status: 'open',
     category: t.category ?? null,
     priority: (t.priority ?? null) as Priority,
+    effort: t.effort ?? null,
+    due_date: t.due_date ?? null,
     created_at: String(t.created_at),
   }));
 };
