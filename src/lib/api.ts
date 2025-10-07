@@ -377,18 +377,23 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
       const isNew = (p as any)._isNew === true;
       // Only include fields that were explicitly changed, or all for new rows
       const include = (key: string) => isNew || changed.has(key);
-      if (include('task') && Object.prototype.hasOwnProperty.call(p, 'task')) row.task = p.task;
-      if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) row.category = p.category ?? null;
+      let hasUpdateField = false;
+      if (include('task') && Object.prototype.hasOwnProperty.call(p, 'task')) { row.task = p.task; hasUpdateField = true; }
+      if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) { row.category = p.category ?? null; hasUpdateField = true; }
       if (include('priority') && Object.prototype.hasOwnProperty.call(p, 'priority')) {
         row.priority = (p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low') ? p.priority : null;
+        hasUpdateField = true;
       }
       if (include('effort') && Object.prototype.hasOwnProperty.call(p, 'effort')) {
         row.effort = (p.effort === 'S' || p.effort === 'M' || p.effort === 'L') ? p.effort : null;
+        hasUpdateField = true;
       }
-      if (include('due_date') && Object.prototype.hasOwnProperty.call(p, 'due_date')) row.due_date = p.due_date ?? null;
+      if (include('due_date') && Object.prototype.hasOwnProperty.call(p, 'due_date')) { row.due_date = p.due_date ?? null; hasUpdateField = true; }
       // Keep status open for all active items
       row.status = 'open';
       if (isNew && (p as any).created_at) row.created_at = (p as any).created_at;
+      // Skip no-op patches (e.g., id-only undo markers)
+      if (!hasUpdateField && !isNew) return null;
       return row;
     }).filter(Boolean) as any[];
     if (upserts.length > 0) {

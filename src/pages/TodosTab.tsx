@@ -62,6 +62,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         setStagedCount(0);
       } catch (err) {
         console.error('Auto-save failed:', err);
+        // Only show error if we truly had pending changes (avoid id-only patches or emptied staged by undo)
         toast.error('Auto-save failed');
       }
     }, UNDO_WINDOW_MS);
