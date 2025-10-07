@@ -426,7 +426,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
                 value={quickTask}
                 onChange={(e) => setQuickTask(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addQuickTodo(); }}
-                className={cn(tokens.input.base, tokens.input.focus, 'w-full sm:col-span-2 lg:col-span-7')}
+                className={cn(tokens.input.base, tokens.input.focus, 'w-full sm:col-span-2 lg:col-span-6')}
               />
               <div className="flex items-center gap-2 lg:col-span-3">
                 <span className={cn(tokens.palette.dark.text_muted, 'text-sm')}>Priority</span>
