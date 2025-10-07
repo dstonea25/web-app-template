@@ -19,7 +19,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [newTodo, setNewTodo] = useState<Partial<Todo>>({ task: '', category: '', priority: 'medium', effort: 'S' });
+  
   const [quickTask, setQuickTask] = useState<string>('');
   const [quickPriority, setQuickPriority] = useState<Priority>('medium');
   const [quickEffort, setQuickEffort] = useState<Effort>('S');
@@ -174,39 +174,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     }
   };
 
-  const addTodo = () => {
-    if (!newTodo.task?.trim()) return;
-    const updatedTodos = storageAddTodo(todos, {
-      task: newTodo.task!,
-      category: (newTodo.category as string | null) ?? null,
-      priority: (newTodo.priority as Priority) ?? null,
-      effort: (newTodo.effort as Effort) ?? null,
-    });
-    setTodos(updatedTodos);
-    
-    // Stage the new todo for saving (get the last added todo)
-    const newTodoItem = updatedTodos[updatedTodos.length - 1];
-    if (newTodoItem) {
-      stageRowEdit({ 
-        id: newTodoItem.id || '', 
-        patch: { 
-          id: newTodoItem.id || '', 
-          task: newTodoItem.task, 
-          category: newTodoItem.category, 
-          priority: newTodoItem.priority,
-          effort: newTodoItem.effort,
-          statusUi: newTodoItem.statusUi,
-          _isNew: true // Mark as new todo - counts as 1 change
-        } 
-      });
-      
-      // Update staged count
-      const staged = getStagedChanges();
-      setStagedCount(staged.fieldChangeCount);
-    }
-    
-    setNewTodo({ task: '', category: (newTodo.category as string) || '', priority: 'medium', effort: 'S' });
-  };
+  
 
   // Inline quick-add when filtered by a specific category
   const addQuickTodo = () => {
@@ -346,56 +314,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
-      {/* Add new todo form - moved to top as separate section */}
-      <div className={cn(tokens.card.base, 'mb-6')}>
-        <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'mb-3', tokens.palette.dark.text)}>
-          Add New Todo
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <input
-            type="text"
-            placeholder="Todo task"
-            value={newTodo.task}
-            onChange={(e) => setNewTodo({ ...newTodo, task: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus)}
-          />
-          <select
-            value={(newTodo.category as string) || ''}
-            onChange={(e) => setNewTodo({ ...newTodo, category: e.target.value })}
-            className={cn(tokens.input.base, tokens.input.focus, !newTodo.category && 'text-neutral-400')}
-            style={!newTodo.category ? { color: '#9ca3af' } : {}}
-          >
-            <option value="" style={{ color: '#9ca3af' }}>Select category</option>
-            <option value="work">work</option>
-            <option value="n8n">n8n</option>
-            <option value="content">content</option>
-            <option value="research">research</option>
-            <option value="personal">personal</option>
-          </select>
-          <SelectPriority
-            value={(newTodo.priority as Priority) ?? 'medium'}
-            onChange={(p) => setNewTodo({ ...newTodo, priority: p || 'medium' })}
-            ariaLabel="Set priority"
-            placeholderLabel="Priority"
-          />
-          <select
-            value={(newTodo.effort as Effort) || 'S'}
-            onChange={(e) => setNewTodo({ ...newTodo, effort: (e.target.value as Effort) })}
-            className={cn(tokens.input.base, tokens.input.focus, !newTodo.effort && 'text-neutral-400')}
-            style={!newTodo.effort ? { color: '#9ca3af' } : {}}
-          >
-            <option value="S">S</option>
-            <option value="M">M</option>
-            <option value="L">L</option>
-          </select>
-          <button
-            onClick={addTodo}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-            Add Todo
-          </button>
-        </div>
-      </div>
+      
 
       {/* Main todos section */}
       <div className="mb-6">
