@@ -22,6 +22,16 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     loadTodos();
   }, [isVisible]);
 
+  // Cross-tab sync: refresh when storage broadcasts updates
+  useEffect(() => {
+    const handler = () => {
+      const working = getWorkingTodos();
+      setTodos(working);
+    };
+    window.addEventListener('dashboard:todos-updated', handler as any);
+    return () => window.removeEventListener('dashboard:todos-updated', handler as any);
+  }, []);
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (stagedCount > 0) {

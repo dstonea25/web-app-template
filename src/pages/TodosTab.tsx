@@ -32,6 +32,16 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     loadTodos();
   }, [isVisible]);
 
+  // Cross-tab sync: refresh when storage broadcasts updates
+  useEffect(() => {
+    const handler = () => {
+      const working = getWorkingTodos();
+      setTodos(working);
+    };
+    window.addEventListener('dashboard:todos-updated', handler as any);
+    return () => window.removeEventListener('dashboard:todos-updated', handler as any);
+  }, []);
+
   // Auto-commit staged changes after a short undo window
   const scheduleCommit = () => {
     if (commitTimerRef.current) {

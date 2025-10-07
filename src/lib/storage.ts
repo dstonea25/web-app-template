@@ -30,6 +30,13 @@ export class StorageManager {
     try {
       localStorage.setItem(this.TODOS_KEY, JSON.stringify(todos));
       console.log('💾 Saved todos to localStorage');
+      // Broadcast update to all listeners within the app
+      try {
+        if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
+          const event = new CustomEvent('dashboard:todos-updated', { detail: { todos, ts: Date.now() } });
+          window.dispatchEvent(event);
+        }
+      } catch {}
     } catch (error) {
       console.warn('Failed to save todos to localStorage:', error);
     }
