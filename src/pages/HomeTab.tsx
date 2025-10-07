@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Todo, Priority, TodoPatch, Effort } from '../types';
 import { tokens, cn } from '../theme/config';
-import { TodosTable } from '../components/TodosTable';
+import { HomeTodosTable } from '../components/HomeTodosTable';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, applyFileSave, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 
@@ -80,25 +80,26 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     }
   };
 
-  const saveBatch = async () => {
+  // Home is read-only: complete goes straight to DB without Save
+  const completeImmediately = async (id: string) => {
     try {
       setLoading(true);
+      // Locally stage and optimistically hide
+      stageComplete({ id });
+      setTodos(prev => prev.filter(t => String(t.id) !== String(id)));
       const staged = getStagedChanges();
-      if ((staged.updates.length + staged.completes.length) === 0) {
-        setLoading(false);
-        return;
-      }
-      await saveTodosBatchToWebhook(staged.updates, staged.completes);
+      setStagedCount(staged.fieldChangeCount);
+      // Persist completes only
+      await saveTodosBatchToWebhook([], [id]);
+      // Refresh minimal
       const freshTodos = await fetchTodosFromWebhook();
       StorageManager.saveTodos(freshTodos);
-      const transformed = StorageManager.loadTodos();
-      setTodos(transformed);
       setCachedData('todos-cache', freshTodos);
-      clearStagedChanges();
-      setStagedCount(0);
     } catch (error) {
-      console.error('Failed to save (home):', error);
-      alert(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to complete (home):', error);
+      alert(`Failed to complete: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // On failure, reload to reconcile
+      loadTodos();
     } finally {
       setLoading(false);
     }
@@ -161,50 +162,18 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-            Home · High-Priority To-Dos ({priorityFiltered.length})
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={saveBatch}
-              disabled={stagedCount === 0 || loading}
-              className={cn(tokens.button.base, tokens.button.primary, (stagedCount === 0 || loading) && 'opacity-50 cursor-not-allowed')}
-            >
-              {loading ? 'Saving...' : (stagedCount > 0 ? `Save (${stagedCount})` : 'Save')}
-            </button>
-            {stagedCount > 0 && (
-              <button
-                onClick={() => {
-                  clearStagedChanges();
-                  setStagedCount(0);
-                  loadTodos();
-                }}
-                disabled={loading}
-                className={cn(tokens.button.base, tokens.button.ghost, 'border border-gray-500 text-gray-500 hover:bg-gray-500 hover:text-white')}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
+        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+          Home · High-Priority To-Dos ({priorityFiltered.length})
+        </h2>
       </div>
 
-      <TodosTable
+      <HomeTodosTable
         todos={priorityFiltered}
-        filter={filter}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        editingId={editingId}
-        onFilterChange={setFilter}
         onSortChange={setSortBy}
         onSortOrderChange={setSortOrder}
-        onEditStart={handleEditStart}
-        onEditEnd={handleEditEnd}
-        onTodoUpdate={updateTodo}
-        onTodoComplete={completeTodo}
-        onCommitRowEdit={() => {}}
-        showCategory
+        onComplete={completeImmediately}
       />
     </div>
   );
