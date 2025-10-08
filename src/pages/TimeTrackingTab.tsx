@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Session } from '../types';
 import { cn, tokens } from '../theme/config';
 import { 

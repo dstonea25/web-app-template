@@ -381,7 +381,8 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
       if (include('task') && Object.prototype.hasOwnProperty.call(p, 'task')) { row.task = p.task; hasUpdateField = true; }
       if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) { row.category = p.category ?? null; hasUpdateField = true; }
       if (include('priority') && Object.prototype.hasOwnProperty.call(p, 'priority')) {
-        const pr = p.priority === 'crucial' ? 'critical' : p.priority; // normalize any legacy
+        const prRaw = (p as any).priority as string | null | undefined; // allow legacy string
+        const pr = prRaw === 'crucial' ? 'critical' : prRaw; // normalize any legacy
         row.priority = (pr === 'critical' || pr === 'high' || pr === 'medium' || pr === 'low') ? pr : null;
         hasUpdateField = true;
       }
