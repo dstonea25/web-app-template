@@ -1,6 +1,6 @@
 // Data models based on the specification
 export type StatusUi = 'open' | 'paused' | 'blocked';
-export type Priority = 'crucial' | 'high' | 'medium' | 'low' | null;
+export type Priority = 'critical' | 'high' | 'medium' | 'low' | null;
 export type Effort = 'S' | 'M' | 'L' | null;
 
 export interface Todo {

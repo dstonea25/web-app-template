@@ -2,6 +2,7 @@ import { AppShell } from './components/AppShell'
 import { AuthProvider } from './contexts/AuthContext'
 import { TimerProvider } from './contexts/TimerContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { WorkModeProvider } from './contexts/WorkModeContext'
 import React from 'react'
 
 interface ErrorBoundaryState {
@@ -47,9 +48,11 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <TimerProvider>
-          <ProtectedRoute>
-            <AppShell />
-          </ProtectedRoute>
+          <WorkModeProvider>
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          </WorkModeProvider>
         </TimerProvider>
       </AuthProvider>
     </ErrorBoundary>

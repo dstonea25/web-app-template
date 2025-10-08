@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Idea, IdeaPatch } from '../types';
 import { tokens, cn } from '../theme/config';
 import { IdeasTable } from '../components/IdeasTable';
@@ -7,8 +7,10 @@ import { StorageManager, stageIdeaEdit, stageIdeaComplete, getStagedIdeaChanges,
 import { addIdea as storageAddIdea } from '../lib/storage';
 import { fetchIdeasFromWebhook, saveIdeasBatchToWebhook } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
+import { useWorkMode } from '../contexts/WorkModeContext';
 
 export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
+  const { workMode } = useWorkMode();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +25,16 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const UNDO_WINDOW_MS = 2500;
   const prevEditRef = useRef<Idea | null>(null);
   const hasLoadedRef = useRef(false);
+
+  // Ensure UI category selection reflects Work Mode so inline add appears
+  useEffect(() => {
+    if (workMode) {
+      if (activeCategory !== 'work') setActiveCategory('work');
+    } else {
+      if (activeCategory === 'work') setActiveCategory('All');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workMode]);
 
   // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
@@ -231,6 +243,13 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     setEditingId(null);
   };
 
+  // Compute filtered view (must be before any early returns to keep hooks order stable)
+  const effectiveActiveCategory = useMemo(() => (workMode ? 'work' : activeCategory), [workMode, activeCategory]);
+  const filteredIdeas = useMemo(() => {
+    if (workMode) return ideas.filter(idea => String(idea.category || '').toLowerCase() === 'work');
+    return effectiveActiveCategory === 'All' ? ideas : ideas.filter(idea => idea.category === effectiveActiveCategory);
+  }, [ideas, workMode, effectiveActiveCategory]);
+
   if (loading && isVisible) {
     return (
       <div className={tokens.layout.container}>
@@ -267,11 +286,6 @@ export const IdeasTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       </div>
     );
   }
-
-  // Filter ideas by active category
-  const filteredIdeas = activeCategory === 'All' 
-    ? ideas 
-    : ideas.filter(idea => idea.category === activeCategory);
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>

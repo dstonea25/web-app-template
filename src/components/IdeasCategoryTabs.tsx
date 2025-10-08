@@ -1,6 +1,7 @@
 import React from 'react';
 import { tokens, cn } from '../theme/config';
 import type { Idea } from '../types';
+import { useWorkMode } from '../contexts/WorkModeContext';
 
 interface IdeasCategoryTabsProps {
   ideas: Idea[];
@@ -13,15 +14,17 @@ export const IdeasCategoryTabs: React.FC<IdeasCategoryTabsProps> = ({
   activeCategory,
   onCategoryChange,
 }) => {
+  const { workMode } = useWorkMode();
   // Static categories list: show all even if empty, plus any ad-hoc ones in data
   const categories = React.useMemo(() => {
+    if (workMode) return ['work'];
     const staticCats = ['work','projects','videos','writing','health','business','life','future','travel'];
     const dynamicCats = Array.from(
       new Set(ideas.map(idea => idea.category).filter((cat): cat is string => Boolean(cat)))
     ).sort();
     const merged = Array.from(new Set([...staticCats, ...dynamicCats]));
     return ['All', ...merged];
-  }, [ideas]);
+  }, [ideas, workMode]);
 
   return (
     <div className={tokens.tabs.list}>

@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Todo } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
+import { useWorkMode } from '../contexts/WorkModeContext';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
+  const { workMode } = useWorkMode();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +45,22 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [stagedCount]);
+
+  // Listen for important updates from Todos tab (priority/complete changes)
+  useEffect(() => {
+    const refresh = () => {
+      const working = getWorkingTodos();
+      setTodos(working);
+    };
+    window.addEventListener('dashboard:todos-important-updated', refresh as any);
+    window.addEventListener('dashboard:todos-working-updated', refresh as any);
+    window.addEventListener('dashboard:todos-updated', refresh as any);
+    return () => {
+      window.removeEventListener('dashboard:todos-important-updated', refresh as any);
+      window.removeEventListener('dashboard:todos-working-updated', refresh as any);
+      window.removeEventListener('dashboard:todos-updated', refresh as any);
+    };
+  }, []);
 
   const loadTodos = async () => {
     try {
@@ -105,6 +123,9 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
       const freshTodos = await fetchTodosFromWebhook();
       StorageManager.saveTodos(freshTodos);
       setCachedData('todos-cache', freshTodos);
+      try {
+        window.dispatchEvent(new CustomEvent('dashboard:todos-important-updated', { detail: { ts: Date.now() } }));
+      } catch {}
     } catch (error) {
       console.error('Failed to complete (home):', error);
       alert(`Failed to complete: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -121,7 +142,11 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
 
   // no inline edit state on Home
 
-  const priorityFiltered = todos.filter(t => t.priority === 'crucial' || t.priority === 'high');
+  const priorityFiltered = useMemo(() => {
+    const base = todos.filter(t => t.priority === 'critical' || t.priority === 'high');
+    if (!workMode) return base;
+    return base.filter(t => String(t.category || '').toLowerCase() === 'work');
+  }, [todos, workMode]);
 
   if (loading && isVisible) {
     return (
@@ -161,7 +186,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="mb-6">
         <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-          Home · High-Priority To-Dos ({priorityFiltered.length})
+          Important Tasks ({priorityFiltered.length})
         </h2>
       </div>
 

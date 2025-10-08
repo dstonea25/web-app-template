@@ -3,6 +3,7 @@ import { LogOut } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 import { useAuth } from '../contexts/AuthContext';
 import { HeaderTimerMini } from './HeaderTimerMini';
+import WorkModeToggle from './WorkModeToggle';
 
 interface TopBannerProps {
   title?: string;
@@ -38,6 +39,7 @@ export const TopBanner: React.FC<TopBannerProps> = ({
             )}
           </div>
           <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            <WorkModeToggle />
             {onOpenTimeTab && (
               <HeaderTimerMini onOpenTimeTab={onOpenTimeTab} isOnTimeTab={isOnTimeTab} />
             )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
+import WorkModeToggle from './WorkModeToggle';
 import { Sidebar, type ModuleId } from './Sidebar';
 import { MobileDrawer } from './MobileDrawer';
 import { TodosTab } from '../pages/TodosTab';
@@ -158,7 +159,12 @@ export const AppShell: React.FC = () => {
         <TopNav 
           onHamburger={handleOpenMobileDrawer} 
           mobileOpen={mobileDrawerOpen}
-          rightSlot={<LogoutButton />}
+          rightSlot={(
+            <div className="flex items-center gap-2">
+              <WorkModeToggle compact />
+              <LogoutButton />
+            </div>
+          )}
         />
         <main className="p-4">
           {visitedTabs.has('home') && (

@@ -315,7 +315,7 @@ export const fetchTodosFromWebhook = async (): Promise<Todo[]> => {
     id: String(row.id),
     task: row.task,
     category: row.category ?? null,
-    priority: (row.priority === 'crucial' || row.priority === 'high' || row.priority === 'medium' || row.priority === 'low') ? (row.priority as any) : null,
+    priority: (row.priority === 'crucial' ? 'critical' : row.priority === 'high' || row.priority === 'medium' || row.priority === 'low' || row.priority === 'critical') ? ((row.priority === 'crucial' ? 'critical' : row.priority) as any) : null,
     effort: (row.effort === 'S' || row.effort === 'M' || row.effort === 'L') ? row.effort : null,
     due_date: row.due_date ?? null,
     created_at: row.created_at,
@@ -344,7 +344,7 @@ export const saveTodosToWebhook = async (todos: Todo[]): Promise<void> => {
     id: Number(t.id || 0),
     task: t.task,
     category: t.category ?? null,
-    priority: (t.priority === 'crucial' || t.priority === 'high' || t.priority === 'medium' || t.priority === 'low') ? t.priority : null,
+    priority: (t.priority === 'critical' || t.priority === 'high' || t.priority === 'medium' || t.priority === 'low') ? t.priority : null,
     effort: (t.effort === 'S' || t.effort === 'M' || t.effort === 'L') ? t.effort : null,
     due_date: t.due_date ?? null,
     status: 'open',
@@ -381,7 +381,8 @@ export const saveTodosBatchToWebhook = async (updates: TodoPatch[], completes: s
       if (include('task') && Object.prototype.hasOwnProperty.call(p, 'task')) { row.task = p.task; hasUpdateField = true; }
       if (include('category') && Object.prototype.hasOwnProperty.call(p, 'category')) { row.category = p.category ?? null; hasUpdateField = true; }
       if (include('priority') && Object.prototype.hasOwnProperty.call(p, 'priority')) {
-        row.priority = (p.priority === 'crucial' || p.priority === 'high' || p.priority === 'medium' || p.priority === 'low') ? p.priority : null;
+        const pr = p.priority === 'crucial' ? 'critical' : p.priority; // normalize any legacy
+        row.priority = (pr === 'critical' || pr === 'high' || pr === 'medium' || pr === 'low') ? pr : null;
         hasUpdateField = true;
       }
       if (include('effort') && Object.prototype.hasOwnProperty.call(p, 'effort')) {

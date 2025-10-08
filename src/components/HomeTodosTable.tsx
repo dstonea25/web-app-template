@@ -21,7 +21,7 @@ export const HomeTodosTable: React.FC<HomeTodosTableProps> = ({
 }) => {
   const priorityRank = (p: Todo['priority']) => {
     switch (p) {
-      case 'crucial': return 4;
+      case 'critical': return 4;
       case 'high': return 3;
       case 'medium': return 2;
       case 'low': return 1;

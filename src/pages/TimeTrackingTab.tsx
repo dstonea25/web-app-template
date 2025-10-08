@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Session } from '../types';
 import { cn, tokens } from '../theme/config';
 import { 
@@ -15,6 +15,7 @@ import { fetchSessionsFromWebhook, saveSessionsToWebhook, fetchRecentSessionsFro
 import { toast } from '../lib/notifications/toast';
 import { useTimer } from '../contexts/TimerContext';
 import RecentSessionsTable from '../components/RecentSessionsTable';
+import { useWorkMode } from '../contexts/WorkModeContext';
 
 // Mock data from the scope
 const MOCK_DATA = {
@@ -41,6 +42,7 @@ interface PendingSession {
 }
 
 export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
+  const { workMode } = useWorkMode();
   const { setActive: setCtxActive, resetElapsed } = useTimer();
   // Core state
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -69,6 +71,18 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   const autoStoppedRef = useRef(false);
 
   const hasInitializedRef = useRef(false);
+
+  // Sync visible selections with Work Mode so UI clearly shows Work selected
+  useEffect(() => {
+    if (workMode) {
+      if (timerCategory !== 'Work') setTimerCategory('Work');
+      if (chartCategory !== 'Work') setChartCategory('Work');
+      if (manualCategory !== 'Work') setManualCategory('Work');
+      if (pendingSession && pendingSession.category !== 'Work') {
+        setPendingSession({ ...pendingSession, category: 'Work' });
+      }
+    }
+  }, [workMode, timerCategory, chartCategory, manualCategory, pendingSession]);
 
   // Initialize tab when it mounts (only happens when tab is active)
   useEffect(() => {
@@ -202,11 +216,13 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
   };
 
   const selectCategory = (category: Category) => {
+    if (workMode && category !== 'Work') return; // lock to Work
     setTimerCategory(category);
     localStorage.setItem('geronimo.time.lastCategory', category);
   };
 
   const selectChartCategory = (category: Category) => {
+    if (workMode && category !== 'Work') return; // lock to Work
     setChartCategory(category);
   };
 
@@ -514,9 +530,10 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
     const filteredSessions = sessions.filter(session => {
       const sessionDate = new Date(session.startedAt);
       const sessionYear = sessionDate.getFullYear();
+      const categoryOk = workMode ? (session.category === 'Work') : (session.category === chartCategory);
       return sessionYear === currentYear && 
              sessionDate >= rangeStart && 
-             session.category === chartCategory;
+             categoryOk;
     });
     
     // Group by day of week
@@ -571,11 +588,13 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
       const filteredSessions = sessions.filter(session => {
         const sessionYear = new Date(session.startedAt).getFullYear();
         const sessionDate = new Date(session.startedAt);
-        return sessionYear === currentYear && sessionDate >= config.start;
+        if (!(sessionYear === currentYear && sessionDate >= config.start)) return false;
+        if (workMode) return session.category === 'Work';
+        return true;
       });
       
       // Initialize all categories with 0
-      const byCategory: { [key: string]: number } = {
+      const byCategory: { [key: string]: number } = workMode ? { 'Work': 0 } : {
         'Gaming': 0,
         'Personal Projects': 0,
         'Work': 0
@@ -661,7 +680,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
             {/* Category Selection */}
             <div className="mb-4">
               <div className="flex items-center gap-2">
-                {CATEGORIES.map((category) => (
+                {(workMode ? (['Work'] as Category[]) : CATEGORIES).map((category) => (
                   <button
                     key={category}
                     onClick={() => selectCategory(category)}
@@ -745,10 +764,10 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
                   <label className="block text-sm font-medium mb-1 text-neutral-100">Category</label>
                   <select
                     value={pendingSession.category}
-                    onChange={(e) => setPendingSession({...pendingSession, category: e.target.value as Category})}
+                    onChange={(e) => { if (!workMode || e.target.value === 'Work') setPendingSession({...pendingSession, category: e.target.value as Category}); }}
                     className="px-3 py-2 border border-neutral-800 rounded-lg bg-neutral-900 text-neutral-100 w-full"
                   >
-                    {CATEGORIES.map(cat => (
+                    {(workMode ? (['Work'] as Category[]) : CATEGORIES).map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -797,11 +816,11 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
           <div>
             <label className="block text-sm font-medium mb-1 text-neutral-100">Category</label>
             <select
-              value={manualCategory}
-              onChange={(e) => setManualCategory(e.target.value as Category)}
+              value={workMode ? 'Work' : manualCategory}
+              onChange={(e) => { if (!workMode || e.target.value === 'Work') setManualCategory(e.target.value as Category); }}
               className={tokens.input.base}
             >
-              {CATEGORIES.map(cat => (
+              {(workMode ? (['Work'] as Category[]) : CATEGORIES).map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
@@ -867,7 +886,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
             
             {/* Time Period Filter */}
             <div className="flex gap-2">
-              {(['week', 'month', 'ytd'] as const).map((period) => (
+            {(['week', 'month', 'ytd'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setTimePeriod(period)}
@@ -886,7 +905,7 @@ export const TimeTrackingTab: React.FC<{ isVisible?: boolean }> = ({ isVisible =
 
           {/* Category Filter */}
           <div className="flex gap-2 mb-6">
-            {CATEGORIES.map((category) => (
+            {(workMode ? (['Work'] as Category[]) : CATEGORIES).map((category) => (
                     <button
                 key={category}
                 onClick={() => selectChartCategory(category)}

@@ -50,7 +50,8 @@ export class StorageManager {
       // Transform: ensure priority exists (null), ignore status, ensure id string, default statusUi
       return parsed.map((item) => {
         const id: string = item.id ? String(item.id) : generateId();
-        const priority: Priority = (item.priority === 'crucial' || item.priority === 'high' || item.priority === 'medium' || item.priority === 'low') ? item.priority : null;
+        const normalized = item.priority === 'crucial' ? 'critical' : item.priority;
+        const priority: Priority = (normalized === 'critical' || normalized === 'high' || normalized === 'medium' || normalized === 'low') ? (normalized as Priority) : null;
         const effort: Effort = (item.effort === 'S' || item.effort === 'M' || item.effort === 'L') ? item.effort : null;
         const statusUi: StatusUi = (item.statusUi === 'open' || item.statusUi === 'paused' || item.statusUi === 'blocked') ? item.statusUi : 'open';
         return {

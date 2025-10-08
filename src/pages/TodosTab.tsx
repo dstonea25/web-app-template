@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Todo, Priority, TodoPatch, Effort } from '../types';
 import { StorageManager, stageRowEdit, stageComplete, getStagedChanges, clearStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { addTodo as storageAddTodo } from '../lib/storage';
@@ -8,8 +8,10 @@ import SelectPriority from '../components/SelectPriority';
 import { TodosTable } from '../components/TodosTable';
 import { CategoryTabs } from '../components/CategoryTabs';
 import { toast } from '../lib/notifications/toast';
+import { useWorkMode } from '../contexts/WorkModeContext';
 
 export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
+  const { workMode } = useWorkMode();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,16 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const UNDO_WINDOW_MS = 2500;
   const prevEditRef = useRef<Todo | null>(null);
   const hasLoadedRef = useRef(false);
+
+  // Ensure UI category selection reflects Work Mode so inline add appears
+  useEffect(() => {
+    if (workMode) {
+      if (activeCategory !== 'work') setActiveCategory('work');
+    } else {
+      if (activeCategory === 'work') setActiveCategory('All');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workMode]);
 
   // Load initial data when tab mounts (only happens when tab is active)
   useEffect(() => {
@@ -62,6 +74,9 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         setCachedData('todos-cache', freshTodos);
         clearStagedChanges();
         setStagedCount(0);
+        try {
+          window.dispatchEvent(new CustomEvent('dashboard:todos-important-updated', { detail: { ts: Date.now() } }));
+        } catch {}
       } catch (err) {
         console.error('Auto-save failed:', err);
         // Only show error if we truly had pending changes (avoid id-only patches or emptied staged by undo)
@@ -186,6 +201,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     stageRowEdit({ id, patch: { id, ...updates } as TodoPatch });
     const staged = getStagedChanges();
     setStagedCount(staged.fieldChangeCount);
+    try { window.dispatchEvent(new CustomEvent('dashboard:todos-working-updated', { detail: { ts: Date.now(), id, type: 'update' } })); } catch {}
     toast.info('Updated todo', {
       ttlMs: UNDO_WINDOW_MS,
       actionLabel: 'Undo',
@@ -207,6 +223,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
     const staged = getStagedChanges();
     setStagedCount(staged.updates.length + staged.completes.length);
     setTodos(prev => prev.filter(t => String(t.id) !== String(id)));
+    try { window.dispatchEvent(new CustomEvent('dashboard:todos-working-updated', { detail: { ts: Date.now(), id, type: 'complete' } })); } catch {}
     toast.info('Completed todo', {
       ttlMs: UNDO_WINDOW_MS,
       actionLabel: 'Undo',
@@ -217,6 +234,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
         if (removed) setTodos(prev => [...prev, removed].sort((a, b) => (a.id! < b.id! ? -1 : 1)));
         const s = getStagedChanges();
         setStagedCount(s.fieldChangeCount);
+        try { window.dispatchEvent(new CustomEvent('dashboard:todos-working-updated', { detail: { ts: Date.now(), id, type: 'undo-complete' } })); } catch {}
       }
     });
     scheduleCommit();
@@ -232,6 +250,13 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
   const handleEditEnd = () => {
     setEditingId(null);
   };
+
+  // Compute filtered view (must be before any early returns to keep hooks order stable)
+  const effectiveActiveCategory = useMemo(() => (workMode ? 'work' : activeCategory), [workMode, activeCategory]);
+  const filteredTodos = useMemo(() => {
+    if (workMode) return todos.filter(todo => String(todo.category || '').toLowerCase() === 'work');
+    return effectiveActiveCategory === 'All' ? todos : todos.filter(todo => todo.category === effectiveActiveCategory);
+  }, [todos, workMode, effectiveActiveCategory]);
 
   if (loading && isVisible) {
     return (
@@ -269,11 +294,6 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
       </div>
     );
   }
-
-  // Filter todos by active category
-  const filteredTodos = activeCategory === 'All' 
-    ? todos 
-    : todos.filter(todo => todo.category === activeCategory);
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
@@ -366,6 +386,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
           stageRowEdit({ id, patch });
           const staged = getStagedChanges();
           setStagedCount(staged.fieldChangeCount);
+      try { window.dispatchEvent(new CustomEvent('dashboard:todos-working-updated', { detail: { ts: Date.now(), id, type: 'commit' } })); } catch {}
           // Undo toast based on snapshot
           const prev = prevEditRef.current;
           toast.info('Updated todo', {
@@ -377,6 +398,7 @@ export const TodosTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }
               stageRowEdit({ id, patch: { id, task: prev.task, category: prev.category ?? null, priority: prev.priority, effort: prev.effort, due_date: prev.due_date } as TodoPatch });
               const s = getStagedChanges();
               setStagedCount(s.fieldChangeCount);
+              try { window.dispatchEvent(new CustomEvent('dashboard:todos-working-updated', { detail: { ts: Date.now(), id, type: 'undo-commit' } })); } catch {}
             }
           });
           scheduleCommit();
