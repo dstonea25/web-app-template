@@ -244,7 +244,7 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
   const [okrs, setOkrs] = useState<Okr[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [flashKrId, setFlashKrId] = useState<string | null>(null);
+  // const [flashKrId, setFlashKrId] = useState<string | null>(null);
 
   const UNDO_WINDOW_MS = 2500;
   const commitTimersRef = useRef<Record<string, number>>({});
@@ -329,8 +329,7 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
     commitTimersRef.current[kr.id] = window.setTimeout(async () => {
       try {
         await updateKeyResultValue(kr.id, value);
-        setFlashKrId(kr.id);
-        setTimeout(() => setFlashKrId((id) => (id === kr.id ? null : id)), 600);
+        // Visual flash removed for build cleanliness
         await refetchSingle(kr.okr_id);
       } catch (e: any) {
         toast.error(e?.message || 'Failed to update');

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, tokens } from '../../theme/config';
-import type { CurrentIntentionRow, IntentionPillar } from '../../types';
+import type { IntentionPillar } from '../../types';
 import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
 import { SessionTimer } from './SessionTimer';
@@ -30,7 +30,6 @@ const getTodayLocalDate = (): string => {
 
 export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisible = true }) => {
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<CurrentIntentionRow[]>([]);
   const [drafts, setDrafts] = useState<Record<IntentionPillar, string>>({ Power: '', Passion: '', Purpose: '', Production: '' });
   const [lockedIn, setLockedIn] = useState<boolean>(false);
 
@@ -52,7 +51,6 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
         await resetIntentionsIfNewDay();
         const current = await fetchCurrentIntentions();
         if (!mounted) return;
-        setRows(current);
         const nextDrafts: Record<IntentionPillar, string> = { Power: '', Passion: '', Purpose: '', Production: '' };
         for (const r of current) nextDrafts[r.pillar] = r.intention || '';
         setDrafts(nextDrafts);
@@ -76,8 +74,6 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
     try {
       const payload = PILLARS.map(p => ({ pillar: p.key, intention: (drafts[p.key] || '').trim() }));
       await upsertIntentions(payload);
-      // refresh rows locally
-      setRows(prev => prev.map(r => ({ ...r, intention: payload.find(x => x.pillar === r.pillar)?.intention || r.intention })));
       setLockedIn(true);
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
       toast.success('Intentions locked for today ✅');
