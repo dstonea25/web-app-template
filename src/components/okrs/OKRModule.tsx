@@ -135,7 +135,6 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   };
   const progress = calcProgress();
   const targetNum = Number(kr.target_value || 0);
-  const inputId = `okr-input-${kr.id}`;
 
   return (
     <div className="py-3 sm:min-h-[104px] sm:flex sm:flex-col sm:justify-between overflow-visible">
