@@ -1,4 +1,4 @@
-import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, IdeaPatch, Session, Habit } from '../types';
+import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, IdeaPatch, Session, Habit, CurrentIntentionRow, IntentionStatsRow, UpsertIntentionInput, IntentionPillar } from '../types';
 
 // Mocked API client for MVP - all saves are stubbed
 export class ApiClient {
@@ -287,6 +287,7 @@ const N8N_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/a
 const N8N_SAVE_ALLOTMENTS_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments';
 const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allotments-ledger';
 const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments-ledger';
+// const N8N_INTENTIONS_LOCK_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/intentions-lock'; // v2
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 
 // Global loading states to prevent duplicate webhook calls
@@ -610,6 +611,119 @@ export const deleteSessionsFromWebhook = async (ids: string[]): Promise<void> =>
     .delete()
     .in('id', numericOrStringIds);
   if (error) throw error;
+};
+
+// ============= Daily Intentions (Supabase) =============
+const PILLARS: IntentionPillar[] = ['Power', 'Passion', 'Purpose', 'Production'];
+
+const getTodayLocalDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const fetchCurrentIntentions = async (): Promise<CurrentIntentionRow[]> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) return PILLARS.map((p) => ({ pillar: p, intention: '', updated_at: new Date(0).toISOString() }));
+
+  // Ensure 4 rows exist
+  const ensureRows = PILLARS.map((pillar) => ({ pillar, intention: '' }));
+  await supabase
+    .from('current_intentions')
+    .upsert(ensureRows, { onConflict: 'pillar' });
+
+  const { data, error } = await supabase
+    .from('current_intentions')
+    .select('pillar,intention,updated_at')
+    .order('pillar', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []) as { pillar: IntentionPillar; intention: string; updated_at: string }[];
+  return rows;
+};
+
+export const upsertIntentions = async (updates: UpsertIntentionInput[]): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) return;
+  if (!updates || updates.length === 0) return;
+  const payload = updates.map((u) => ({ pillar: u.pillar, intention: u.intention }));
+  const { error } = await supabase
+    .from('current_intentions')
+    .upsert(payload, { onConflict: 'pillar' });
+  if (error) throw error;
+};
+
+export const resetIntentionsIfNewDay = async (): Promise<void> => {
+  const lastResetKey = 'intentions.lastResetDate';
+  const today = getTodayLocalDate();
+  try {
+    const last = localStorage.getItem(lastResetKey);
+    if (last === today) return;
+  } catch {}
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) {
+    try { localStorage.setItem(lastResetKey, today); } catch {}
+    return;
+  }
+  // no server resets needed for now
+  try { localStorage.setItem(lastResetKey, today); } catch {}
+};
+
+export const fetchIntentionStats = async (): Promise<IntentionStatsRow> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  const defaults: IntentionStatsRow = { id: 'local', current_streak: 0, longest_streak: 0, last_completed_date: null, updated_at: new Date(0).toISOString() };
+  if (!isSupabaseConfigured || !supabase) return defaults;
+  const { data, error } = await supabase
+    .from('intention_stats')
+    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error; // ignore no rows
+  if (!data) {
+    const { data: created, error: insErr } = await supabase
+      .from('intention_stats')
+      .insert({ current_streak: 0, longest_streak: 0, last_completed_date: null })
+      .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+      .single();
+    if (insErr) throw insErr;
+    return created as IntentionStatsRow;
+  }
+  return data as IntentionStatsRow;
+};
+
+// v1: streak is read-only; no local incrementing
+
+// v2: webhook will be added later
+
+export const updateLastCompletedDateToday = async (): Promise<IntentionStatsRow | null> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  if (!isSupabaseConfigured || !supabase) return null;
+  const today = getTodayLocalDate();
+  const { data: statsRow } = await supabase
+    .from('intention_stats')
+    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data: updated, error } = await supabase
+    .from('intention_stats')
+    .upsert({ id: statsRow?.id, last_completed_date: today, current_streak: statsRow?.current_streak ?? 0, longest_streak: statsRow?.longest_streak ?? 0 }, { onConflict: 'id' })
+    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+    .single();
+  if (error) throw error;
+  return updated as IntentionStatsRow;
 };
 
 // Webhook function to fetch allotments

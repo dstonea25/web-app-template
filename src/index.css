@@ -12,3 +12,11 @@ input.date-empty::-webkit-input-placeholder { color: transparent; }
 input.date-empty::-moz-placeholder { color: transparent; }
 input.date-empty:-ms-input-placeholder { color: transparent; }
 input.date-empty::placeholder { color: transparent; }
+
+/* Utility: two-line clamp without plugin */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

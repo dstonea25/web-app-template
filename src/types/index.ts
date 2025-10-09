@@ -116,3 +116,50 @@ export interface AuthContextType {
   login: (credentials: AuthCredentials) => Promise<boolean>;
   logout: () => void;
 }
+
+// Personal OKRs
+export type OkrPillar = 'Power' | 'Passion' | 'Purpose' | 'Production';
+export type KeyResultKind = 'boolean' | 'count' | 'percent' | 'duration';
+
+export interface OkrKeyResult {
+  id: string;
+  okr_id: string;
+  description: string;
+  kind: KeyResultKind;
+  target_value: number | boolean | null;
+  current_value: number | boolean | null;
+  // Optional, may be provided by the view as 0..1 or 0..100
+  progress?: number | null;
+}
+
+export interface Okr {
+  id: string;
+  pillar: OkrPillar;
+  objective: string;
+  // Optional, may be provided by the view as 0..1 or 0..100
+  progress?: number | null;
+  // When coming from okrs_with_progress, key results often arrive as JSON
+  key_results?: OkrKeyResult[];
+}
+
+// Daily Intentions
+export type IntentionPillar = OkrPillar; // 'Power' | 'Passion' | 'Purpose' | 'Production'
+
+export interface CurrentIntentionRow {
+  pillar: IntentionPillar;
+  intention: string;
+  updated_at: string; // timestamptz
+}
+
+export interface IntentionStatsRow {
+  id: string; // uuid
+  current_streak: number;
+  longest_streak: number;
+  last_completed_date: string | null; // YYYY-MM-DD
+  updated_at: string; // timestamptz
+}
+
+export interface UpsertIntentionInput {
+  pillar: IntentionPillar;
+  intention: string;
+}

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Todo } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
+import { OKRModule } from '../components/okrs/OKRModule';
+import { DailyIntentionsModule } from '../components/intentions/DailyIntentionsModule';
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
@@ -184,20 +186,30 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
-      <div className="mb-6">
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-          Important Tasks ({priorityFiltered.length})
-        </h2>
-      </div>
+      <div className="grid gap-6">
+        <section>
+          <DailyIntentionsModule isVisible={isVisible} />
+        </section>
+        <section>
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Important Tasks ({priorityFiltered.length})
+          </h2>
+          <div className="mt-4">
+            <HomeTodosTable
+              todos={priorityFiltered}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={setSortBy}
+              onSortOrderChange={setSortOrder}
+              onComplete={completeImmediately}
+            />
+          </div>
+        </section>
 
-      <HomeTodosTable
-        todos={priorityFiltered}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSortChange={setSortBy}
-        onSortOrderChange={setSortOrder}
-        onComplete={completeImmediately}
-      />
+        <section>
+          <OKRModule isVisible={isVisible} />
+        </section>
+      </div>
     </div>
   );
 };
