@@ -18,8 +18,30 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const AppShell: React.FC = () => {
   const { logout } = useAuth();
+  // URL <-> module mapping helpers
+  const normalizePath = (path: string) => path.replace(/\/+$/, '') || '/';
+  const moduleToPath = (module: ModuleId): string => {
+    if (module === 'home') return '/';
+    const tabId = module === 'time_tracking' ? 'time' : module;
+    const tab = TAB_REGISTRY.find(t => t.id === tabId);
+    return tab?.route || '/';
+  };
+  const pathToModule = (pathname: string): ModuleId | null => {
+    const clean = normalizePath(pathname);
+    if (clean === '/' || clean === '/home') return 'home';
+    const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled);
+    for (const tab of enabledTabs) {
+      const moduleId = (tab.id === 'time' ? 'time_tracking' : tab.id) as ModuleId;
+      if (normalizePath(tab.route) === clean) return moduleId;
+    }
+    return null;
+  };
+
   const [activeModule, setActiveModule] = useState<ModuleId>(() => {
     try {
+      // Prefer URL on first load
+      const urlModule = pathToModule(typeof window !== 'undefined' ? window.location.pathname : '/');
+      if (urlModule) return urlModule;
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
@@ -36,6 +58,29 @@ export const AppShell: React.FC = () => {
   // Save tab to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('dashboard-active-tab', activeModule);
+  }, [activeModule]);
+
+  // Sync URL when activeModule changes (visual URL only; no full router)
+  useEffect(() => {
+    try {
+      const nextPath = moduleToPath(activeModule);
+      if (typeof window !== 'undefined' && window.location.pathname !== nextPath) {
+        window.history.pushState({ module: activeModule }, '', nextPath + window.location.search);
+      }
+    } catch {}
+  }, [activeModule]);
+
+  // Handle browser back/forward to update visible tab
+  useEffect(() => {
+    const onPop = () => {
+      const mod = pathToModule(typeof window !== 'undefined' ? window.location.pathname : '/');
+      if (mod && mod !== activeModule) {
+        setActiveModule(mod);
+        setVisitedTabs(prev => (prev.has(mod) ? prev : new Set(prev).add(mod)));
+      }
+    };
+    if (typeof window !== 'undefined') window.addEventListener('popstate', onPop);
+    return () => { if (typeof window !== 'undefined') window.removeEventListener('popstate', onPop); };
   }, [activeModule]);
 
   // Map TAB_REGISTRY to navigation items, filtering enabled tabs and sorting by order
