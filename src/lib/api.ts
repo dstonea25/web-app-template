@@ -289,6 +289,7 @@ const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allot
 const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments-ledger';
 // const N8N_INTENTIONS_LOCK_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/intentions-lock'; // v2
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
+const N8N_INTENTIONS_PING_URL = import.meta.env.VITE_N8N_INTENTIONS_PING_URL || '';
 
 // Global loading states to prevent duplicate webhook calls
 // let isLoadingTodos = false; // no longer needed without webhook fallback
@@ -724,6 +725,27 @@ export const updateLastCompletedDateToday = async (): Promise<IntentionStatsRow 
     .single();
   if (error) throw error;
   return updated as IntentionStatsRow;
+};
+
+// Fire-and-forget ping to n8n when intentions are committed (optional)
+export const pingIntentionsCommitted = async (source: 'home' | 'public'): Promise<void> => {
+  try {
+    if (!N8N_INTENTIONS_PING_URL || !N8N_WEBHOOK_TOKEN) return; // disabled if not configured
+    const today = getTodayLocalDate();
+    await fetch(N8N_INTENTIONS_PING_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`,
+        'X-Source': source,
+        'Content-Type': 'application/json',
+      },
+      // Keepalive so navigation/redirect doesn't cancel the request
+      keepalive: true,
+      body: JSON.stringify({ source, date: today, ts: new Date().toISOString() }),
+    }).catch(() => {});
+  } catch {
+    // swallow — ping should never block UI
+  }
 };
 
 // Webhook function to fetch allotments

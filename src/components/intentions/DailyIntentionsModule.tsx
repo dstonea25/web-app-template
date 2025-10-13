@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, tokens } from '../../theme/config';
 import type { IntentionPillar } from '../../types';
-import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions } from '../../lib/api';
+import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
 import { SessionTimer } from './SessionTimer';
 import { StreakDisplay } from './StreakDisplay';
@@ -77,6 +77,8 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
       setLockedIn(true);
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
       toast.success('Intentions locked for today ✅');
+      // Non-blocking webhook ping
+      pingIntentionsCommitted('home');
       // v2 webhook will be added later
     } catch (e) {
       console.error('Failed to lock in intentions:', e);
