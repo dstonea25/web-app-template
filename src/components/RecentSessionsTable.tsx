@@ -76,7 +76,149 @@ export const RecentSessionsTable: React.FC<RecentSessionsTableProps> = ({
   return (
     <div className="mt-8">
       <h3 className="text-lg font-semibold mb-4 text-neutral-100">Recent Sessions</h3>
-      <div className="overflow-x-auto">
+      {/* Mobile cards (show on small screens only) */}
+      <div className="sm:hidden space-y-3">
+        {(!sessions || sessions.length === 0) ? (
+          <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No recent sessions.</div>
+        ) : (
+          sessions.map((s) => {
+            const isEditing = editingId === String(s.id);
+            const hrs = Math.floor((s.minutes || 0) / 60);
+            const mins = (s.minutes || 0) % 60;
+            return (
+              <div key={s.id} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+                {/* Date */}
+                <div>
+                  <div className="text-xs mb-1">Date</div>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={draftById[s.id]?.date || ''}
+                      onChange={(e) => setDraftById((prev) => ({ ...prev, [s.id]: { ...prev[s.id], date: e.target.value } }))}
+                      className={tokens.input.date}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commit(String(s.id)); if (e.key === 'Escape') { resetDraftFromSession(String(s.id)); setEditingId(null); } }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={cn('text-left w-full', tokens.accent?.text_hover || '')}
+                      onClick={() => { resetDraftFromSession(String(s.id)); setEditingId(String(s.id)); }}
+                      title="Edit session"
+                    >
+                      {new Date(s.startedAt).toLocaleDateString()}
+                    </button>
+                  )}
+                </div>
+
+                {/* Category */}
+                <div>
+                  <div className="text-xs mb-1">Category</div>
+                  {isEditing ? (
+                    <select
+                      value={draftById[s.id]?.category || s.category}
+                      onChange={(e) => setDraftById((prev) => ({ ...prev, [s.id]: { ...prev[s.id], category: e.target.value as Session['category'] } }))}
+                      className={tokens.input.base}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commit(String(s.id)); if (e.key === 'Escape') { resetDraftFromSession(String(s.id)); setEditingId(null); } }}
+                    >
+                      {categories.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      className={cn('text-left w-full', tokens.accent?.text_hover || '')}
+                      onClick={() => { resetDraftFromSession(String(s.id)); setEditingId(String(s.id)); }}
+                      title="Edit session"
+                    >
+                      {s.category}
+                    </button>
+                  )}
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <div className="text-xs mb-1">Duration</div>
+                  {isEditing ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        value={draftById[s.id]?.hours ?? '0'}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9-]/g, '');
+                          setDraftById((prev) => ({ ...prev, [s.id]: { ...prev[s.id], hours: val } }));
+                        }}
+                        className={cn(tokens.input.base, 'w-16')}
+                        placeholder="0"
+                        min="0"
+                        max="23"
+                        onKeyDown={(e) => { if (e.key === 'Enter') commit(String(s.id)); if (e.key === 'Escape') { resetDraftFromSession(String(s.id)); setEditingId(null); } }}
+                      />
+                      <span className="text-sm text-neutral-400">h</span>
+                      <input
+                        type="number"
+                        value={draftById[s.id]?.minutes ?? '0'}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9-]/g, '');
+                          setDraftById((prev) => ({ ...prev, [s.id]: { ...prev[s.id], minutes: val } }));
+                        }}
+                        className={cn(tokens.input.base, 'w-16')}
+                        placeholder="0"
+                        min="0"
+                        max="59"
+                        onKeyDown={(e) => { if (e.key === 'Enter') commit(String(s.id)); if (e.key === 'Escape') { resetDraftFromSession(String(s.id)); setEditingId(null); } }}
+                      />
+                      <span className="text-sm text-neutral-400">m</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className={cn('text-left w-full', tokens.accent?.text_hover || '')}
+                      onClick={() => { resetDraftFromSession(String(s.id)); setEditingId(String(s.id)); }}
+                      title="Edit session"
+                    >
+                      {hrs}h {mins}m
+                    </button>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2">
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={() => commit(String(s.id))}
+                        className={cn(tokens.button.base, tokens.button.primary, 'text-sm')}
+                        aria-label="Save session"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { resetDraftFromSession(String(s.id)); setEditingId(null); }}
+                        className={cn(tokens.button.base, tokens.button.secondary, 'text-sm')}
+                        aria-label="Cancel edit"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => onDelete(String(s.id))}
+                      className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                      aria-label="Delete session"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop table (hidden on small screens) */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className={cn(tokens.table.table)}>
           <thead className={tokens.table.thead}>
             <tr>

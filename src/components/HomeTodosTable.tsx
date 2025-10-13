@@ -43,7 +43,50 @@ export const HomeTodosTable: React.FC<HomeTodosTableProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className={tokens.table.wrapper}>
+      {/* Mobile cards (show on small screens only) */}
+      <div className="sm:hidden space-y-3">
+        {sorted.length === 0 ? (
+          <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No todos found.</div>
+        ) : (
+          sorted.map((todo) => (
+            <div key={todo.id} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+              <div className="break-words">{todo.task || ''}</div>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <div className={cn('text-neutral-100', 'text-xs mb-1')}>Category</div>
+                  <div className={cn(tokens.badge.base, tokens.badge.neutral, 'max-w-full truncate')}>{todo.category || '—'}</div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="text-neutral-400 mr-1">Priority:</span>
+                    <span className="text-neutral-100">{todo.priority || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 mr-1">Effort:</span>
+                    <span className="text-neutral-100">{todo.effort || '—'}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className={cn('text-neutral-100', 'text-xs mb-1')}>Due Date</div>
+                  <div className="text-neutral-100">{todo.due_date || '—'}</div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onComplete(String(todo.id!))}
+                  className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
+                  aria-label="Complete task"
+                >
+                  Complete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table (hidden on small screens) */}
+      <div className={cn(tokens.table.wrapper, 'hidden sm:block')}> 
         <table className={tokens.table.table}>
           <thead className={tokens.table.thead}>
             <tr>

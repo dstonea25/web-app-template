@@ -106,7 +106,7 @@ export const tokens = {
     content: 'min-w-0',
   },
   topnav: {
-    base: 'flex items-center justify-between h-14 px-3 sm:px-4 border-b border-neutral-800 bg-neutral-950',
+    base: 'flex items-center justify-between h-14 px-3 sm:px-4 border-b border-neutral-800 bg-neutral-950 w-full max-w-full',
     brand: 'flex items-center gap-2 text-lg sm:text-xl font-semibold text-neutral-100',
     burger: 'inline-flex items-center justify-center w-10 h-10 rounded-lg border border-neutral-800 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950 sm:hidden',
     right: 'flex items-center gap-2',
@@ -162,7 +162,7 @@ export const tokens = {
     inverse: 'text-neutral-100',
   },
   table: {
-    wrapper: 'overflow-x-auto rounded-2xl border border-neutral-800',
+    wrapper: 'overflow-x-auto rounded-2xl border border-neutral-800 max-w-full',
     table: 'min-w-full text-sm',
     thead: 'sticky top-0 z-10 bg-neutral-900',
     th: 'text-left font-semibold px-4 py-2 border-b border-neutral-800 text-neutral-100',

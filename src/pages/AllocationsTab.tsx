@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn, tokens } from '../theme/config';
-import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove, fetchRecentRedemptions, deleteRedemptionById } from '../lib/allocations';
+import { loadLedgerAndAllotments, redeemItem, addAllocation, admitDefeat, undoAdmitDefeat, saveAllocationsItems, clearAllocationsOverrides, type AllocationState, type AllotmentItem, stageAllocationEdit, getStagedAllocationChanges, clearStagedAllocationChanges, applyStagedChangesToAllocations, stageAllocationRemove, fetchRecentRedemptions, deleteRedemptionById, unstageAllocationEdit, unstageAllocationRemove } from '../lib/allocations';
 import RecentRedemptionsTable from '../components/RecentRedemptionsTable';
 import { getCachedData, setCachedData } from '../lib/storage';
 import { toast } from '../lib/notifications/toast';
@@ -10,6 +10,10 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [recentRows, setRecentRows] = useState<{ id: string; item: string; ts: string; qty?: number }[]>([]);
+  const UNDO_WINDOW_MS = 2500;
+  const commitTimerRef = useRef<number | null>(null);
+  const stateRef = useRef<AllocationState | null>(null);
+  const prevEditRef = useRef<{ index: number; item: AllotmentItem } | null>(null);
   // Manual add inputs
   const [newItem, setNewItem] = useState('');
   const [newCadence, setNewCadence] = useState<'weekly'|'monthly'|'quarterly'|'yearly'>('monthly');
@@ -89,6 +93,34 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
     })();
   }, [isVisible]);
 
+  // Keep a ref of the latest state to avoid stale closures during auto-commit
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Auto-commit staged allocation changes after a short undo window
+  const scheduleCommit = () => {
+    if (commitTimerRef.current) {
+      window.clearTimeout(commitTimerRef.current);
+    }
+    commitTimerRef.current = window.setTimeout(async () => {
+      try {
+        // Nothing to do if no staged field changes
+        const staged = getStagedAllocationChanges();
+        if ((staged.updates.length + staged.removes.length) === 0) return;
+        // Save the current working items view derived from the latest base + staged changes
+        const baseItems = stateRef.current ? stateRef.current.items : [];
+        const itemsToSave = applyStagedChangesToAllocations(baseItems);
+        await saveAllocationsItems(itemsToSave);
+        const fresh = await loadLedgerAndAllotments();
+        setState(fresh);
+        setCachedData('allocations-cache', fresh);
+        clearStagedAllocationChanges();
+      } catch (err) {
+        console.error('Allocations auto-save failed:', err);
+        toast.error('Auto-save failed');
+      }
+    }, UNDO_WINDOW_MS);
+  };
+
   // One-time recovery: if Chocolate Strawberry Bag is missing due to a saved override,
   // clear overrides and reload from file data.
   const recoveryRan = useRef(false);
@@ -166,100 +198,85 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
 
   const handleManualAdd = async () => {
     if (!newItem.trim()) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Create new allocation item
-      const newAllocation = { 
-        type: newItem.trim(), 
-        quota: Number(newQuota) || 1, 
-        cadence: newCadence, 
-        multiplier: Number(newMultiplier) || 1 
-      };
-      
-      console.log('💾 Adding new allocation:', newAllocation);
-      
-      // Add to current items
-      const updatedItems = [...(state?.items || []), newAllocation];
-      
-      // Save to webhook
-      await saveAllocationsItems(updatedItems);
-      console.log('✅ New allocation saved successfully');
-      
-      // Reload from webhook to get updated state
-      const fresh = await loadLedgerAndAllotments();
-      setState(fresh);
-      
-      // Only show success toast after webhook confirms the save
-      toast.success(`Added new allocation: ${newItem.trim()}`);
-      
-      // Reset form
-      setNewItem(''); 
-      setNewQuota('1'); 
-      setNewMultiplier('1'); 
-      setNewCadence('monthly');
-      
-    } catch (e) {
-      console.error('Failed to add allocation:', e);
-      setError(e instanceof Error ? e.message : 'Failed to add allocation');
-      toast.error(`Failed to add allocation: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
+    if (!state) return;
+    const index = state.items.length;
+    const prevState = state;
+    const newAllocation: AllotmentItem = {
+      type: newItem.trim(),
+      quota: Number(newQuota) || 1,
+      cadence: newCadence,
+      multiplier: Number(newMultiplier) || 1,
+    };
+    // Stage as new row beyond base length and update working view
+    stageAllocationEdit({ index, patch: { index, ...newAllocation, _isNew: true } as any });
+    const working = applyStagedChangesToAllocations(state.items);
+    setState({ ...state, items: working });
+    toast.info('Added allocation', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        // Remove the staged new row and revert UI
+        unstageAllocationEdit(index);
+        setState(prev => prev ? { ...prev, items: prevState.items } : prev);
+      }
+    });
+    scheduleCommit();
+    // Reset form inputs
+    setNewItem('');
+    setNewQuota('1');
+    setNewMultiplier('1');
+    setNewCadence('monthly');
   };
 
   // Editable table helpers
-  const updateItem = (index: number, patch: Partial<AllotmentItem>) => {
+  const updateItemUiOnly = (index: number, patch: Partial<AllotmentItem>) => {
     if (!state) return;
-    // Stage edit (like Ideas)
-    stageAllocationEdit({ index, patch: { index, ...patch } as any });
-    const working = applyStagedChangesToAllocations(state.items);
-    setState({ ...state, items: working });
+    setState(prev => {
+      if (!prev) return prev;
+      const items = prev.items.map((it, i) => (i === index ? { ...it, ...patch } : it));
+      return { ...prev, items };
+    });
+  };
+
+  const handleEditStart = (index: number, field: 'type'|'quota'|'cadence'|'multiplier') => {
+    setEditingCell({ index, field });
+    if (state) prevEditRef.current = { index, item: { ...state.items[index] } };
+  };
+
+  const commitItemEdit = (index: number) => {
+    if (!state) return;
+    const current = state.items[index];
+    const prevSnapshot = prevEditRef.current && prevEditRef.current.index === index ? prevEditRef.current.item : null;
+    stageAllocationEdit({ index, patch: { index, type: current.type, quota: current.quota, cadence: current.cadence, multiplier: current.multiplier } as any });
+    toast.info('Updated allocation', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        if (!prevSnapshot) return;
+        unstageAllocationEdit(index);
+        setState(prev => prev ? { ...prev, items: prev.items.map((it, i) => (i === index ? prevSnapshot : it)) } : prev);
+      }
+    });
+    scheduleCommit();
   };
 
   const removeItem = (index: number) => {
     if (!state) return;
+    const prevItems = state.items;
     stageAllocationRemove(index);
     const working = applyStagedChangesToAllocations(state.items);
     setState({ ...state, items: working });
+    toast.info('Removed allocation', {
+      ttlMs: UNDO_WINDOW_MS,
+      actionLabel: 'Undo',
+      onAction: () => {
+        unstageAllocationRemove(index);
+        setState(prev => prev ? { ...prev, items: prevItems } : prev);
+      }
+    });
+    scheduleCommit();
   };
-
-  const commitAllocations = async () => {
-    if (!state) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('💾 Saving allocations...');
-      
-      // Save to webhook and wait for confirmation
-      await saveAllocationsItems(state.items);
-      console.log('✅ Allocations saved successfully');
-      
-      // Reload from webhook to get updated state
-      const fresh = await loadLedgerAndAllotments();
-      setState(fresh);
-      clearStagedAllocationChanges();
-      
-      // Only show success toast after webhook confirms the save
-      toast.success('Allocations saved successfully');
-      
-    } catch (error) {
-      console.error('Failed to save allocations:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save allocations');
-      toast.error(`Failed to save allocations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const reloadAllocations = async () => {
-    const fresh = await loadLedgerAndAllotments();
-    setState(fresh);
-  };
+  // Removed explicit commit and cancel flow in favor of auto-commit with undo window
 
   if (loading && isVisible) {
     return (
@@ -552,12 +569,13 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                         <input
                           className={cn(tokens.input.base, tokens.input.focus)}
                           value={it.type}
-                          onChange={(e)=>updateItem(originalIdx, { type: e.target.value })}
-                          onBlur={()=>setEditingCell(null)}
+                          onChange={(e)=>updateItemUiOnly(originalIdx, { type: e.target.value })}
+                          onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                          onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
                           autoFocus
                         />
                       ) : (
-                        <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'type' })}>{it.type}</span>
+                        <span className="cursor-pointer" onClick={()=>handleEditStart(originalIdx, 'type')}>{it.type}</span>
                       )}
                     </td>
                     <td className={tokens.table.td}>
@@ -567,13 +585,14 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                           min={0}
                           className={cn(tokens.input.base, tokens.input.focus, 'w-20')}
                           value={String(it.quota)}
-                          onChange={(e)=>updateItem(originalIdx, { quota: Number(e.target.value)||0 })}
+                          onChange={(e)=>updateItemUiOnly(originalIdx, { quota: Number(e.target.value)||0 })}
                         onFocus={handleSelectAll}
                         ref={(el)=>{ if (el) { setTimeout(()=>{ try { el.select(); } catch {} }, 0); } }}
-                        onBlur={()=>setEditingCell(null)}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
                       />
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'quota' })}>{it.quota}</span>
+                      <span className="cursor-pointer" onClick={()=>handleEditStart(originalIdx, 'quota')}>{it.quota}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
@@ -581,16 +600,17 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                       <select
                         className={cn(tokens.input.base, tokens.input.focus)}
                         value={it.cadence}
-                        onChange={(e)=>updateItem(originalIdx, { cadence: e.target.value as any })}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { cadence: e.target.value as any })}
                         autoFocus
-                        onBlur={()=>setEditingCell(null)}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLSelectElement).blur(); } }}
                       >
                         <option value="weekly">weekly</option>
                         <option value="monthly">monthly</option>
                         <option value="yearly">yearly</option>
                       </select>
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'cadence' })}>{it.cadence}</span>
+                      <span className="cursor-pointer" onClick={()=>handleEditStart(originalIdx, 'cadence')}>{it.cadence}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
@@ -600,13 +620,14 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                         min={1}
                         className={cn(tokens.input.base, tokens.input.focus, 'w-20')}
                         value={String(it.multiplier || 1)}
-                        onChange={(e)=>updateItem(originalIdx, { multiplier: Math.max(1, Number(e.target.value)||1) })}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { multiplier: Math.max(1, Number(e.target.value)||1) })}
                         onFocus={handleSelectAll}
                         ref={(el)=>{ if (el) { setTimeout(()=>{ try { el.select(); } catch {} }, 0); } }}
-                        onBlur={()=>setEditingCell(null)}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
                       />
                     ) : (
-                      <span className="cursor-pointer" onClick={()=>setEditingCell({ index: originalIdx, field: 'multiplier' })}>{it.multiplier || 1}</span>
+                      <span className="cursor-pointer" onClick={()=>handleEditStart(originalIdx, 'multiplier')}>{it.multiplier || 1}</span>
                     )}
                   </td>
                   <td className={tokens.table.td}>
@@ -624,19 +645,7 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
           </table>
         </div>
 
-        {/* Save/Cancel + staged count */}
-        {(() => { const s = getStagedAllocationChanges(); const count = s.fieldChangeCount; return (
-          <div className="mt-4 flex items-center gap-3">
-            <button onClick={commitAllocations} disabled={count===0} className={cn(tokens.button.base, tokens.button.primary, count===0 && 'opacity-50 cursor-not-allowed')}>
-              {count > 0 ? `Save (${count})` : 'Save'}
-            </button>
-            {count > 0 && (
-              <button onClick={() => { clearStagedAllocationChanges(); reloadAllocations(); }} className={cn(tokens.button.base, tokens.button.ghost, 'border border-gray-500 text-gray-500 hover:bg-gray-500 hover:text-white')}>
-                Cancel
-              </button>
-            )}
-          </div>
-        )})()}
+        {/* Auto-commit active; explicit Save/Cancel removed */}
       </div>
 
       {/* Recent Redemptions */}

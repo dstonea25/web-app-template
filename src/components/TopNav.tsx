@@ -10,7 +10,7 @@ interface TopNavProps {
 
 export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOpen }) => {
   return (
-    <nav className={tokens.topnav.base}>
+    <nav className={`${tokens.topnav.base} overflow-x-hidden`}>
       <div className="flex items-center gap-3">
         <button
           onClick={onHamburger}

@@ -147,6 +147,21 @@ export const stageAllocationRemove = (index: number): void => {
   saveStagedAllocationUpdates(stagedAllocUpdates);
 };
 
+// Undo helpers mirror Todos' ability to unstage changes during the toast undo window
+export const unstageAllocationEdit = (index: number): void => {
+  if (stagedAllocUpdates.has(index)) {
+    stagedAllocUpdates.delete(index);
+    saveStagedAllocationUpdates(stagedAllocUpdates);
+  }
+};
+
+export const unstageAllocationRemove = (index: number): void => {
+  if (stagedAllocRemovals.has(index)) {
+    stagedAllocRemovals.delete(index);
+    saveStagedAllocRemovals(stagedAllocRemovals);
+  }
+};
+
 export const getStagedAllocationChanges = (): { updates: AllocationPatch[]; removes: number[]; fieldChangeCount: number } => {
   const updates = Array.from(stagedAllocUpdates.values());
   const removes = Array.from(stagedAllocRemovals.values());

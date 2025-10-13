@@ -142,8 +142,87 @@ export const IdeasTable: React.FC<IdeasTableProps> = ({
         </button>
       </div>
 
-      {/* Ideas Table */}
-      <div className={tokens.table.wrapper}>
+      {/* Mobile cards (show on small screens only) */}
+      <div className="sm:hidden space-y-3">
+        {filteredAndSortedIdeas.length === 0 ? (
+          <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No ideas found. Add one above!</div>
+        ) : (
+          filteredAndSortedIdeas.map((idea) => (
+            <div key={idea.id} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+              <div>
+                {editingId === idea.id ? (
+                  <input
+                    ref={(el) => { editingCellRef.current = el; }}
+                    type="text"
+                    value={idea.idea || ''}
+                    onChange={(e) => onIdeaUpdate(String(idea.id!), { idea: e.target.value })}
+                    className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus, 'break-words')}
+                    onBlur={() => handleBlurCommit(idea)}
+                    onKeyDown={(e) => handleKeyDown(e, idea)}
+                    aria-label="Edit idea"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className={cn('text-left w-full break-words', tokens.accent.text_hover)}
+                    onClick={() => onEditStart(String(idea.id!))}
+                    aria-label="Edit idea"
+                  >
+                    {idea.idea || ''}
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <div className={cn('text-neutral-100', 'text-xs mb-1')}>Notes</div>
+                {editingId === idea.id ? (
+                  <textarea
+                    ref={(el) => { editingCellRef.current = el; }}
+                    value={idea.notes || ''}
+                    onChange={(e) => onIdeaUpdate(String(idea.id!), { notes: e.target.value })}
+                    className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus, 'resize-none min-h-[100px]')}
+                    onBlur={() => handleBlurCommit(idea)}
+                    onKeyDown={(e) => handleKeyDown(e, idea)}
+                    rows={idea.notes && idea.notes.length > 50 ? 5 : 3}
+                    aria-label="Edit notes"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className={cn('text-left w-full block break-words', tokens.accent.text_hover)}
+                    onClick={() => onEditStart(String(idea.id!))}
+                    aria-label="Edit notes"
+                    style={{ whiteSpace: 'pre-wrap' }}
+                  >
+                    {idea.notes || ''}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-neutral-300">
+                <div>{idea.created_at ? new Date(idea.created_at).toLocaleDateString() : '—'}</div>
+                {idea.category ? (
+                  <div className={cn(tokens.badge.base, tokens.badge.neutral, 'max-w-[60%] truncate')}>{idea.category}</div>
+                ) : <span />}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onIdeaComplete(String(idea.id!))}
+                  className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                  aria-label="Remove idea"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Ideas Table (hidden on small screens) */}
+      <div className={cn(tokens.table.wrapper, 'hidden sm:block')}>
         <table ref={tableRef} className={tokens.table.table}>
           <thead className={tokens.table.thead}>
             <tr>

@@ -151,7 +151,7 @@ export const AppShell: React.FC = () => {
   );
 
   return (
-    <div className={cn('min-h-screen', tokens.palette.dark.bg)}>
+    <div className={cn('min-h-screen overflow-x-hidden', tokens.palette.dark.bg)}>
       <ToastHost />
       {/* Desktop Layout */}
       <div className={cn(tokens.app_shell.grid, 'hidden sm:grid')}>
@@ -200,7 +200,7 @@ export const AppShell: React.FC = () => {
       </div>
 
       {/* Mobile Layout */}
-      <div className="sm:hidden">
+      <div className="sm:hidden overflow-x-hidden">
         <TopNav 
           onHamburger={handleOpenMobileDrawer} 
           mobileOpen={mobileDrawerOpen}

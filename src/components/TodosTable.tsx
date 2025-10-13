@@ -148,8 +148,95 @@ export const TodosTable: React.FC<TodosTableProps> = ({
         </button>
       </div>
 
-      {/* Todos Table */}
-      <div className={tokens.table.wrapper}>
+      {/* Mobile cards (show on small screens only) */}
+      <div className="sm:hidden space-y-3">
+        {filteredAndSortedTodos.length === 0 ? (
+          <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No todos found. Add one above!</div>
+        ) : (
+          filteredAndSortedTodos.map((todo) => (
+            <div key={todo.id} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+              <div>
+                {editingId === todo.id ? (
+                  <input
+                    ref={(el) => { editingCellRef.current = el; }}
+                    type="text"
+                    value={todo.task || ''}
+                    onChange={(e) => onTodoUpdate(String(todo.id!), { task: e.target.value })}
+                    className={cn(tokens.editable?.input || tokens.input.base, tokens.input.focus, 'break-words')}
+                    onBlur={() => handleBlurCommit(todo)}
+                    onKeyDown={(e) => handleKeyDown(e, todo)}
+                    aria-label="Edit task"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className={cn('text-left w-full break-words', tokens.accent.text_hover)}
+                    onClick={() => onEditStart(String(todo.id!))}
+                    aria-label="Edit task"
+                  >
+                    {todo.task || ''}
+                  </button>
+                )}
+                {showCategory && (todo.category ? (
+                  <div className={cn(tokens.badge.base, tokens.badge.neutral, 'mt-2 inline-flex max-w-full truncate')}>{todo.category}</div>
+                ) : null)}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <div className={cn('text-neutral-100', 'text-xs mb-1')}>Priority</div>
+                  <SelectPriority
+                    value={todo.priority ?? null}
+                    onChange={(p) => { onTodoUpdate(String(todo.id!), { priority: p, _dirty: true }); }}
+                    ariaLabel="Set priority"
+                  />
+                </div>
+                <div>
+                  <div className={cn('text-neutral-100', 'text-xs mb-1')}>Effort</div>
+                  <select
+                    value={todo.effort || ''}
+                    onChange={(e) => { onTodoUpdate(String(todo.id!), { effort: (e.target.value || null) as Effort, _dirty: true }); }}
+                    className={cn(tokens.input.base, tokens.input.focus, 'w-full', !todo.effort && 'text-neutral-400')}
+                    style={!todo.effort ? { color: '#9ca3af' } : {}}
+                    aria-label="Set effort"
+                  >
+                    <option value="" style={{ color: '#9ca3af' }}></option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className={cn('text-neutral-100', 'text-xs mb-1')}>Due Date</div>
+                <input
+                  type="date"
+                  value={todo.due_date || ''}
+                  onChange={(e) => { onTodoUpdate(String(todo.id!), { due_date: e.target.value || null, _dirty: true }); }}
+                  className={cn(tokens.input.base, tokens.input.focus, 'w-full', !todo.due_date && 'date-empty')}
+                  onClick={(e) => { const el = e.currentTarget as HTMLInputElement; (el as any).showPicker && (el as any).showPicker(); }}
+                  aria-label="Set due date"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onTodoComplete(String(todo.id!))}
+                  className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
+                  aria-label="Complete task"
+                >
+                  Complete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Todos Table (hidden on small screens) */}
+      <div className={cn(tokens.table.wrapper, 'hidden sm:block')}>
         <table ref={tableRef} className={tokens.table.table}>
           <thead className={tokens.table.thead}>
             <tr>
