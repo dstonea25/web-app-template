@@ -1,0 +1,39 @@
+# Build artifacts
+/dist/
+/build/
+.vite/
+
+# Dependencies
+/node_modules/
+
+# Logs
+*.log
+logs/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Generated types/cache
+*.tsbuildinfo
+
+# Env/Secrets
+.env*
+!.env.example
+.ssh/
+
+# Output bundles
+/dist/**
+
+# Coverage
+coverage/
+
+# Storybook / examples (not present, future-proof)
+.storybook/
+examples/
+
+# Docker related
+Dockerfile*
+docker-compose*.yml

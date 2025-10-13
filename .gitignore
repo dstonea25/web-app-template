@@ -1,45 +1,42 @@
-.cursor
-
-# Dependencies
+# Node
 node_modules/
-
-# Build output
-/dist/
-
-# Vite cache
-/.vite/
-node_modules/.vite/
-
-# TypeScript
-*.tsbuildinfo
-
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Logs
+logs/
+*.log
 
-# Env files
-.env
-.env.*
+# Builds
+/dist/
+/build/
+.vite/
+
+# Env
+.env*
 !.env.example
 
-# IDE/editor
+# Secrets
+.ssh/
+
+# Editor
+.vscode/
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
+.cursor/
+*.swp
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
 
 # Coverage
 coverage/
 
-# Misc
-*.local
-*.tmp
-*.swp
+# Mac
+.AppleDouble
+.LSOverride
+
+# Docker local
+*.local.env
