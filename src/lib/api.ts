@@ -631,11 +631,21 @@ export const fetchCurrentIntentions = async (): Promise<CurrentIntentionRow[]> =
   const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
   if (!isSupabaseConfigured || !supabase) return PILLARS.map((p) => ({ pillar: p, intention: '', updated_at: new Date(0).toISOString() }));
 
-  // Ensure 4 rows exist
-  const ensureRows = PILLARS.map((pillar) => ({ pillar, intention: '' }));
-  await supabase
+  // Ensure 4 rows exist without overwriting existing intentions
+  // 1) Read existing pillars
+  const { data: existingRows, error: readErr } = await supabase
     .from('current_intentions')
-    .upsert(ensureRows, { onConflict: 'pillar' });
+    .select('pillar');
+  if (readErr) throw readErr;
+  const existing = new Set<string>((existingRows || []).map((r: any) => r.pillar));
+  // 2) Insert only missing pillars with empty intention
+  const missing = PILLARS.filter((p) => !existing.has(p));
+  if (missing.length > 0) {
+    const { error: insertErr } = await supabase
+      .from('current_intentions')
+      .insert(missing.map((pillar) => ({ pillar, intention: '' })));
+    if (insertErr) throw insertErr;
+  }
 
   const { data, error } = await supabase
     .from('current_intentions')
@@ -652,7 +662,11 @@ export const upsertIntentions = async (updates: UpsertIntentionInput[]): Promise
   const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
   if (!isSupabaseConfigured || !supabase) return;
   if (!updates || updates.length === 0) return;
-  const payload = updates.map((u) => ({ pillar: u.pillar, intention: u.intention }));
+  // Defensive: never overwrite with empty/whitespace intentions
+  const payload = updates
+    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim() }))
+    .filter((u) => u.intention.length > 0);
+  if (payload.length === 0) return;
   const { error } = await supabase
     .from('current_intentions')
     .upsert(payload, { onConflict: 'pillar' });
