@@ -289,8 +289,8 @@ const N8N_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/allot
 const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/save-allotments-ledger';
 // const N8N_INTENTIONS_LOCK_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/intentions-lock'; // v2
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
-// Prefer not to require a URL env; default to standard intentions-lock endpoint, allow override via env
-const N8N_INTENTIONS_PING_URL = (import.meta.env.VITE_N8N_INTENTIONS_PING_URL as string) || 'https://geronimo.askdavidstone.com/webhook/intentions-lock';
+// Prefer not to require a URL env; default to provided intentions-set endpoint, allow override via env
+const N8N_INTENTIONS_PING_URL = (import.meta.env.VITE_N8N_INTENTIONS_PING_URL as string) || 'https://geronimo.askdavidstone.com/webhook/intentions-set';
 const INTENTIONS_RESET_RPC = import.meta.env.VITE_INTENTIONS_RESET_RPC || 'reset_intentions_daily';
 
 // Global loading states to prevent duplicate webhook calls
