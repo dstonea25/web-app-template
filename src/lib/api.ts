@@ -664,7 +664,7 @@ export const upsertIntentions = async (updates: UpsertIntentionInput[]): Promise
   if (!updates || updates.length === 0) return;
   // Defensive: never overwrite with empty/whitespace intentions
   const payload = updates
-    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim() }))
+    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim(), updated_at: new Date().toISOString() }))
     .filter((u) => u.intention.length > 0);
   if (payload.length === 0) return;
   const { error } = await supabase
@@ -744,7 +744,12 @@ export const updateLastCompletedDateToday = async (): Promise<IntentionStatsRow 
 // Fire-and-forget ping to n8n when intentions are committed (optional)
 export const pingIntentionsCommitted = async (source: 'home' | 'public'): Promise<void> => {
   try {
-    if (!N8N_INTENTIONS_PING_URL || !N8N_WEBHOOK_TOKEN) return; // disabled if not configured
+    if (!N8N_INTENTIONS_PING_URL || !N8N_WEBHOOK_TOKEN) {
+      // Visible warning to help diagnose missing pings in prod
+      // eslint-disable-next-line no-console
+      console.warn('Intentions ping disabled: missing VITE_N8N_INTENTIONS_PING_URL or VITE_N8N_WEBHOOK_TOKEN');
+      return;
+    }
     const today = getTodayLocalDate();
     await fetch(N8N_INTENTIONS_PING_URL, {
       method: 'POST',
