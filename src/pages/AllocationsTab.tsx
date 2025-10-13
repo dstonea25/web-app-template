@@ -441,7 +441,43 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
           Unavailable ({unavailableList.length})
         </h2>
-        <div className={tokens.table.wrapper}>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {unavailableList.length === 0 ? (
+            <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No unavailable items</div>
+          ) : (
+            unavailableList.map(item => (
+              <div key={item.type} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+                <div className="font-medium">{item.type}</div>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div>
+                    <span className="text-neutral-400 mr-1">Last Redeemed:</span>
+                    <span className="text-neutral-100">{item.lastRedeemed}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 mr-1">Next Available:</span>
+                    <span className="text-neutral-100">{state.stats?.nextReset?.[item.type] || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 mr-1">Count This Year:</span>
+                    <span className="text-neutral-100">{item.countThisYear}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleAdmitDefeat(item.type)}
+                    disabled={loading}
+                    className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                  >
+                    Admit Defeat
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className={cn(tokens.table.wrapper, 'hidden sm:block')}>
           <table className={tokens.table.table}>
             <thead className={tokens.table.thead}>
               <tr>
@@ -546,8 +582,99 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
           </div>
         </div>
 
-        {/* Table (editable like Ideas) */}
-        <div className={tokens.table.wrapper}>
+        {/* Mobile cards (editable) */}
+        <div className="sm:hidden space-y-3">
+          {sortedItems.length === 0 ? (
+            <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No allocations</div>
+          ) : (
+            sortedItems.map((it, sortedIdx) => {
+              const originalIdx = state.items.findIndex(item => item.type === it.type);
+              const isEditing = editingCell?.index === originalIdx;
+              return (
+                <div key={it.type + sortedIdx} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+                  {/* Item */}
+                  <div>
+                    <div className="text-xs mb-1">Item</div>
+                    {isEditing && editingCell?.field === 'type' ? (
+                      <input
+                        className={cn(tokens.input.base, tokens.input.focus)}
+                        value={it.type}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { type: e.target.value })}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
+                        autoFocus
+                      />
+                    ) : (
+                      <button type="button" className={cn('text-left w-full', tokens.accent.text_hover)} onClick={()=>handleEditStart(originalIdx, 'type')}>{it.type}</button>
+                    )}
+                  </div>
+                  {/* Quota */}
+                  <div>
+                    <div className="text-xs mb-1">Quota</div>
+                    {isEditing && editingCell?.field === 'quota' ? (
+                      <input
+                        type="number"
+                        min={0}
+                        className={cn(tokens.input.base, tokens.input.focus, 'w-full')}
+                        value={String(it.quota)}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { quota: Number(e.target.value)||0 })}
+                        onFocus={handleSelectAll}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
+                      />
+                    ) : (
+                      <button type="button" className={cn('text-left w-full', tokens.accent.text_hover)} onClick={()=>handleEditStart(originalIdx, 'quota')}>{it.quota}</button>
+                    )}
+                  </div>
+                  {/* Cadence */}
+                  <div>
+                    <div className="text-xs mb-1">Cadence</div>
+                    {isEditing && editingCell?.field === 'cadence' ? (
+                      <select
+                        className={cn(tokens.input.base, tokens.input.focus)}
+                        value={it.cadence}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { cadence: e.target.value as any })}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLSelectElement).blur(); } }}
+                      >
+                        <option value="weekly">weekly</option>
+                        <option value="monthly">monthly</option>
+                        <option value="yearly">yearly</option>
+                      </select>
+                    ) : (
+                      <button type="button" className={cn('text-left w-full', tokens.accent.text_hover)} onClick={()=>handleEditStart(originalIdx, 'cadence')}>{it.cadence}</button>
+                    )}
+                  </div>
+                  {/* Multiplier */}
+                  <div>
+                    <div className="text-xs mb-1">Multiplier</div>
+                    {isEditing && editingCell?.field === 'multiplier' ? (
+                      <input
+                        type="number"
+                        min={1}
+                        className={cn(tokens.input.base, tokens.input.focus, 'w-full')}
+                        value={String(it.multiplier || 1)}
+                        onChange={(e)=>updateItemUiOnly(originalIdx, { multiplier: Math.max(1, Number(e.target.value)||1) })}
+                        onFocus={handleSelectAll}
+                        onBlur={()=>{ commitItemEdit(originalIdx); setEditingCell(null); }}
+                        onKeyDown={(e)=>{ if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
+                      />
+                    ) : (
+                      <button type="button" className={cn('text-left w-full', tokens.accent.text_hover)} onClick={()=>handleEditStart(originalIdx, 'multiplier')}>{it.multiplier || 1}</button>
+                    )}
+                  </div>
+                  <div className="flex justify-end">
+                    <button className={cn(tokens.button.base, tokens.button.secondary, 'text-sm')} onClick={()=>removeItem(originalIdx)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        {/* Desktop table (hidden on small screens) */}
+        <div className={cn(tokens.table.wrapper, 'hidden sm:block')}>
           <table className={tokens.table.table}>
             <thead className={tokens.table.thead}>
               <tr>

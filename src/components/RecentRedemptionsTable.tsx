@@ -26,7 +26,39 @@ export const RecentRedemptionsTable: React.FC<RecentRedemptionsTableProps> = ({ 
   return (
     <div className="mt-8">
       <h3 className="text-lg font-semibold mb-4 text-neutral-100">Recent Redemptions</h3>
-      <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {(!rows || rows.length === 0) ? (
+          <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No recent redemptions.</div>
+        ) : (
+          rows.map((r) => (
+            <div key={r.id} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
+              <div className="font-medium">{r.item}</div>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <div>
+                  <span className="text-neutral-400 mr-1">When:</span>
+                  <span className="text-neutral-100">{fmt(r.ts)}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 mr-1">Qty:</span>
+                  <span className="text-neutral-100">{r.qty ?? 1}</span>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onDelete(String(r.id))}
+                  className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table (hidden on small screens) */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className={cn(tokens.table.table)}>
           <thead className={tokens.table.thead}>
             <tr>
