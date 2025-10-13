@@ -666,7 +666,7 @@ export const upsertIntentions = async (updates: UpsertIntentionInput[]): Promise
   if (!updates || updates.length === 0) return;
   // Defensive: never overwrite with empty/whitespace intentions
   const payload = updates
-    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim(), updated_at: new Date().toISOString() }))
+    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim(), completed: false, updated_at: new Date().toISOString() }))
     .filter((u) => u.intention.length > 0);
   if (payload.length === 0) return;
   const { error } = await supabase
