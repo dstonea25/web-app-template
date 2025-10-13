@@ -34,14 +34,15 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   const [lockedIn, setLockedIn] = useState<boolean>(false);
 
   const today = useMemo(() => getTodayLocalDate(), []);
-
-  // Determine locked state from localStorage per-day
-  useEffect(() => {
+  const isSameLocalDay = (iso: string, ymd: string): boolean => {
     try {
-      const v = localStorage.getItem('intentions.lockedDate');
-      setLockedIn(v === today);
-    } catch {}
-  }, [today]);
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}` === ymd;
+    } catch { return false; }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -51,9 +52,31 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
         await resetIntentionsIfNewDay();
         const current = await fetchCurrentIntentions();
         if (!mounted) return;
-        const nextDrafts: Record<IntentionPillar, string> = { Power: '', Passion: '', Purpose: '', Production: '' };
-        for (const r of current) nextDrafts[r.pillar] = r.intention || '';
-        setDrafts(nextDrafts);
+        // Determine lock based on DB (all 4 set today) or local lock for today
+        const lockedByDb = Array.isArray(current) && current.length === 4 && current.every((r: any) => ((r.intention || '').trim().length > 0) && isSameLocalDay((r as any).updated_at, today));
+        let lockedLocal = false;
+        try { lockedLocal = localStorage.getItem('intentions.lockedDate') === today; } catch {}
+        const isLocked = lockedByDb || lockedLocal;
+        setLockedIn(isLocked);
+
+        // Prefill only when locked. Otherwise start from local drafts for today or blanks.
+        if (isLocked) {
+          const prefill: Record<IntentionPillar, string> = { Power: '', Passion: '', Purpose: '', Production: '' };
+          for (const r of current as any[]) prefill[(r as any).pillar as IntentionPillar] = (r as any).intention || '';
+          setDrafts(prefill);
+        } else {
+          try {
+            const raw = localStorage.getItem(`intentions.drafts.${today}`);
+            if (raw) {
+              const parsed = JSON.parse(raw) as Record<IntentionPillar, string>;
+              setDrafts(parsed);
+            } else {
+              setDrafts({ Power: '', Passion: '', Purpose: '', Production: '' });
+            }
+          } catch {
+            setDrafts({ Power: '', Passion: '', Purpose: '', Production: '' });
+          }
+        }
       } catch (e) {
         console.error('Failed to load intentions:', e);
       } finally {
@@ -66,7 +89,11 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   const allFilled = PILLARS.every(p => (drafts[p.key] || '').trim().length > 0);
 
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
-    setDrafts(prev => ({ ...prev, [pillar]: value }));
+    setDrafts(prev => {
+      const next = { ...prev, [pillar]: value } as Record<IntentionPillar, string>;
+      try { localStorage.setItem(`intentions.drafts.${today}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const onLockIn = async () => {
@@ -76,6 +103,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
       await upsertIntentions(payload);
       setLockedIn(true);
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
+      try { localStorage.removeItem(`intentions.drafts.${today}`); } catch {}
       toast.success('Intentions locked for today ✅');
       // Reset completion flags in DB for the new day, then ping
       try {

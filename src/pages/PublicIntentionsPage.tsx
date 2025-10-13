@@ -43,13 +43,16 @@ export const PublicIntentionsPage: React.FC = () => {
   const [drafts, setDrafts] = useState<Record<IntentionPillar, string>>({ Power: '', Passion: '', Purpose: '', Production: '' });
   const [lockedIn, setLockedIn] = useState<boolean>(false);
 
-  // Local lock parity with Home
-  useEffect(() => {
+  // Helper to check same local day
+  const isSameLocalDay = (iso: string, ymd: string): boolean => {
     try {
-      const v = localStorage.getItem('intentions.lockedDate');
-      setLockedIn(v === today);
-    } catch {}
-  }, [today]);
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}` === ymd;
+    } catch { return false; }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -59,9 +62,29 @@ export const PublicIntentionsPage: React.FC = () => {
         await resetIntentionsIfNewDay();
         const current = await fetchCurrentIntentions();
         if (!mounted) return;
-        const nextDrafts: Record<IntentionPillar, string> = { Power: '', Passion: '', Purpose: '', Production: '' };
-        for (const r of current) nextDrafts[r.pillar] = r.intention || '';
-        setDrafts(nextDrafts);
+        const lockedByDb = Array.isArray(current) && current.length === 4 && current.every((r: any) => ((r.intention || '').trim().length > 0) && isSameLocalDay((r as any).updated_at, today));
+        let lockedLocal = false;
+        try { lockedLocal = localStorage.getItem('intentions.lockedDate') === today; } catch {}
+        const isLocked = lockedByDb || lockedLocal;
+        setLockedIn(isLocked);
+
+        if (isLocked) {
+          const prefill: Record<IntentionPillar, string> = { Power: '', Passion: '', Purpose: '', Production: '' };
+          for (const r of current as any[]) prefill[(r as any).pillar as IntentionPillar] = (r as any).intention || '';
+          setDrafts(prefill);
+        } else {
+          try {
+            const raw = localStorage.getItem(`intentions.drafts.${today}`);
+            if (raw) {
+              const parsed = JSON.parse(raw) as Record<IntentionPillar, string>;
+              setDrafts(parsed);
+            } else {
+              setDrafts({ Power: '', Passion: '', Purpose: '', Production: '' });
+            }
+          } catch {
+            setDrafts({ Power: '', Passion: '', Purpose: '', Production: '' });
+          }
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to load intentions (public):', e);
@@ -75,7 +98,11 @@ export const PublicIntentionsPage: React.FC = () => {
   const allFilled = PILLARS.every(p => (drafts[p.key] || '').trim().length > 0);
 
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
-    setDrafts(prev => ({ ...prev, [pillar]: value }));
+    setDrafts(prev => {
+      const next = { ...prev, [pillar]: value } as Record<IntentionPillar, string>;
+      try { localStorage.setItem(`intentions.drafts.${today}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const onCommit = async () => {
@@ -85,6 +112,7 @@ export const PublicIntentionsPage: React.FC = () => {
       await upsertIntentions(payload);
       setLockedIn(true);
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
+      try { localStorage.removeItem(`intentions.drafts.${today}`); } catch {}
       toast.success('Intentions committed ✅');
       // Fire-and-forget ping
       pingIntentionsCommitted('public');

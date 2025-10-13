@@ -43,7 +43,7 @@ RUN npm run build
 FROM node:20-alpine AS production
 
 # Install http-server globally
-RUN npm install -g http-server
+RUN npm install -g serve
 
 # Set working directory
 WORKDIR /app
@@ -67,4 +67,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
 
 # Start http-server
-CMD ["http-server", "dist", "-p", "8080", "-a", "0.0.0.0", "--cors"]
+CMD ["serve", "-s", "dist", "-l", "8080"]
