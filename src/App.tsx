@@ -1,4 +1,5 @@
 import { AppShell } from './components/AppShell'
+import { PublicIntentionsPage } from './pages/PublicIntentionsPage'
 import { AuthProvider } from './contexts/AuthContext'
 import { TimerProvider } from './contexts/TimerContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -49,9 +50,15 @@ function App() {
       <AuthProvider>
         <TimerProvider>
           <WorkModeProvider>
-            <ProtectedRoute>
-              <AppShell />
-            </ProtectedRoute>
+            {typeof window !== 'undefined' && window.location.pathname.startsWith('/intentions') ? (
+              <ProtectedRoute>
+                <PublicIntentionsPage />
+              </ProtectedRoute>
+            ) : (
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            )}
           </WorkModeProvider>
         </TimerProvider>
       </AuthProvider>
