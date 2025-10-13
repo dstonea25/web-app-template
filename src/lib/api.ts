@@ -290,7 +290,7 @@ const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/
 // const N8N_INTENTIONS_LOCK_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/intentions-lock'; // v2
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 const N8N_INTENTIONS_PING_URL = import.meta.env.VITE_N8N_INTENTIONS_PING_URL || '';
-const INTENTIONS_RESET_RPC = import.meta.env.VITE_INTENTIONS_RESET_RPC || 'reset_intentions_completion';
+const INTENTIONS_RESET_RPC = import.meta.env.VITE_INTENTIONS_RESET_RPC || 'reset_intentions_daily';
 
 // Global loading states to prevent duplicate webhook calls
 // let isLoadingTodos = false; // no longer needed without webhook fallback
@@ -680,7 +680,6 @@ export const resetIntentionsCompletionOnCommit = async (): Promise<void> => {
   const supabase = (mod as any).supabase as any | null;
   const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
   if (!isSupabaseConfigured || !supabase) return;
-  // Call Postgres function to reset completion-related fields
   const { error } = await supabase.rpc(INTENTIONS_RESET_RPC);
   if (error) throw error;
 };

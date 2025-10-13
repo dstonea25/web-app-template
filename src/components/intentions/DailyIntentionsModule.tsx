@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, tokens } from '../../theme/config';
 import type { IntentionPillar } from '../../types';
-import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted, resetIntentionsCompletionOnCommit } from '../../lib/api';
+import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
 import { SessionTimer } from './SessionTimer';
 import { StreakDisplay } from './StreakDisplay';
@@ -74,11 +74,14 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
     try {
       const payload = PILLARS.map(p => ({ pillar: p.key, intention: (drafts[p.key] || '').trim() }));
       await upsertIntentions(payload);
-      // Reset completion flags for the new day after successful commit
-      try { await resetIntentionsCompletionOnCommit(); } catch {}
       setLockedIn(true);
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
       toast.success('Intentions locked for today ✅');
+      // Reset completion flags in DB for the new day, then ping
+      try {
+        const mod = await import('../../lib/api');
+        await (mod as any).resetIntentionsCompletionOnCommit();
+      } catch {}
       // Non-blocking webhook ping
       pingIntentionsCommitted('home');
       // v2 webhook will be added later
