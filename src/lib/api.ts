@@ -703,34 +703,154 @@ export const resetIntentionsIfNewDay = async (): Promise<void> => {
   try { localStorage.setItem(lastResetKey, today); } catch {}
 };
 
-export const fetchIntentionStats = async (): Promise<IntentionStatsRow> => {
+export const fetchIntentionStats = async (): Promise<IntentionStatsRow[]> => {
   const mod = await import('./supabase');
   const supabase = (mod as any).supabase as any | null;
   const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-  const defaults: IntentionStatsRow = { id: 'local', current_streak: 0, longest_streak: 0, last_completed_date: null, updated_at: new Date(0).toISOString() };
-  if (!isSupabaseConfigured || !supabase) return defaults;
+  
+  if (!isSupabaseConfigured || !supabase) {
+    // Return default structure for all pillars
+    return PILLARS.map(pillar => ({
+      id: `local-${pillar.toLowerCase()}`,
+      pillar,
+      current_streak: 0,
+      longest_streak: 0,
+      last_completed_date: null,
+      updated_at: new Date(0).toISOString()
+    }));
+  }
+
   const { data, error } = await supabase
     .from('intention_stats')
-    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error && error.code !== 'PGRST116') throw error; // ignore no rows
-  if (!data) {
-    const { data: created, error: insErr } = await supabase
-      .from('intention_stats')
-      .insert({ current_streak: 0, longest_streak: 0, last_completed_date: null })
-      .select('id,current_streak,longest_streak,last_completed_date,updated_at')
-      .single();
-    if (insErr) throw insErr;
-    return created as IntentionStatsRow;
-  }
-  return data as IntentionStatsRow;
+    .select('id, pillar, current_streak, longest_streak, last_completed_date, updated_at')
+    .order('pillar', { ascending: true });
+    
+  if (error) throw error;
+  
+  // Ensure all 4 pillars exist, fill missing ones with defaults
+  const pillarData = new Map(data?.map((row: any) => [row.pillar, row]) || []);
+  return PILLARS.map(pillar => {
+    const existing = pillarData.get(pillar);
+    return existing || {
+      id: `missing-${pillar.toLowerCase()}`,
+      pillar,
+      current_streak: 0,
+      longest_streak: 0,
+      last_completed_date: null,
+      updated_at: new Date(0).toISOString()
+    };
+  }) as IntentionStatsRow[];
 };
 
 // v1: streak is read-only; no local incrementing
 
 // v2: webhook will be added later
+
+// ===== STREAK TRACKING FUNCTIONS =====
+
+// Mark a specific pillar intention as completed for today
+export const markIntentionCompleted = async (pillar: IntentionPillar): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  const today = getTodayLocalDate();
+  
+  if (!isSupabaseConfigured || !supabase) return;
+  
+  // First, mark the intention as completed in daily_intentions
+  const { error: updateError } = await supabase
+    .from('daily_intentions')
+    .update({ completed: true })
+    .eq('date', today)
+    .eq('pillar', pillar);
+    
+  if (updateError) throw updateError;
+  
+  // Then update the streak stats
+  await calculateAndUpdatePillarStreak(pillar);
+};
+
+// Calculate and update streak for a specific pillar
+export const calculateAndUpdatePillarStreak = async (pillar: IntentionPillar): Promise<void> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  const today = getTodayLocalDate();
+  
+  if (!isSupabaseConfigured || !supabase) return;
+  
+  // Get current stats for this pillar
+  const { data: currentStats, error: fetchError } = await supabase
+    .from('intention_stats')
+    .select('id, current_streak, longest_streak, last_completed_date')
+    .eq('pillar', pillar)
+    .maybeSingle();
+    
+  if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+  
+  const currentStreak = currentStats?.current_streak || 0;
+  const longestStreak = currentStats?.longest_streak || 0;
+  const lastCompleted = currentStats?.last_completed_date;
+  
+  // Calculate new streak
+  let newStreak = 1; // Start with 1 for today
+  if (lastCompleted) {
+    const lastDate = new Date(lastCompleted);
+    const todayDate = new Date(today);
+    const daysDiff = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff === 1) {
+      // Consecutive day - increment streak
+      newStreak = currentStreak + 1;
+    } else if (daysDiff > 1) {
+      // Gap in days - reset to 1
+      newStreak = 1;
+    }
+    // If daysDiff === 0, it's the same day, don't update
+  }
+  
+  const newLongestStreak = Math.max(longestStreak, newStreak);
+  
+  // Upsert the updated stats
+  const { error: upsertError } = await supabase
+    .from('intention_stats')
+    .upsert({
+      pillar,
+      current_streak: newStreak,
+      longest_streak: newLongestStreak,
+      last_completed_date: today,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'pillar' });
+    
+  if (upsertError) throw upsertError;
+};
+
+// Get completion status for today's intentions
+export const getTodayCompletionStatus = async (): Promise<Record<IntentionPillar, boolean>> => {
+  const mod = await import('./supabase');
+  const supabase = (mod as any).supabase as any | null;
+  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
+  const today = getTodayLocalDate();
+  
+  if (!isSupabaseConfigured || !supabase) {
+    return { Power: false, Passion: false, Purpose: false, Production: false };
+  }
+  
+  const { data, error } = await supabase
+    .from('daily_intentions')
+    .select('pillar, completed')
+    .eq('date', today);
+    
+  if (error) throw error;
+  
+  const completionMap = new Map(data?.map((row: any) => [row.pillar, row.completed]) || []);
+  return {
+    Power: Boolean(completionMap.get('Power')),
+    Passion: Boolean(completionMap.get('Passion')),
+    Purpose: Boolean(completionMap.get('Purpose')),
+    Production: Boolean(completionMap.get('Production'))
+  };
+};
 
 export const updateLastCompletedDateToday = async (): Promise<IntentionStatsRow | null> => {
   const mod = await import('./supabase');
@@ -740,14 +860,14 @@ export const updateLastCompletedDateToday = async (): Promise<IntentionStatsRow 
   const today = getTodayLocalDate();
   const { data: statsRow } = await supabase
     .from('intention_stats')
-    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+    .select('id,pillar,current_streak,longest_streak,last_completed_date,updated_at')
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   const { data: updated, error } = await supabase
     .from('intention_stats')
-    .upsert({ id: statsRow?.id, last_completed_date: today, current_streak: statsRow?.current_streak ?? 0, longest_streak: statsRow?.longest_streak ?? 0 }, { onConflict: 'id' })
-    .select('id,current_streak,longest_streak,last_completed_date,updated_at')
+    .upsert({ id: statsRow?.id, pillar: statsRow?.pillar, last_completed_date: today, current_streak: statsRow?.current_streak ?? 0, longest_streak: statsRow?.longest_streak ?? 0 }, { onConflict: 'id' })
+    .select('id,pillar,current_streak,longest_streak,last_completed_date,updated_at')
     .single();
   if (error) throw error;
   return updated as IntentionStatsRow;

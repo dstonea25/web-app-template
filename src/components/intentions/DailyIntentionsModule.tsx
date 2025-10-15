@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, tokens } from '../../theme/config';
-import type { IntentionPillar } from '../../types';
-import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted } from '../../lib/api';
+import type { IntentionPillar, IntentionStatsRow } from '../../types';
+import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted, fetchIntentionStats, getTodayCompletionStatus, markIntentionCompleted } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
 import { SessionTimer } from './SessionTimer';
-import { StreakDisplay } from './StreakDisplay';
 
 const PILLARS: { key: IntentionPillar; label: string; emoji: string }[] = [
   { key: 'Power', label: 'Power', emoji: '💪' },
@@ -32,6 +31,8 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<IntentionPillar, string>>({ Power: '', Passion: '', Purpose: '', Production: '' });
   const [lockedIn, setLockedIn] = useState<boolean>(false);
+  const [streakStats, setStreakStats] = useState<IntentionStatsRow[]>([]);
+  const [completionStatus, setCompletionStatus] = useState<Record<IntentionPillar, boolean>>({ Power: false, Passion: false, Purpose: false, Production: false });
 
   const today = useMemo(() => getTodayLocalDate(), []);
   const isSameLocalDay = (iso: string, ymd: string): boolean => {
@@ -50,8 +51,16 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
       setLoading(true);
       try {
         await resetIntentionsIfNewDay();
-        const current = await fetchCurrentIntentions();
+        const [current, stats, completion] = await Promise.all([
+          fetchCurrentIntentions(),
+          fetchIntentionStats(),
+          getTodayCompletionStatus()
+        ]);
         if (!mounted) return;
+        
+        setStreakStats(stats);
+        setCompletionStatus(completion);
+        
         // Determine lock based on DB (all 4 set today) or local lock for today
         const lockedByDb = Array.isArray(current) && current.length === 4 && current.every((r: any) => ((r.intention || '').trim().length > 0) && isSameLocalDay((r as any).updated_at, today));
         let lockedLocal = false;
@@ -88,12 +97,49 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
 
   const allFilled = PILLARS.every(p => (drafts[p.key] || '').trim().length > 0);
 
+  // Helper function to get compact streak display
+  const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
+    const stat = streakStats.find(s => s.pillar === pillar);
+    if (!stat || stat.current_streak === 0) {
+      return ''; // Don't show anything for 0 streaks
+    }
+    
+    if (stat.current_streak === 1) {
+      return '🔥'; // Just emoji for 1 day
+    }
+    
+    // 2+ days: use Nx emoji format for streamlined look
+    return `${stat.current_streak}x 🔥`;
+  };
+
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
     setDrafts(prev => {
       const next = { ...prev, [pillar]: value } as Record<IntentionPillar, string>;
       try { localStorage.setItem(`intentions.drafts.${today}`, JSON.stringify(next)); } catch {}
       return next;
     });
+  };
+
+  const handleCompletionToggle = async (pillar: IntentionPillar) => {
+    if (!lockedIn) return; // Only allow completion if intentions are locked in
+    
+    try {
+      await markIntentionCompleted(pillar);
+      
+      // Refresh streak stats and completion status
+      const [newStats, newCompletion] = await Promise.all([
+        fetchIntentionStats(),
+        getTodayCompletionStatus()
+      ]);
+      
+      setStreakStats(newStats);
+      setCompletionStatus(newCompletion);
+      
+      toast.success(`${pillar} intention completed! 🔥`);
+    } catch (error) {
+      console.error('Failed to mark intention as completed:', error);
+      toast.error('Failed to mark as completed');
+    }
   };
 
   const onLockIn = async () => {
@@ -128,7 +174,6 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
           <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'text-neutral-100')}>
             Daily Intentions
           </h3>
-          <StreakDisplay />
         </div>
         <div className="mt-3" />
 
@@ -137,16 +182,34 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
         ) : (
           <div className="mt-2 grid gap-3">
             {PILLARS.map(p => (
-              <div key={p.key} className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] items-center gap-2">
-                <div className={cn(tokens.typography.weights.semibold, 'text-neutral-100')}>{`${p.emoji} ${p.label}`}</div>
+              <div key={p.key} className="flex items-center gap-3">
+                <div className={cn(tokens.typography.weights.semibold, 'text-neutral-100', 'text-sm', 'w-24', 'whitespace-nowrap')}>
+                  {p.emoji} {p.label}
+                </div>
+                <div className={cn(tokens.typography.weights.medium, 'text-neutral-300', 'text-sm', 'w-12', 'text-center')}>
+                  {getCompactStreakDisplay(p.key)}
+                </div>
                 <input
                   type="text"
-                  className={cn(tokens.input.base, tokens.input.focus, 'text-neutral-100 placeholder:text-neutral-300')}
+                  className={cn(tokens.input.base, tokens.input.focus, 'text-neutral-100 placeholder:text-neutral-300', 'flex-1')}
                   placeholder={PLACEHOLDERS[p.key]}
                   value={drafts[p.key]}
                   onChange={(e) => onChangeDraft(p.key, e.target.value)}
                   readOnly={lockedIn}
                 />
+                {lockedIn && (
+                  <button
+                    onClick={() => handleCompletionToggle(p.key)}
+                    className={cn(
+                      'w-6 h-6 rounded border-2 flex items-center justify-center transition-colors',
+                      completionStatus[p.key]
+                        ? 'bg-green-600 border-green-600 text-white'
+                        : 'border-neutral-500 hover:border-green-500 hover:bg-green-500/20'
+                    )}
+                  >
+                    {completionStatus[p.key] && '✓'}
+                  </button>
+                )}
               </div>
             ))}
           </div>

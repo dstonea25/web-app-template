@@ -153,6 +153,7 @@ export interface CurrentIntentionRow {
 
 export interface IntentionStatsRow {
   id: string; // uuid
+  pillar: IntentionPillar; // 'Power' | 'Passion' | 'Purpose' | 'Production'
   current_streak: number;
   longest_streak: number;
   last_completed_date: string | null; // YYYY-MM-DD
