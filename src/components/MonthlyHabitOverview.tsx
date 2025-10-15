@@ -1,8 +1,6 @@
 import React from 'react';
-import { cn } from '../theme/config';
 import { toast } from '../lib/notifications/toast';
 import type { Habit } from '../types';
-import { apiClient } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 interface HabitStreak {
@@ -85,7 +83,6 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     const cells = [];
     
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
       const dateIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       cells.push({ day, dateIso });
     }
