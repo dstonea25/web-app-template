@@ -1,0 +1,37 @@
+{
+  "version": "1.1.0",
+  "tab": "allocations",
+  "functions": [
+    {
+      "name": "loadAllocations",
+      "description": "Loads the current year's ledger and allotments from webhooks. Returns derived state: available, coming_up, and unavailable."
+    },
+    {
+      "name": "redeemAllocation",
+      "description": "Takes an item type (e.g. 'Caloric Beverage'), saves redemption to webhook, recalculates derived state."
+    },
+    {
+      "name": "addAllocation",
+      "description": "Optional. Allows manual override to add back one allocation (useful for testing or corrections)."
+    },
+    {
+      "name": "getStats",
+      "description": "Returns analytics view: usage counts, reset schedule, and percentages used this year."
+    },
+    {
+      "name": "saveAllocationsItems",
+      "description": "Saves allocation items configuration to webhook."
+    }
+  ],
+  "webhook_integration": [
+    "fetchAllotmentsFromWebhook",
+    "saveAllotmentsToWebhook", 
+    "fetchLedgerFromWebhook",
+    "saveLedgerToWebhook"
+  ],
+  "mvp_notes": "Now uses n8n webhooks for all data persistence. No longer uses stub data files."
+}
+
+
+
+

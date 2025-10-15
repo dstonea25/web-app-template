@@ -1,0 +1,41 @@
+{
+  "version": "1.3.0",
+  "tab_id": "time",
+  "acceptance": [
+    "Timer with continue functionality - start, stop, continue from elapsed time",
+    "Manual time entry with separate hour/minute inputs and validation",
+    "Auto-switch chart category when adding time within current period",
+    "Real-time timer display with proper state management",
+    "Form validation preventing double-submission and invalid inputs",
+    "Chart filtering by category and time period (week/month/year)",
+    "Session persistence with localStorage and webhook integration",
+    "Responsive layout with proper alignment and spacing",
+    "Toast notifications for user feedback",
+    "Error handling with fallback to mock data"
+  ],
+  "features": [
+    "Timer Controls: Start, Stop, Continue, Reset",
+    "Manual Time Entry: Date, Category, Duration (Hours/Minutes)",
+    "Chart Visualization: Daily hours by category and time period",
+    "Data Management: Webhook sync, localStorage persistence",
+    "Form Validation: Input validation, loading states, error handling",
+    "UI/UX: Responsive design, proper alignment, visual feedback"
+  ],
+  "state_management": [
+    "activeSession: Current running timer session",
+    "pendingSession: Stopped timer awaiting submission", 
+    "sessions: All time tracking sessions",
+    "timerCategory: Selected category for timer",
+    "chartCategory: Selected category for chart display",
+    "timePeriod: Current time period filter (week/month/year)",
+    "manualDate/manualCategory/manualHours/manualMinutes: Manual entry form",
+    "isSubmitting: Loading state for form submission",
+    "elapsedMs: Current timer elapsed time in milliseconds"
+  ],
+  "integrations": [
+    "TimerContext: Cross-tab timer state management",
+    "Webhook API: Session data persistence and retrieval",
+    "localStorage: Timer state and preferences persistence",
+    "Toast Notifications: User feedback system"
+  ]
+}

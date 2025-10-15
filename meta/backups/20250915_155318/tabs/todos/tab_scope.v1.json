@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "tab_id": "todos",
+  "acceptance": [
+    "Inline edit (task) + editable priority.",
+    "Status is UI-only; not exported.",
+    "Update/Complete stage only; no network until Save.",
+    "Save exports full array with ids 1..N by created_at asc; status='open'.",
+    "A11y: aria-sort + live announcements."
+  ]
+}

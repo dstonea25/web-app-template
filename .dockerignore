@@ -1,0 +1,59 @@
+# Git
+.git/
+.gitignore
+
+# Dependencies (will be installed in container)
+node_modules/
+
+# Build outputs (will be built in container)
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Documentation
+*.md
+README.md
+AUTHENTICATION.md
+DEPLOYMENT.md
+WEBHOOK_SETUP.md
+AUX_TODOS_AUDIT.md
+
+# Development files
+.vscode/
+.idea/
+.cursor/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage/
+.nyc_output/
+
+# Meta and backups
+meta/
+backups/
+
+# Docker files (no need to copy into image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Scripts that aren't needed in container
+test-deployment.sh
+start-production.sh
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Lock files (uncomment if you want to use package.json only)
+# package-lock.json
+

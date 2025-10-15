@@ -1,0 +1,91 @@
+{
+  "version": "1.2.0",
+  "overrides": {
+    "component_tokens": {
+      "table": { 
+        "density": { "comfortable": "td:px-5 td:py-3" },
+        "zebra": "even:bg-neutral-800/30",
+        "sticky_header": "sticky top-0 bg-neutral-900 z-10",
+        "sortable": "cursor-pointer hover:bg-neutral-800/50",
+        "editable": "focus:outline-none focus:ring-2 focus:ring-blue-400",
+        "multiline_cell": "min-h-[60px] py-2"
+      },
+      "button": { 
+        "info": "text-neutral-100 bg-blue-500 border-blue-500 hover:bg-blue-400",
+        "save": "text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-400",
+        "cancel": "text-neutral-100 bg-neutral-600 border-neutral-600 hover:bg-neutral-500",
+        "remove": "text-red-400 hover:text-red-300"
+      },
+      "input": {
+        "search": "w-full px-3 py-2 border border-neutral-800 rounded-lg bg-neutral-900 text-neutral-100",
+        "inline_edit": "w-full px-2 py-1 border-0 bg-transparent text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-400",
+        "multiline_edit": "w-full px-2 py-1 border-0 bg-transparent text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none min-h-[60px]"
+      },
+      "select": {
+        "category": "w-full px-2 py-1 border-0 bg-transparent text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-400",
+        "sort": "px-3 py-2 border border-neutral-800 rounded-lg bg-neutral-900 text-neutral-100"
+      },
+      "category_tabs": {
+        "container": "flex flex-wrap gap-2 mb-4",
+        "tab": "px-3 py-1.5 rounded-full border text-sm transition-colors",
+        "active": "bg-blue-500 text-white border-blue-500",
+        "inactive": "border-neutral-600 text-neutral-300 hover:border-neutral-500"
+      },
+      "status_indicator": {
+        "staged": "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+        "saved": "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+        "error": "bg-red-500/20 text-red-400 border border-red-500/30"
+      },
+      "form": {
+        "new_idea": "flex flex-col gap-4 mb-4",
+        "input_group": "flex gap-2",
+        "category_select": "min-w-[120px]",
+        "notes_textarea": "min-h-[80px] resize-none"
+      },
+      "loading": {
+        "spinner": "animate-spin h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full",
+        "overlay": "absolute inset-0 bg-neutral-900/50 flex items-center justify-center"
+      },
+      "error": {
+        "message": "text-red-400 text-sm mt-2",
+        "retry_button": "text-blue-400 hover:text-blue-300 underline"
+      },
+      "field_editing": {
+        "idea_field": "font-medium text-neutral-100",
+        "category_field": "text-blue-400",
+        "notes_field": "text-neutral-300 text-sm",
+        "editing": "bg-blue-500/10 border border-blue-500/30 rounded"
+      }
+    }
+  },
+  "layout": {
+    "main_container": "p-6 max-w-6xl mx-auto",
+    "header": "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6",
+    "controls": "flex flex-col sm:flex-row gap-4",
+    "table_container": "overflow-x-auto"
+  },
+  "responsive": {
+    "mobile": {
+      "table": "text-sm",
+      "buttons": "text-xs px-2 py-1",
+      "form": "flex-col",
+      "multiline_cells": "min-h-[40px]"
+    },
+    "desktop": {
+      "table": "text-base",
+      "buttons": "text-sm px-3 py-2",
+      "form": "flex-row",
+      "multiline_cells": "min-h-[60px]"
+    }
+  },
+  "accessibility": {
+    "focus_ring": "focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-neutral-900",
+    "aria_live": "aria-live='polite'",
+    "screen_reader_only": "sr-only"
+  },
+  "multiline_support": {
+    "textarea": "resize-none min-h-[60px] max-h-[200px] overflow-y-auto",
+    "auto_height": "transition-all duration-200 ease-in-out",
+    "placeholder": "text-neutral-500 italic"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "version": "1.2.0",
+  "overrides": {
+    "time": {
+      "categoryPills": {
+        "container": "flex items-center gap-2",
+        "pill": "px-3 py-1.5 rounded-full border text-sm data-[active=true]:opacity-100 opacity-80 cursor-pointer",
+        "work": "border-[var(--color-primary)] text-[var(--color-primary)]",
+        "personal": "border-[var(--color-accent)] text-[var(--color-accent)]",
+        "gaming": "border-[var(--color-warning)] text-[var(--color-warning)]"
+      },
+      "timerCard": {
+        "wrapper": "rounded-2xl border p-8 flex flex-col items-center justify-center text-center",
+        "time": "text-6xl font-semibold tracking-tight",
+        "state": "mt-1 text-muted-foreground",
+        "actions": "mt-4 flex items-center gap-2"
+      },
+      "pendingEditor": {
+        "row": "mt-4 grid grid-cols-1 sm:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,180px)_auto] gap-3 items-center",
+        "input": "px-3 py-2 border rounded-lg bg-background",
+        "submit": "btn btn-primary"
+      },
+      "manualAdd": {
+        "wrapper": "mt-6 rounded-2xl border p-4",
+        "row": "grid grid-cols-1 md:grid-cols-[minmax(0,220px)_minmax(0,220px)_minmax(0,220px)_auto] gap-3",
+        "button": "btn btn-primary"
+      },
+      "filters": {
+        "range": "flex items-center gap-2",
+        "category": "flex items-center gap-2"
+      },
+      "charts": {
+        "container": "mt-6 grid gap-6",
+        "panel": "rounded-2xl border p-4",
+        "legend": "flex items-center gap-3 text-sm text-muted-foreground",
+        "seriesColors": {
+          "work": "var(--color-primary)",
+          "personal": "var(--color-accent)",
+          "gaming": "var(--color-warning)"
+        }
+      }
+    }
+  }
+}

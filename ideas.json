@@ -1,0 +1,402 @@
+[
+  {
+    "id": 1,
+    "idea": "Create a tool to summarize YouTube videos into actionable insights",
+    "category": "business",
+    "status": "open",
+    "notes": "Could be a SaaS product for busy professionals",
+    "created_at": "2025-01-15T10:30:00.000Z"
+  },
+  {
+    "id": 2,
+    "idea": "Develop a mobile app for habit tracking with social accountability",
+    "category": "projects",
+    "status": "open",
+    "notes": "React Native project with gamification elements",
+    "created_at": "2025-01-14T16:45:00.000Z"
+  },
+  {
+    "id": 3,
+    "idea": "Video series on 'Tech fails in real life' - when technology doesn't work as expected",
+    "category": "videos",
+    "status": "open",
+    "notes": "Comedy content showing relatable tech frustrations",
+    "created_at": "2025-01-13T14:20:00.000Z"
+  },
+  {
+    "id": 4,
+    "idea": "Write a comprehensive guide on building AI-powered workflows",
+    "category": "writing",
+    "status": "open",
+    "notes": "Target audience: automation enthusiasts and developers",
+    "created_at": "2025-01-12T09:15:00.000Z"
+  },
+  {
+    "id": 5,
+    "idea": "Implement a morning routine optimization system",
+    "category": "health",
+    "status": "open",
+    "notes": "Track energy levels, mood, and productivity correlations",
+    "created_at": "2025-01-11T07:00:00.000Z"
+  },
+  {
+    "id": 6,
+    "idea": "Build an automated email marketing sequence for small businesses",
+    "category": "business",
+    "status": "open",
+    "notes": "Focus on local service providers",
+    "created_at": "2025-01-10T13:30:00.000Z"
+  },
+  {
+    "id": 7,
+    "idea": "Create a minimalist home organization system",
+    "category": "life",
+    "status": "open",
+    "notes": "Declutter and optimize living spaces for better mental health",
+    "created_at": "2025-01-09T18:00:00.000Z"
+  },
+  {
+    "id": 8,
+    "idea": "Design a personal finance tracking app with AI insights",
+    "category": "projects",
+    "status": "open",
+    "notes": "Include predictive budgeting and expense categorization",
+    "created_at": "2025-01-08T11:45:00.000Z"
+  },
+  {
+    "id": 9,
+    "idea": "Video tutorial series on 'Coding shortcuts that save hours'",
+    "category": "videos",
+    "status": "open",
+    "notes": "Target beginner to intermediate developers",
+    "created_at": "2025-01-07T15:20:00.000Z"
+  },
+  {
+    "id": 10,
+    "idea": "Write a series of articles on sustainable living practices",
+    "category": "writing",
+    "status": "open",
+    "notes": "Focus on practical, achievable changes for urban dwellers",
+    "created_at": "2025-01-06T12:10:00.000Z"
+  },
+  {
+    "id": 11,
+    "idea": "Develop a meditation app with nature sounds and guided sessions",
+    "category": "health",
+    "status": "open",
+    "notes": "Include progress tracking and personalized recommendations",
+    "created_at": "2025-01-05T08:30:00.000Z"
+  },
+  {
+    "id": 12,
+    "idea": "Launch a subscription box service for productivity tools",
+    "category": "business",
+    "status": "open",
+    "notes": "Monthly curated selection of apps, books, and gadgets",
+    "created_at": "2025-01-04T14:15:00.000Z"
+  },
+  {
+    "id": 13,
+    "idea": "Create a digital nomad lifestyle planning system",
+    "category": "life",
+    "status": "open",
+    "notes": "Help people transition to location-independent work",
+    "created_at": "2025-01-03T16:40:00.000Z"
+  },
+  {
+    "id": 14,
+    "idea": "Build an AI-powered recipe generator based on available ingredients",
+    "category": "projects",
+    "status": "open",
+    "notes": "Include dietary restrictions and nutritional information",
+    "created_at": "2025-01-02T10:25:00.000Z"
+  },
+  {
+    "id": 15,
+    "idea": "Video documentary on the future of remote work culture",
+    "category": "videos",
+    "status": "open",
+    "notes": "Interview remote workers and company founders",
+    "created_at": "2025-01-01T19:00:00.000Z"
+  },
+  {
+    "id": 16,
+    "idea": "Write a book about digital minimalism and mindful technology use",
+    "category": "writing",
+    "status": "open",
+    "notes": "Focus on practical strategies for reducing digital overwhelm",
+    "created_at": "2024-12-31T11:50:00.000Z"
+  },
+  {
+    "id": 17,
+    "idea": "Design a sleep optimization program with wearable integration",
+    "category": "health",
+    "status": "open",
+    "notes": "Track sleep patterns and provide personalized improvement suggestions",
+    "created_at": "2024-12-30T06:15:00.000Z"
+  },
+  {
+    "id": 18,
+    "idea": "Create a platform connecting freelancers with micro-projects",
+    "category": "business",
+    "status": "open",
+    "notes": "Focus on quick turnaround tasks and skill building",
+    "created_at": "2024-12-29T13:20:00.000Z"
+  },
+  {
+    "id": 19,
+    "idea": "Develop a comprehensive life planning workbook and system",
+    "category": "life",
+    "status": "open",
+    "notes": "Include goal setting, habit tracking, and reflection exercises",
+    "created_at": "2024-12-28T17:35:00.000Z"
+  },
+  {
+    "id": 20,
+    "idea": "Build a language learning app with AI conversation partners",
+    "category": "projects",
+    "status": "open",
+    "notes": "Use speech recognition and natural language processing",
+    "created_at": "2024-12-27T09:40:00.000Z"
+  },
+  {
+    "id": 21,
+    "idea": "Video series exploring emerging technologies and their societal impact",
+    "category": "videos",
+    "status": "open",
+    "notes": "Educational content for general audience",
+    "created_at": "2024-12-26T15:10:00.000Z"
+  },
+  {
+    "id": 22,
+    "idea": "Write a comprehensive guide to personal automation and productivity",
+    "category": "writing",
+    "status": "open",
+    "notes": "Cover tools, techniques, and mindset shifts",
+    "created_at": "2024-12-25T12:00:00.000Z"
+  },
+  {
+    "id": 23,
+    "idea": "Create a mental health check-in app with mood tracking and resources",
+    "category": "health",
+    "status": "open",
+    "notes": "Include access to professional resources and crisis support",
+    "created_at": "2024-12-24T14:30:00.000Z"
+  },
+  {
+    "id": 24,
+    "idea": "Launch an online course platform for practical life skills",
+    "category": "business",
+    "status": "open",
+    "notes": "Focus on skills not typically taught in traditional education",
+    "created_at": "2024-12-23T10:45:00.000Z"
+  },
+  {
+    "id": 25,
+    "idea": "Design a comprehensive travel planning and budgeting system",
+    "category": "life",
+    "status": "open",
+    "notes": "Include itinerary optimization and cost tracking",
+    "created_at": "2024-12-22T16:20:00.000Z"
+  },
+  {
+    "id": 26,
+    "idea": "Build a collaborative whiteboarding tool for remote teams",
+    "category": "projects",
+    "status": "open",
+    "notes": "Real-time collaboration with AI-powered facilitation",
+    "created_at": "2024-12-21T11:15:00.000Z"
+  },
+  {
+    "id": 27,
+    "idea": "Video series on 'Building sustainable habits that actually stick'",
+    "category": "videos",
+    "status": "open",
+    "notes": "Science-based approach to behavior change",
+    "created_at": "2024-12-20T13:45:00.000Z"
+  },
+  {
+    "id": 28,
+    "idea": "Write a series on the psychology of productivity and motivation",
+    "category": "writing",
+    "status": "open",
+    "notes": "Bridge academic research with practical applications",
+    "created_at": "2024-12-19T09:30:00.000Z"
+  },
+  {
+    "id": 29,
+    "idea": "Develop a nutrition tracking app with AI meal planning",
+    "category": "health",
+    "status": "open",
+    "notes": "Personalized recommendations based on health goals",
+    "created_at": "2024-12-18T07:20:00.000Z"
+  },
+  {
+    "id": 30,
+    "idea": "Create a marketplace for digital products and services",
+    "category": "business",
+    "status": "open",
+    "notes": "Focus on quality curation and creator support",
+    "created_at": "2024-12-17T14:00:00.000Z"
+  },
+  {
+    "id": 31,
+    "idea": "Design a comprehensive relationship and social connection system",
+    "category": "life",
+    "status": "open",
+    "notes": "Help maintain meaningful connections in a digital age",
+    "created_at": "2024-12-16T18:25:00.000Z"
+  },
+  {
+    "id": 32,
+    "idea": "Build an AI-powered code review and improvement suggestion tool",
+    "category": "projects",
+    "status": "open",
+    "notes": "Focus on learning and skill development for developers",
+    "created_at": "2024-12-15T12:40:00.000Z"
+  },
+  {
+    "id": 33,
+    "idea": "Video series on 'Tech entrepreneurship for non-technical founders'",
+    "category": "videos",
+    "status": "open",
+    "notes": "Practical advice for building tech businesses without coding",
+    "created_at": "2024-12-14T15:50:00.000Z"
+  },
+  {
+    "id": 34,
+    "idea": "Write about the intersection of technology and human creativity",
+    "category": "writing",
+    "status": "open",
+    "notes": "Explore how AI tools enhance rather than replace human creativity",
+    "created_at": "2024-12-13T11:35:00.000Z"
+  },
+  {
+    "id": 35,
+    "idea": "Create a comprehensive stress management and resilience program",
+    "category": "health",
+    "status": "open",
+    "notes": "Include mindfulness, exercise, and lifestyle modifications",
+    "created_at": "2024-12-12T08:15:00.000Z"
+  },
+  {
+    "id": 36,
+    "idea": "Launch a subscription service for curated productivity and lifestyle content",
+    "category": "business",
+    "status": "open",
+    "notes": "Weekly newsletters, tools, and exclusive resources",
+    "created_at": "2024-12-11T16:30:00.000Z"
+  },
+  {
+    "id": 37,
+    "idea": "Develop a system for tracking and achieving long-term personal goals",
+    "category": "life",
+    "status": "open",
+    "notes": "Break down big goals into manageable milestones with accountability",
+    "created_at": "2024-12-10T13:45:00.000Z"
+  },
+  {
+    "id": 38,
+    "idea": "Build a voice-controlled home automation system",
+    "category": "projects",
+    "status": "open",
+    "notes": "Privacy-focused alternative to commercial solutions",
+    "created_at": "2024-12-09T10:20:00.000Z"
+  },
+  {
+    "id": 39,
+    "idea": "Video series exploring the future of education and learning",
+    "category": "videos",
+    "status": "open",
+    "notes": "Interview educators, students, and edtech innovators",
+    "created_at": "2024-12-08T14:10:00.000Z"
+  },
+  {
+    "id": 40,
+    "idea": "Write a guide to building meaningful side projects",
+    "category": "writing",
+    "status": "open",
+    "notes": "From ideation to launch, including lessons learned",
+    "created_at": "2024-12-07T09:55:00.000Z"
+  },
+  {
+    "id": 41,
+    "idea": "Design a comprehensive fitness program for remote workers",
+    "category": "health",
+    "status": "open",
+    "notes": "Address common issues like back pain and sedentary lifestyle",
+    "created_at": "2024-12-06T06:30:00.000Z"
+  },
+  {
+    "id": 42,
+    "idea": "Create a platform for micro-investing in creative projects",
+    "category": "business",
+    "status": "open",
+    "notes": "Allow small investments in artists, musicians, and creators",
+    "created_at": "2024-12-05T12:15:00.000Z"
+  },
+  {
+    "id": 43,
+    "idea": "Develop a comprehensive personal knowledge management system",
+    "category": "life",
+    "status": "open",
+    "notes": "Organize ideas, notes, and insights for long-term retention",
+    "created_at": "2024-12-04T17:40:00.000Z"
+  },
+  {
+    "id": 44,
+    "idea": "Build an AI-powered writing assistant for creative projects",
+    "category": "projects",
+    "status": "open",
+    "notes": "Help with brainstorming, structure, and style improvement",
+    "created_at": "2024-12-03T11:25:00.000Z"
+  },
+  {
+    "id": 45,
+    "idea": "Video series on 'Building a sustainable tech career'",
+    "category": "videos",
+    "status": "open",
+    "notes": "Address burnout, continuous learning, and career transitions",
+    "created_at": "2024-12-02T15:35:00.000Z"
+  },
+  {
+    "id": 46,
+    "idea": "Write about the future of work and human-AI collaboration",
+    "category": "writing",
+    "status": "open",
+    "notes": "Explore how to thrive in an AI-augmented workplace",
+    "created_at": "2024-12-01T10:50:00.000Z"
+  },
+  {
+    "id": 47,
+    "idea": "Create a comprehensive mental wellness tracking and improvement system",
+    "category": "health",
+    "status": "open",
+    "notes": "Include mood tracking, journaling, and evidence-based interventions",
+    "created_at": "2024-11-30T08:45:00.000Z"
+  },
+  {
+    "id": 48,
+    "idea": "Launch a community platform for digital nomads and remote workers",
+    "category": "business",
+    "status": "open",
+    "notes": "Include job board, networking, and location recommendations",
+    "created_at": "2024-11-29T14:20:00.000Z"
+  },
+  {
+    "id": 49,
+    "idea": "Design a system for maintaining work-life balance in remote settings",
+    "category": "life",
+    "status": "open",
+    "notes": "Help remote workers establish boundaries and routines",
+    "created_at": "2024-11-28T16:10:00.000Z"
+  },
+  {
+    "id": 50,
+    "idea": "Build a decentralized social media platform focused on meaningful connections",
+    "category": "projects",
+    "status": "open",
+    "notes": "Prioritize privacy, authenticity, and community building",
+    "created_at": "2024-11-27T12:55:00.000Z"
+  }
+]

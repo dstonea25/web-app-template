@@ -1,0 +1,79 @@
+{
+  "version": "1.2.0",
+  "updated_at": "2025-09-20",
+  "default_tab": "todos",
+  "tab_persistence": {
+    "enabled": true,
+    "storage_key": "dashboard-active-tab",
+    "fallback_behavior": "first_enabled_tab_or_default",
+    "validation": ["todos", "ideas", "time_tracking", "allocations", "habit_tracker"]
+  },
+  "tabs": [
+    {
+      "id": "todos",
+      "title": "To-Dos",
+      "route": "/todos",
+      "icon": "check-square",
+      "order": 10,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/todos/tab_scope.v1.json",
+        "functions": "/meta/tabs/todos/tab_functions.v1.json",
+        "styles": "/meta/tabs/todos/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "ideas",
+      "title": "Ideas",
+      "route": "/ideas",
+      "icon": "lightbulb",
+      "order": 15,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/ideas/tab_scope.v1.json",
+        "functions": "/meta/tabs/ideas/tab_functions.v1.json",
+        "styles": "/meta/tabs/ideas/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "time",
+      "title": "Time Tracking",
+      "route": "/time",
+      "icon": "timer",
+      "order": 20,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/time/tab_scope.v1.json",
+        "functions": "/meta/tabs/time/tab_functions.v1.json",
+        "styles": "/meta/tabs/time/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "allocations",
+      "title": "Allocations",
+      "route": "/allocations",
+      "icon": "check-square",
+      "order": 25,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/allocations/tab_scope.v1.json",
+        "functions": "/meta/tabs/allocations/tab_functions.v1.json",
+        "styles": "/meta/tabs/allocations/tab_styles.v1.json"
+      }
+    }
+    ,
+    {
+      "id": "habit_tracker",
+      "title": "Habit Tracker",
+      "route": "/habits",
+      "icon": "check-circle",
+      "order": 30,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/habit_tracker/tab_scope.v1.json",
+        "functions": "/meta/tabs/habit_tracker/tab_functions.v1.json",
+        "styles": "/meta/tabs/habit_tracker/tab_styles.v1.json"
+      }
+    }
+  ]
+}

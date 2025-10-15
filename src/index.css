@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide placeholder for empty date inputs */
+input.date-empty::-webkit-datetime-edit-fields-wrapper { color: transparent; }
+input.date-empty::-webkit-datetime-edit { color: transparent; }
+input.date-empty::-webkit-datetime-edit-year-field { color: transparent; }
+input.date-empty::-webkit-datetime-edit-month-field { color: transparent; }
+input.date-empty::-webkit-datetime-edit-day-field { color: transparent; }
+input.date-empty::-webkit-input-placeholder { color: transparent; }
+input.date-empty::-moz-placeholder { color: transparent; }
+input.date-empty:-ms-input-placeholder { color: transparent; }
+input.date-empty::placeholder { color: transparent; }
+
+/* Utility: two-line clamp without plugin */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

@@ -1,0 +1,36 @@
+# Dependencies - no need to index
+node_modules/
+
+# Build outputs - generated files
+dist/
+build/
+
+# Backups - old versions
+backups/
+
+# Meta backups - likely large and not needed for active development
+meta/backups/
+
+# Logs
+*.log
+logs/
+
+# Large data files (if needed, can be more specific)
+# public/data/
+# dist/data/
+
+# Lock files - not useful for AI assistance
+package-lock.json
+
+# Build artifacts
+*.tsbuildinfo
+.cache/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
