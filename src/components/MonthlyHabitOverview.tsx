@@ -5,6 +5,13 @@ import type { Habit } from '../types';
 import { apiClient } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabase';
 
+interface HabitStreak {
+  habit_id: string;
+  current_streak: number;
+  longest_streak: number;
+  last_completed_date: string | null;
+}
+
 interface MonthlyHabitOverviewProps {
   habits: Habit[];
   calendarData: Record<string, Set<string>>;
@@ -43,6 +50,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [habitStreaks, setHabitStreaks] = React.useState<Record<string, HabitStreak>>({});
 
   // Generate month options for selector
   const monthOptions = React.useMemo(() => {
@@ -94,10 +102,66 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     return COLOR_CYCLE[i];
   }, [habits]);
 
+  // Fetch habit streaks
+  const fetchHabitStreaks = React.useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    
+    try {
+      const mod = await import('../lib/supabase');
+      const supabase = (mod as any).supabase;
+      if (!supabase) return;
+
+      const { data, error } = await supabase
+        .from('habit_streaks')
+        .select('habit_id, current_streak, longest_streak, last_completed_date');
+
+      if (error) throw error;
+
+      const streaksMap: Record<string, HabitStreak> = {};
+      (data || []).forEach((streak: any) => {
+        streaksMap[streak.habit_id] = streak;
+      });
+
+      setHabitStreaks(streaksMap);
+    } catch (error) {
+      console.error('Failed to fetch habit streaks:', error);
+    }
+  }, []);
+
+  // Load streaks when component mounts
+  React.useEffect(() => {
+    fetchHabitStreaks();
+  }, [fetchHabitStreaks]);
+
+  // Get streak emoji (1/2/3 progression based on length)
+  const getStreakEmoji = (streak: number): string => {
+    if (streak <= 5) return '🔥';
+    if (streak <= 10) return '🔥🔥';
+    return '🔥🔥🔥';
+  };
+
+  // Get cold streak emoji (1/2/3 progression based on length)
+  const getColdStreakEmoji = (daysSince: number): string => {
+    if (daysSince <= 5) return '❄️';
+    if (daysSince <= 10) return '❄️❄️';
+    return '❄️❄️❄️';
+  };
+
+  // Get days since last completed (same logic as intentions)
+  const getDaysSinceLastCompleted = (lastCompletedDate: string | null): number => {
+    if (!lastCompletedDate) return 999; // Never completed
+    const lastDate = new Date(lastCompletedDate);
+    const today = new Date();
+    const diffTime = today.getTime() - lastDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
+
   // Handle day toggle
   const handleToggleDay = async (habitId: string, dateIso: string) => {
     try {
       await onToggleDay(habitId, dateIso);
+      // Streaks are automatically updated by database trigger
     } catch (error) {
       toast.error('Failed to update habit');
     }
@@ -186,6 +250,35 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                   >
                     {habit.name}
                   </h4>
+                  {habitStreaks[habit.id] && (
+                    <div className="flex items-center gap-1">
+                      {habitStreaks[habit.id].current_streak === 0 ? (
+                        getDaysSinceLastCompleted(habitStreaks[habit.id].last_completed_date) > 0 ? (
+                          <>
+                            <span className="text-white text-sm font-medium">
+                              {getDaysSinceLastCompleted(habitStreaks[habit.id].last_completed_date)}x
+                            </span>
+                            <span className="text-sm">
+                              {getColdStreakEmoji(getDaysSinceLastCompleted(habitStreaks[habit.id].last_completed_date))}
+                            </span>
+                          </>
+                        ) : null
+                      ) : habitStreaks[habit.id].current_streak === 1 ? (
+                        <span className="text-sm">
+                          {getStreakEmoji(habitStreaks[habit.id].current_streak)}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-white text-sm font-medium">
+                            {habitStreaks[habit.id].current_streak}x
+                          </span>
+                          <span className="text-sm">
+                            {getStreakEmoji(habitStreaks[habit.id].current_streak)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {habit.rule && (
                     <span className="text-xs text-neutral-400 italic">
                       {habit.rule}

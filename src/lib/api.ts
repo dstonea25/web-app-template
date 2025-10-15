@@ -245,6 +245,8 @@ export class ApiClient {
     const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
     if (!isSupabaseConfigured || !supabase) return { success: false, error: 'Supabase not configured' };
     const { habitId, date, isDone, source = 'frontend' } = params;
+    
+    // Update habit entry
     const { error } = await supabase
       .from('habit_entries')
       .upsert(
@@ -252,6 +254,9 @@ export class ApiClient {
         { onConflict: 'habit_id,date' }
       );
     if (error) return { success: false, error: error.message };
+    
+    // Streaks are automatically updated by database trigger
+    
     // Update caches optimistically for current year if present
     const year = Number(date.slice(0, 4));
     if (Number.isFinite(year)) {
@@ -263,6 +268,7 @@ export class ApiClient {
     }
     return { success: true };
   }
+
 
   // Future webhook endpoints (disabled in MVP)
   // private async makeRequest<T>(
