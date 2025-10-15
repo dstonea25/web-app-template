@@ -4,6 +4,7 @@ import { toast } from '../lib/notifications/toast';
 import type { Habit } from '../types';
 import { apiClient } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { MonthlyHabitOverview } from '../components/MonthlyHabitOverview';
 
 interface HabitTrackerTabProps {
   isVisible?: boolean;
@@ -285,9 +286,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   // No rule editing in this view; rules are read-only labels sourced from DB
 
-  const toggleDay = async (dateIso: string) => {
-    if (isInitialLoading || isHabitLoading || !selectedHabitId || !loadedHabits.has(selectedHabitId) || errorMessage) return;
-    const habitId = selectedHabitId;
+  const toggleDay = async (habitId: string, dateIso: string) => {
+    if (isInitialLoading || isHabitLoading || !loadedHabits.has(habitId) || errorMessage) return;
     const prevHad = Boolean(calendarData[habitId]?.has(dateIso));
     const nextVal = !prevHad;
     const t0 = performance.now();
@@ -321,6 +321,12 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Legacy wrapper for yearly view compatibility
+  const toggleDayForSelectedHabit = async (dateIso: string) => {
+    if (!selectedHabitId) return;
+    await toggleDay(selectedHabitId, dateIso);
   };
 
   const renderPills = () => (
@@ -469,7 +475,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         fill="#000"
                         fillOpacity={0.001}
                         pointerEvents="all"
-                        onClick={() => !disabled && toggleDay(date)}
+                        onClick={() => !disabled && toggleDayForSelectedHabit(date)}
                         onMouseEnter={(e) => {
                           setHoveredDate(date); setHoveredMonth(m);
                           const rect = wrapperRef.current?.getBoundingClientRect();
@@ -540,6 +546,17 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
+      {/* Monthly Overview */}
+      {!isInitialLoading && habits.length > 0 && !errorMessage && (
+        <MonthlyHabitOverview
+          habits={habits}
+          calendarData={calendarData}
+          onToggleDay={toggleDay}
+          isVisible={isVisible}
+        />
+      )}
+
+      {/* Yearly Calendar */}
       <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
         <header className="mb-4 relative">
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'text-center')}>{year}</h2>
