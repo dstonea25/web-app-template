@@ -265,6 +265,20 @@ export class ApiClient {
       if (idx >= 0) list[idx] = { habitId, date, complete: isDone };
       else list.push({ habitId, date, complete: isDone });
       this.entriesCacheByYear.set(year, list);
+
+      // Keep per-habit yearly cache in sync as well (this cache only stores completed entries)
+      const perHabitKey = `${habitId}:${year}`;
+      const perList = this.entriesCacheByHabitYear.get(perHabitKey) || [];
+      const i = perList.findIndex(e => e.date === date);
+      if (isDone) {
+        if (i >= 0) perList[i] = { habitId, date, complete: true };
+        else perList.push({ habitId, date, complete: true });
+      } else if (i >= 0) {
+        perList.splice(i, 1);
+      }
+      this.entriesCacheByHabitYear.set(perHabitKey, perList);
+      // Persist per-habit cache to localStorage so immediate refetch reflects the latest state
+      this.writeCache(`${ApiClient.ENTRIES_CACHE_PER_HABIT_PREFIX}${habitId}_${year}_v1`, perList);
     }
     return { success: true };
   }

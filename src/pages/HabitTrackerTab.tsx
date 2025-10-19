@@ -305,6 +305,20 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       if (isSupabaseConfigured) {
         const res = await apiClient.upsertHabitEntry({ habitId, date: dateIso, isDone: nextVal, source: 'frontend' });
         if (!res.success) throw new Error(res.error || 'Failed');
+        // Light refetch for this habit only to reconcile with DB-side logic (e.g., triggers)
+        apiClient.fetchHabitEntriesForHabit(getCurrentYear(), habitId)
+          .then(entries => {
+            setCalendarData(prev => {
+              const next: Record<string, Set<string>> = { ...prev };
+              const set = new Set<string>();
+              for (const e of entries) if (e.complete) set.add(e.date);
+              next[habitId] = set;
+              return next;
+            });
+          })
+          .catch(() => {
+            // non-fatal; keep optimistic state
+          });
       }
       requestAnimationFrame(() => debug('toggle:paint ms=', Math.round(performance.now() - t0), dateIso));
       toast.success('Saved');
@@ -347,6 +361,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
           title={h.rule || undefined}
         >
           {h.name}
+          {isActive && loadedHabits.has(h.id) ? ` - ${calendarData[h.id]?.size ?? 0}` : ''}
         </button>
         );
       })}
@@ -558,13 +573,16 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
 
       {/* Yearly Calendar */}
       <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
-        <header className="mb-4 relative">
+        <header className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-neutral-100">Yearly Overview</h3>
+            {(isSaving || isInitialLoading || isHabitLoading) && (
+              <div className="text-xs text-neutral-400">
+                {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
+              </div>
+            )}
+          </div>
           <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'text-center')}>{year}</h2>
-          {(isSaving || isInitialLoading || isHabitLoading) && (
-            <div className="absolute right-0 top-0 text-xs text-neutral-400">
-              {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
-            </div>
-          )}
         </header>
         {isInitialLoading ? (
           <div className="py-16 flex items-center justify-center">

@@ -47,7 +47,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
-  const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [hoveredCell, setHoveredCell] = React.useState<{ habitId: string; dateIso: string } | null>(null);
   const [habitStreaks, setHabitStreaks] = React.useState<Record<string, HabitStreak>>({});
 
   // Generate month options for selector
@@ -125,6 +125,28 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     }
   }, []);
 
+  // Refresh a single habit's streak after a toggle/backfill to avoid refetching all
+  const refreshHabitStreakForHabit = React.useCallback(async (habitId: string) => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const mod = await import('../lib/supabase');
+      const supabase = (mod as any).supabase;
+      if (!supabase) return;
+
+      const { data, error } = await supabase
+        .from('habit_streaks')
+        .select('habit_id, current_streak, longest_streak, last_completed_date')
+        .eq('habit_id', habitId)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setHabitStreaks(prev => ({ ...prev, [habitId]: data as HabitStreak }));
+      }
+    } catch (error) {
+      console.error('Failed to refresh habit streak:', error);
+    }
+  }, []);
+
   // Load streaks when component mounts
   React.useEffect(() => {
     fetchHabitStreaks();
@@ -161,6 +183,8 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     try {
       await onToggleDay(habitId, dateIso);
       // Streaks are automatically updated by database trigger
+      // Incrementally refresh only the affected habit's streak
+      refreshHabitStreakForHabit(habitId);
     } catch (error) {
       toast.error('Failed to update habit');
     }
@@ -306,7 +330,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                <div className="flex flex-wrap gap-1 max-w-full">
                  {dayCells.map(({ day, dateIso }) => {
                    const isComplete = habitDays.has(dateIso);
-                   const isHovered = hoveredDate === dateIso;
+                   const isHovered = hoveredCell?.habitId === habit.id && hoveredCell?.dateIso === dateIso;
                    
                    // More robust today detection
                    const today = new Date();
@@ -336,8 +360,8 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                          viewBox="0 0 28 28"
                          className="absolute inset-0 cursor-pointer transition-all duration-150 hover:scale-105 active:scale-95"
                          onClick={() => handleToggleDay(habit.id, dateIso)}
-                         onMouseEnter={() => setHoveredDate(dateIso)}
-                         onMouseLeave={() => setHoveredDate(null)}
+                         onMouseEnter={() => setHoveredCell({ habitId: habit.id, dateIso })}
+                         onMouseLeave={() => setHoveredCell(null)}
                        >
                          <defs>
                            <filter id={`monthly-glow-${habit.id}`} x="-60%" y="-60%" width="220%" height="220%">
