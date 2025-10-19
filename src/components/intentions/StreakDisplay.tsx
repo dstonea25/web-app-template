@@ -3,13 +3,6 @@ import { cn, tokens } from '../../theme/config';
 import type { IntentionStatsRow } from '../../types';
 import { fetchIntentionStats } from '../../lib/api';
 
-const getStreakEmoji = (streak: number) => {
-  if (streak === 0) return '❄️';
-  if (streak < 3) return '🔥';
-  if (streak < 7) return '🔥🔥';
-  return '🔥🔥🔥';
-};
-
 const getDaysSinceLastCompleted = (lastCompletedDate: string | null): number => {
   if (!lastCompletedDate) return 999; // Never completed
   const lastDate = new Date(lastCompletedDate);
@@ -44,11 +37,15 @@ export const StreakDisplay: React.FC = () => {
             </div>
           );
         }
-        return (
-          <div key={stat.pillar} className={cn(tokens.badge.base, tokens.badge.success)}>
-            {stat.pillar} {getStreakEmoji(stat.current_streak)} {stat.current_streak}-day streak
-          </div>
-        );
+        // Show nothing for 1-day; show flame + X-day only when >1
+        if (stat.current_streak > 1) {
+          return (
+            <div key={stat.pillar} className={cn(tokens.badge.base, tokens.badge.success)}>
+              {stat.pillar} 🔥 {stat.current_streak}-day streak
+            </div>
+          );
+        }
+        return null;
       })}
     </div>
   );

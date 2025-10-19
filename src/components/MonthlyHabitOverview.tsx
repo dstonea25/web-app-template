@@ -144,14 +144,16 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
     return '❄️❄️❄️';
   };
 
-  // Get days since last completed (same logic as intentions)
+  // Get days since last completed, excluding the current day
   const getDaysSinceLastCompleted = (lastCompletedDate: string | null): number => {
     if (!lastCompletedDate) return 999; // Never completed
-    const lastDate = new Date(lastCompletedDate);
-    const today = new Date();
-    const diffTime = today.getTime() - lastDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    const last = new Date(lastCompletedDate + 'T00:00:00');
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diffDays = Math.floor((today.getTime() - last.getTime()) / msPerDay);
+    // Exclude the current day from the count
+    return Math.max(0, diffDays - 1);
   };
 
   // Handle day toggle

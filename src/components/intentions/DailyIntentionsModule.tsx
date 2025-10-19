@@ -100,16 +100,9 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   // Helper function to get compact streak display
   const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
     const stat = streakStats.find(s => s.pillar === pillar);
-    if (!stat || stat.current_streak === 0) {
-      return ''; // Don't show anything for 0 streaks
-    }
-    
-    if (stat.current_streak === 1) {
-      return '🔥'; // Just emoji for 1 day
-    }
-    
-    // 2+ days: use Nx emoji format for streamlined look
-    return `${stat.current_streak}x 🔥`;
+    if (!stat) return '';
+    // Show nothing for 0 or 1; show single flame when >1
+    return stat.current_streak > 1 ? '🔥' : '';
   };
 
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
@@ -151,11 +144,6 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
       try { localStorage.setItem('intentions.lockedDate', today); } catch {}
       try { localStorage.removeItem(`intentions.drafts.${today}`); } catch {}
       toast.success('Intentions locked for today ✅');
-      // Reset completion flags in DB for the new day, then ping
-      try {
-        const mod = await import('../../lib/api');
-        await (mod as any).resetIntentionsCompletionOnCommit();
-      } catch {}
       // Non-blocking webhook ping
       pingIntentionsCommitted('home');
       // v2 webhook will be added later

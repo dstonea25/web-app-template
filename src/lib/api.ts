@@ -297,7 +297,7 @@ const N8N_SAVE_LEDGER_WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/
 const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
 // Prefer not to require a URL env; default to provided intentions-set endpoint, allow override via env
 const N8N_INTENTIONS_PING_URL = (import.meta.env.VITE_N8N_INTENTIONS_PING_URL as string) || 'https://geronimo.askdavidstone.com/webhook/intentions-set';
-const INTENTIONS_RESET_RPC = import.meta.env.VITE_INTENTIONS_RESET_RPC || 'reset_intentions_daily';
+// const INTENTIONS_RESET_RPC = import.meta.env.VITE_INTENTIONS_RESET_RPC || 'reset_intentions_daily'; // deprecated
 
 // Global loading states to prevent duplicate webhook calls
 // let isLoadingTodos = false; // no longer needed without webhook fallback
@@ -641,23 +641,26 @@ export const fetchCurrentIntentions = async (): Promise<CurrentIntentionRow[]> =
 
   // Ensure 4 rows exist without overwriting existing intentions
   // 1) Read existing pillars
+  const today = getTodayLocalDate();
   const { data: existingRows, error: readErr } = await supabase
-    .from('current_intentions')
-    .select('pillar');
+    .from('daily_intentions')
+    .select('pillar')
+    .eq('date', today);
   if (readErr) throw readErr;
   const existing = new Set<string>((existingRows || []).map((r: any) => r.pillar));
   // 2) Insert only missing pillars with empty intention
   const missing = PILLARS.filter((p) => !existing.has(p));
   if (missing.length > 0) {
     const { error: insertErr } = await supabase
-      .from('current_intentions')
-      .insert(missing.map((pillar) => ({ pillar, intention: '' })));
+      .from('daily_intentions')
+      .insert(missing.map((pillar) => ({ date: today, pillar, intention: '' })));
     if (insertErr) throw insertErr;
   }
 
   const { data, error } = await supabase
-    .from('current_intentions')
+    .from('daily_intentions')
     .select('pillar,intention,updated_at')
+    .eq('date', today)
     .order('pillar', { ascending: true });
   if (error) throw error;
   const rows = (data || []) as { pillar: IntentionPillar; intention: string; updated_at: string }[];
@@ -671,25 +674,20 @@ export const upsertIntentions = async (updates: UpsertIntentionInput[]): Promise
   if (!isSupabaseConfigured || !supabase) return;
   if (!updates || updates.length === 0) return;
   // Defensive: never overwrite with empty/whitespace intentions
+  const today = getTodayLocalDate();
   const payload = updates
-    .map((u) => ({ pillar: u.pillar, intention: (u.intention ?? '').trim(), completed: false, updated_at: new Date().toISOString() }))
+    .map((u) => ({ date: today, pillar: u.pillar, intention: (u.intention ?? '').trim(), completed: false, updated_at: new Date().toISOString() }))
     .filter((u) => u.intention.length > 0);
   if (payload.length === 0) return;
   const { error } = await supabase
-    .from('current_intentions')
-    .upsert(payload, { onConflict: 'pillar' });
+    .from('daily_intentions')
+    .upsert(payload, { onConflict: 'date,pillar' });
   if (error) throw error;
 };
 
 // Reset downstream completion flags when new intentions are committed
-export const resetIntentionsCompletionOnCommit = async (): Promise<void> => {
-  const mod = await import('./supabase');
-  const supabase = (mod as any).supabase as any | null;
-  const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);
-  if (!isSupabaseConfigured || !supabase) return;
-  const { error } = await supabase.rpc(INTENTIONS_RESET_RPC);
-  if (error) throw error;
-};
+// Deprecated: no longer needed with daily_intentions
+// export const resetIntentionsCompletionOnCommit = async (): Promise<void> => {};
 
 export const resetIntentionsIfNewDay = async (): Promise<void> => {
   const lastResetKey = 'intentions.lastResetDate';
@@ -771,9 +769,7 @@ export const markIntentionCompleted = async (pillar: IntentionPillar): Promise<v
     .eq('pillar', pillar);
     
   if (updateError) throw updateError;
-  
-  // Then update the streak stats
-  await calculateAndUpdatePillarStreak(pillar);
+  // DB trigger will update intention_stats; no client-side recompute
 };
 
 // Calculate and update streak for a specific pillar
