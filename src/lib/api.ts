@@ -1,4 +1,4 @@
-import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, IdeaPatch, Session, Habit, CurrentIntentionRow, IntentionStatsRow, UpsertIntentionInput, IntentionPillar } from '../types';
+import type { SaveTodosRequest, SaveSessionsRequest, ApiResponse, Todo, TodoPatch, TodoFileItem, Idea, IdeaPatch, Session, Habit, CurrentIntentionRow, IntentionStatsRow, UpsertIntentionInput, IntentionPillar, PrioritiesOverviewResponse, CommittedMilestoneRow, PriorityRecord, MilestoneRecord, ActiveFocusRow } from '../types';
 
 // Mocked API client for MVP - all saves are stubbed
 export class ApiClient {
@@ -13,6 +13,380 @@ export class ApiClient {
     } catch {
       return { supabase: null, isSupabaseConfigured: false };
     }
+  }
+
+  // ===== Priorities RPCs & CRUD =====
+  async fetchPrioritiesOverview(): Promise<PrioritiesOverviewResponse[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase not configured');
+    }
+    
+    try {
+      // Try RPC first
+      const { data, error } = await supabase.rpc('get_priorities_overview');
+      if (error) throw error;
+      const raw: any = data;
+      if (Array.isArray(raw)) return raw as PrioritiesOverviewResponse[];
+      if (raw && Array.isArray(raw.items)) return raw.items as PrioritiesOverviewResponse[];
+      if (raw && Array.isArray(raw.rows)) return raw.rows as PrioritiesOverviewResponse[];
+      throw new Error('RPC returned unexpected data format');
+    } catch (rpcError) {
+      console.warn('RPC get_priorities_overview failed, using direct table reads:', rpcError);
+      // Fallback to direct table reads
+      return await this.buildPrioritiesOverviewFromTables(supabase);
+    }
+  }
+
+  async fetchCommittedMilestones(): Promise<CommittedMilestoneRow[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase not configured');
+    }
+    
+    try {
+      // Try RPC first
+      const { data, error } = await supabase.rpc('get_committed_milestones');
+      if (error) throw error;
+      const raw: any = data;
+      if (Array.isArray(raw)) return raw as CommittedMilestoneRow[];
+      if (raw && Array.isArray(raw.items)) return raw.items as CommittedMilestoneRow[];
+      if (raw && Array.isArray(raw.rows)) return raw.rows as CommittedMilestoneRow[];
+      throw new Error('RPC returned unexpected data format');
+    } catch (rpcError) {
+      console.warn('RPC get_committed_milestones failed, using direct table reads:', rpcError);
+      // Fallback to direct table reads
+      return await this.buildCommittedMilestonesFromTables(supabase);
+    }
+  }
+
+  // Direct table reads (no fallback data)
+  private async buildPrioritiesOverviewFromTables(supabase: any): Promise<PrioritiesOverviewResponse[]> {
+    // 1) Pillars
+    const { data: pillars, error: pErr } = await supabase
+      .from('pillars')
+      .select('id, name, emoji, display_order')
+      .order('display_order', { ascending: true });
+    if (pErr) throw new Error(`Failed to fetch pillars: ${pErr.message}`);
+    const pillarIds: string[] = (pillars || []).map((p: any) => p.id);
+    if (pillarIds.length === 0) return [];
+
+    // 2) Priorities for these pillars
+    const { data: priorities, error: prErr } = await supabase
+      .from('priorities')
+      .select('id, pillar_id, title, description, status, importance, committed, created_at, updated_at')
+      .in('pillar_id', pillarIds)
+      .order('created_at', { ascending: true });
+    if (prErr) throw new Error(`Failed to fetch priorities: ${prErr.message}`);
+    const priorityIds: string[] = (priorities || []).map((r: any) => r.id);
+
+    // 3) Milestones for these priorities
+    const { data: milestones, error: mErr } = await supabase
+      .from('milestones')
+      .select('id, priority_id, title, notes, committed, completed, order_index, definition_of_done, due_date, created_at, updated_at')
+      .in('priority_id', priorityIds.length > 0 ? priorityIds : ['00000000-0000-0000-0000-000000000000'])
+      .order('created_at', { ascending: true });
+    if (mErr) throw new Error(`Failed to fetch milestones: ${mErr.message}`);
+
+    // Build nested structure
+    const milestonesByPriority = new Map<string, any[]>();
+    (milestones || []).forEach((m: any) => {
+      const list = milestonesByPriority.get(m.priority_id) || [];
+      list.push({
+        milestone_id: String(m.id),
+        title: m.title,
+        committed: !!m.committed,
+        completed: !!m.completed,
+        definition_of_done: m.definition_of_done ?? null,
+        due_date: m.due_date ?? null,
+      });
+      milestonesByPriority.set(m.priority_id, list);
+    });
+
+    const prioritiesByPillar = new Map<string, any[]>();
+    (priorities || []).forEach((pr: any) => {
+      const list = prioritiesByPillar.get(pr.pillar_id) || [];
+      list.push({
+        priority_id: String(pr.id),
+        title: pr.title,
+        status: pr.status ?? 'backlog',
+        importance: pr.importance ?? null,
+        committed: !!pr.committed,
+        milestones: (milestonesByPriority.get(pr.id) || []).map((m) => ({
+          milestone_id: m.milestone_id,
+          title: m.title,
+          committed: m.committed,
+          completed: m.completed,
+          definition_of_done: m.definition_of_done,
+          due_date: m.due_date,
+        })),
+      });
+      prioritiesByPillar.set(pr.pillar_id, list);
+    });
+
+    const result: PrioritiesOverviewResponse[] = (pillars || []).map((p: any) => ({
+      pillar_id: String(p.id),
+      pillar_name: p.name,
+      emoji: p.emoji ?? null,
+      priorities: prioritiesByPillar.get(p.id) || [],
+    }));
+    return result;
+  }
+
+  private async buildCommittedMilestonesFromTables(supabase: any): Promise<CommittedMilestoneRow[]> {
+    // 1) committed milestones
+    const { data: ms, error: mErr } = await supabase
+      .from('milestones')
+      .select('id, title, completed, priority_id, created_at')
+      .eq('committed', true);
+    if (mErr) throw new Error(`Failed to fetch committed milestones: ${mErr.message}`);
+    if (!ms || ms.length === 0) return [];
+    const priorityIds = Array.from(new Set((ms as any[]).map(r => r.priority_id)));
+
+    // 2) priorities
+    const { data: prs, error: pErr } = await supabase
+      .from('priorities')
+      .select('id, title, pillar_id')
+      .in('id', priorityIds);
+    if (pErr) throw new Error(`Failed to fetch priorities: ${pErr.message}`);
+    const byPriority = new Map<string, any>((prs || []).map((r: any) => [r.id, r]));
+    const pillarIds = Array.from(new Set((prs || []).map((r: any) => r.pillar_id)));
+
+    // 3) pillars
+    const { data: pils, error: piErr } = await supabase
+      .from('pillars')
+      .select('id, name, emoji')
+      .in('id', pillarIds);
+    if (piErr) throw new Error(`Failed to fetch pillars: ${piErr.message}`);
+    const byPillar = new Map<string, any>((pils || []).map((r: any) => [r.id, r]));
+
+    // 4) assemble
+    const rows: CommittedMilestoneRow[] = (ms as any[]).map((r) => {
+      const pr = byPriority.get(r.priority_id);
+      const pil = pr ? byPillar.get(pr.pillar_id) : null;
+      return {
+        milestone_id: String(r.id),
+        milestone_title: r.title,
+        priority_title: pr?.title || '',
+        pillar_name: pil?.name || '',
+        emoji: pil?.emoji || null,
+        due_date: null, // Not in schema
+        completed: !!r.completed,
+        definition_of_done: null, // Not in schema
+        updated_at: r.created_at || new Date().toISOString(),
+      } as CommittedMilestoneRow;
+    });
+    // Sort by created_at desc
+    rows.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    return rows;
+  }
+
+  async toggleMilestoneCommit(milestoneId: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    // First get current state
+    const { data: current, error: fetchError } = await supabase
+      .from('milestones')
+      .select('committed')
+      .eq('id', milestoneId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Toggle the committed state
+    const { error } = await supabase
+      .from('milestones')
+      .update({ committed: !current.committed })
+      .eq('id', milestoneId);
+    
+    if (error) throw error;
+  }
+
+  async toggleMilestoneComplete(milestoneId: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    // First get current state
+    const { data: current, error: fetchError } = await supabase
+      .from('milestones')
+      .select('completed')
+      .eq('id', milestoneId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Toggle the completed state
+    const { error } = await supabase
+      .from('milestones')
+      .update({ completed: !current.completed })
+      .eq('id', milestoneId);
+    
+    if (error) throw error;
+  }
+
+  async togglePriorityCommit(priorityId: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    // First get current state
+    const { data: current, error: fetchError } = await supabase
+      .from('priorities')
+      .select('committed')
+      .eq('id', priorityId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Toggle the committed state
+    const { error } = await supabase
+      .from('priorities')
+      .update({ committed: !current.committed })
+      .eq('id', priorityId);
+    
+    if (error) throw error;
+  }
+
+  async createPriority(record: PriorityRecord): Promise<string> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { data, error } = await supabase.from('priorities').insert({
+      pillar_id: record.pillar_id,
+      title: record.title,
+      description: record.description ?? null,
+      status: record.status ?? 'backlog',
+      importance: record.importance ?? null,
+      committed: record.committed ?? false,
+    }).select('id').single();
+    if (error) throw error;
+    return String((data as any).id);
+  }
+
+  async updatePriority(id: string, patch: Partial<PriorityRecord>): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.from('priorities').update(patch).eq('id', id);
+    if (error) throw error;
+  }
+
+  async deletePriority(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.from('priorities').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async createMilestone(record: MilestoneRecord): Promise<string> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { data, error } = await supabase.from('milestones').insert({
+      priority_id: record.priority_id,
+      title: record.title,
+      notes: record.notes ?? null,
+      committed: record.committed ?? false,
+      completed: record.completed ?? false,
+      order_index: record.order_index ?? null,
+      definition_of_done: record.definition_of_done ?? null,
+      due_date: record.due_date ?? null,
+    }).select('id').single();
+    if (error) throw error;
+    return String((data as any).id);
+  }
+
+  async updateMilestone(id: string, patch: Partial<MilestoneRecord>): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.from('milestones').update(patch).eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteMilestone(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.from('milestones').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async fetchActiveFocus(): Promise<ActiveFocusRow[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase not configured');
+    }
+    
+    try {
+      // Try RPC first
+      const { data, error } = await supabase.rpc('get_active_focus');
+      if (error) throw error;
+      const raw: any = data;
+      if (Array.isArray(raw)) return raw as ActiveFocusRow[];
+      if (raw && Array.isArray(raw.items)) return raw.items as ActiveFocusRow[];
+      if (raw && Array.isArray(raw.rows)) return raw.rows as ActiveFocusRow[];
+      throw new Error('RPC returned unexpected data format');
+    } catch (rpcError) {
+      console.warn('RPC get_active_focus failed, using direct table reads:', rpcError);
+      // Fallback to direct table reads: only committed priorities with their committed milestones
+      return await this.buildActiveFocusFromTables(supabase);
+    }
+  }
+
+  private async buildActiveFocusFromTables(supabase: any): Promise<ActiveFocusRow[]> {
+    // Get committed priorities
+    const { data: priorities, error: prErr } = await supabase
+      .from('priorities')
+      .select('id, pillar_id, title, description, status, importance, committed, created_at, updated_at')
+      .eq('committed', true);
+    if (prErr) throw new Error(`Failed to fetch committed priorities: ${prErr.message}`);
+    
+    if (!priorities || priorities.length === 0) return [];
+    
+    const prIds = priorities.map((r: any) => r.id);
+    
+    // Get committed milestones for these priorities
+    const { data: milestones, error: msErr } = await supabase
+      .from('milestones')
+      .select('id, title, committed, completed, priority_id')
+      .eq('committed', true)
+      .in('priority_id', prIds);
+    if (msErr) throw new Error(`Failed to fetch committed milestones: ${msErr.message}`);
+    
+    // Get pillar info
+    const pillarIds = [...new Set(priorities.map((p: any) => p.pillar_id))];
+    const { data: pillars, error: piErr } = await supabase
+      .from('pillars')
+      .select('id, name, emoji')
+      .in('id', pillarIds);
+    if (piErr) throw new Error(`Failed to fetch pillars: ${piErr.message}`);
+    
+    const byPillar = new Map<string, any>((pillars || []).map((p: any) => [p.id, p]));
+    
+    // Group milestones by priority
+    const milestonesByPriority = new Map<string, any[]>();
+    (milestones || []).forEach((m: any) => {
+      const list = milestonesByPriority.get(m.priority_id) || [];
+      list.push({
+        milestone_id: String(m.id),
+        title: m.title,
+        committed: !!m.committed,
+        completed: !!m.completed,
+      });
+      milestonesByPriority.set(m.priority_id, list);
+    });
+    
+    // Build ActiveFocusRow array
+    const result: ActiveFocusRow[] = (priorities || []).map((pr: any) => {
+      const pillar = byPillar.get(pr.pillar_id);
+      return {
+        pillar_id: String(pr.pillar_id),
+        pillar_name: pillar?.name || '',
+        emoji: pillar?.emoji || null,
+        priority_id: String(pr.id),
+        priority_title: pr.title,
+        priority_committed: true,
+        milestones: milestonesByPriority.get(pr.id) || [],
+      };
+    });
+    
+    return result;
   }
 
   // Stubbed method for saving todos

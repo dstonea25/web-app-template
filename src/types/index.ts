@@ -164,3 +164,88 @@ export interface UpsertIntentionInput {
   pillar: IntentionPillar;
   intention: string;
 }
+
+// Priorities & Milestones
+export type PillarName = IntentionPillar; // reuse existing union
+
+export interface PrioritiesOverviewResponse {
+  pillar_id: string;
+  pillar_name: PillarName;
+  emoji?: string | null;
+  priorities: Array<PriorityItemOverview>;
+}
+
+export interface PriorityItemOverview {
+  priority_id: string;
+  title: string;
+  status: 'backlog' | 'active' | 'archived' | null;
+  importance?: number | null; // 1-5
+  committed?: boolean; // new: priority-level commitment
+  milestones: Array<MilestoneOverview>;
+}
+
+export interface MilestoneOverview {
+  milestone_id: string;
+  title: string;
+  committed: boolean;
+  completed: boolean;
+  definition_of_done?: string | null;
+  due_date?: string | null; // YYYY-MM-DD
+}
+
+export interface CommittedMilestoneRow {
+  milestone_id: string;
+  milestone_title: string;
+  priority_title: string;
+  pillar_name: PillarName;
+  emoji?: string | null;
+  due_date?: string | null;
+  completed: boolean;
+  definition_of_done?: string | null;
+  updated_at: string; // timestamptz
+}
+
+// Active Focus (right pane): committed priorities and their committed milestones
+export interface ActiveFocusRow {
+  pillar_id: string;
+  pillar_name: PillarName;
+  emoji?: string | null;
+  priority_id: string;
+  priority_title: string;
+  priority_committed: boolean;
+  milestones: Array<{
+    milestone_id: string;
+    title: string;
+    committed: boolean;
+    completed: boolean;
+    definition_of_done?: string | null;
+    due_date?: string | null;
+  }>;
+}
+
+// CRUD shapes for direct table access
+export interface PriorityRecord {
+  id?: string;
+  pillar_id: string;
+  title: string;
+  description?: string | null;
+  status?: string | null;
+  importance?: number | null;
+  committed?: boolean | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MilestoneRecord {
+  id?: string;
+  priority_id: string;
+  title: string;
+  notes?: string | null;
+  committed?: boolean | null;
+  completed?: boolean | null;
+  order_index?: number | null;
+  definition_of_done?: string | null;
+  due_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}

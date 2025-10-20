@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home } from 'lucide-react';
+import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home, Target } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import WorkModeToggle from './WorkModeToggle';
@@ -11,6 +11,7 @@ import { IdeasTab } from '../pages/IdeasTab';
 import { TimeTrackingTab } from '../pages/TimeTrackingTab';
 import { AllocationsTab } from '../pages/AllocationsTab';
 import { tokens, cn } from '../theme/config';
+import { PrioritiesTab } from '../pages/PrioritiesTab';
 import { HabitTrackerTab } from '../pages/HabitTrackerTab';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
@@ -45,7 +46,7 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
+      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'priorities', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
       return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'home')) as ModuleId;
     } catch {
       return 'home';
@@ -91,6 +92,7 @@ export const AppShell: React.FC = () => {
       'home': <Home className={cn('w-5 h-5', tokens.icon?.default)} />,
       'check-square': <CheckSquare className={cn('w-5 h-5', tokens.icon?.default)} />,
       'lightbulb': <Lightbulb className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'target': <Target className={cn('w-5 h-5', tokens.icon?.default)} />,
       'timer': <Timer className={cn('w-5 h-5', tokens.icon?.default)} />,
       'layers': <Layers className={cn('w-5 h-5', tokens.icon?.default)} />,
       'activity': <Activity className={cn('w-5 h-5', tokens.icon?.default)} />
@@ -107,6 +109,7 @@ export const AppShell: React.FC = () => {
   const TodosTabAny = TodosTab as React.FC<any>;
   const HomeTabAny = HomeTab as React.FC<any>;
   const IdeasTabAny = IdeasTab as React.FC<any>;
+  const PrioritiesTabAny = PrioritiesTab as React.FC<any>;
   const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
   const AllocationsTabAny = AllocationsTab as React.FC<any>;
   const HabitTrackerTabAny = HabitTrackerTab as React.FC<any>;
@@ -185,6 +188,11 @@ export const AppShell: React.FC = () => {
                 <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
               </section>
             )}
+            {visitedTabs.has('priorities') && (
+              <section style={{ display: activeModule === 'priorities' ? 'block' : 'none' }}>
+                <PrioritiesTabAny isVisible={activeModule === 'priorities'} />
+              </section>
+            )}
             {visitedTabs.has('allocations') && (
               <section style={{ display: activeModule === 'allocations' ? 'block' : 'none' }}>
                 <AllocationsTabAny isVisible={activeModule === 'allocations'} />
@@ -230,6 +238,11 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('time_tracking') && (
             <section style={{ display: activeModule === 'time_tracking' ? 'block' : 'none' }}>
               <TimeTrackingTabAny isVisible={activeModule === 'time_tracking'} />
+            </section>
+          )}
+          {visitedTabs.has('priorities') && (
+            <section style={{ display: activeModule === 'priorities' ? 'block' : 'none' }}>
+              <PrioritiesTabAny isVisible={activeModule === 'priorities'} />
             </section>
           )}
           {visitedTabs.has('allocations') && (
