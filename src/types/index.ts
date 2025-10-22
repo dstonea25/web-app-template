@@ -191,6 +191,7 @@ export interface MilestoneOverview {
   completed: boolean;
   definition_of_done?: string | null;
   due_date?: string | null; // YYYY-MM-DD
+  created_at?: string | null; // ISO-8601 timestamp
 }
 
 export interface CommittedMilestoneRow {

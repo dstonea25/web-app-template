@@ -99,6 +99,7 @@ export class ApiClient {
         completed: !!m.completed,
         definition_of_done: m.definition_of_done ?? null,
         due_date: m.due_date ?? null,
+        created_at: m.created_at ?? null,
       });
       milestonesByPriority.set(m.priority_id, list);
     });
@@ -119,6 +120,7 @@ export class ApiClient {
           completed: m.completed,
           definition_of_done: m.definition_of_done,
           due_date: m.due_date,
+          created_at: m.created_at,
         })),
       });
       prioritiesByPillar.set(pr.pillar_id, list);
