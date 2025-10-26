@@ -176,7 +176,12 @@ export const AppShell: React.FC = () => {
           onToggleCollapse={handleToggleSidebar}
         />
         <div className={tokens.app_shell.content}>
-          <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
+          <TopBanner 
+            title={getCurrentTabTitle()} 
+            subtitle="" 
+            onOpenTimeTab={openTimeTab} 
+            isOnTimeTab={activeModule === 'time_tracking'} 
+          />
           <main className="p-6">
             {visitedTabs.has('home') && (
               <section style={{ display: activeModule === 'home' ? 'block' : 'none' }}>
