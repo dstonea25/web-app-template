@@ -86,9 +86,24 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
       <div className="grid gap-6">
         {/* Challenge Type Selector */}
         <section>
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'mb-4')}>
-            Select Challenge
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+              Select Challenge
+            </h2>
+            <button
+              onClick={generateChallenge}
+              disabled={loading}
+              className={cn(
+                tokens.button.base,
+                tokens.button.primary,
+                'flex items-center gap-2 px-6 py-3',
+                loading && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+              {loading ? 'Generating...' : 'Generate'}
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {challengeTypes.map((type) => (
               <button
@@ -117,23 +132,6 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
               </button>
             ))}
           </div>
-        </section>
-
-        {/* Generate Button */}
-        <section>
-          <button
-            onClick={generateChallenge}
-            disabled={loading}
-            className={cn(
-              tokens.button.base,
-              tokens.button.primary,
-              'flex items-center gap-2 px-6 py-3',
-              loading && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-            {loading ? 'Generating...' : 'Generate New Challenge'}
-          </button>
         </section>
 
         {/* Current Challenge Display */}
