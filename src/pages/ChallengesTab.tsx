@@ -123,7 +123,7 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
                   {type.label}
                 </h3>
                 <p className={cn(
-                  tokens.typography.scale.small,
+                  tokens.typography.scale.muted,
                   'text-gray-300 mt-2'
                 )}>
                   {type.description}
