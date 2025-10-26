@@ -20,3 +20,23 @@ input.date-empty::placeholder { color: transparent; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Celebration animation for allocations redemption */
+@keyframes celebrate-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px 10px rgba(16, 185, 129, 0.3);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.celebrate-pulse {
+  animation: celebrate-pulse 0.6s ease-out;
+}
