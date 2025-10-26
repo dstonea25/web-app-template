@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { tokens, cn } from '../theme/config';
-import { RefreshCw, Zap, Send } from 'lucide-react';
+import { RefreshCw, Send } from 'lucide-react';
 import { toast } from '../lib/notifications/toast';
 
 export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
@@ -84,24 +84,10 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
   return (
     <div className={tokens.layout.container}>
       <div className="grid gap-6">
-        {/* Header */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <Zap className="w-6 h-6 text-emerald-400" />
-            <h1 className={cn(tokens.typography.scale.h1, tokens.typography.weights.bold, 'text-white')}>
-              Generative Challenges
-            </h1>
-          </div>
-          <p className={cn(tokens.typography.scale.body, 'text-gray-300')}>
-            Get AI-generated prompts for journaling, product thinking, and business ideation. 
-            Perfect for sparking creativity and structured thinking.
-          </p>
-        </section>
-
         {/* Challenge Type Selector */}
         <section>
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-white mb-4')}>
-            Challenge Type
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'mb-4')}>
+            Select Challenge
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {challengeTypes.map((type) => (
@@ -154,7 +140,7 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
         {currentChallenge && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-white')}>
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
                 Current Challenge
               </h2>
               <button
@@ -181,7 +167,7 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
         {/* User Response Section */}
         {currentChallenge && (
           <section>
-            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-white mb-4')}>
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'mb-4')}>
               Your Response
             </h2>
             <div className="space-y-4">
@@ -223,7 +209,7 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
         {aiFeedback && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-white')}>
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
                 AI Feedback
               </h2>
               <button
