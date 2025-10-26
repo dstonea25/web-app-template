@@ -6,9 +6,10 @@ interface TopNavProps {
   onHamburger: () => void;
   rightSlot?: React.ReactNode;
   mobileOpen?: boolean;
+  title?: string;
 }
 
-export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOpen }) => {
+export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOpen, title = 'Geronimo' }) => {
   return (
     <nav className={`${tokens.topnav.base} overflow-x-hidden`}>
       <div className="flex items-center gap-3">
@@ -22,7 +23,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOp
           <Menu className={tokens.icon?.default || 'w-5 h-5 text-neutral-100'} />
         </button>
         <div className={tokens.topnav.brand}>
-          <span>Geronimo</span>
+          <span>{title}</span>
         </div>
       </div>
       {rightSlot && (

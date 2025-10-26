@@ -135,6 +135,13 @@ export const AppShell: React.FC = () => {
     setMobileDrawerOpen(true);
   };
 
+  // Get current tab title
+  const getCurrentTabTitle = (): string => {
+    const tabId = activeModule === 'time_tracking' ? 'time' : activeModule;
+    const tab = TAB_REGISTRY.find(t => t.id === tabId);
+    return tab?.title || 'Geronimo';
+  };
+
   const handleCloseMobileDrawer = () => {
     setMobileDrawerOpen(false);
   };
@@ -220,6 +227,7 @@ export const AppShell: React.FC = () => {
         <TopNav 
           onHamburger={handleOpenMobileDrawer} 
           mobileOpen={mobileDrawerOpen}
+          title={getCurrentTabTitle()}
           rightSlot={(
             <div className="flex items-center gap-2">
               <WorkModeToggle compact />
