@@ -142,6 +142,24 @@ export const AppShell: React.FC = () => {
     return tab?.title || 'Geronimo';
   };
 
+  // Get personalized subtitle for current tab
+  const getCurrentTabSubtitle = (): string => {
+    const userName = 'David'; // TODO: Get from auth context when user profile is added
+    
+    const subtitles: Record<ModuleId, string> = {
+      home: `Welcome back, ${userName}`,
+      todos: 'Manage your tasks and get things done',
+      ideas: 'Capture and organize your thoughts',
+      priorities: 'Focus on what matters most',
+      time_tracking: 'Track your productive hours',
+      allocations: 'Manage your rewards and indulgences',
+      habit_tracker: 'Build better habits, one day at a time',
+      challenges: 'Push yourself with new challenges',
+    };
+
+    return subtitles[activeModule] || '';
+  };
+
   const handleCloseMobileDrawer = () => {
     setMobileDrawerOpen(false);
   };
@@ -178,7 +196,7 @@ export const AppShell: React.FC = () => {
         <div className={tokens.app_shell.content}>
           <TopBanner 
             title={getCurrentTabTitle()} 
-            subtitle="" 
+            subtitle={getCurrentTabSubtitle()} 
             onOpenTimeTab={openTimeTab} 
             isOnTimeTab={activeModule === 'time_tracking'} 
           />
