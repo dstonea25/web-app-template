@@ -137,6 +137,13 @@ export const AppShell: React.FC = () => {
 
   // Get current tab title
   const getCurrentTabTitle = (): string => {
+    const userName = 'David'; // TODO: Get from auth context when user profile is added
+    
+    // Special case for Home - use personalized greeting
+    if (activeModule === 'home') {
+      return `Welcome back, ${userName}`;
+    }
+    
     const tabId = activeModule === 'time_tracking' ? 'time' : activeModule;
     const tab = TAB_REGISTRY.find(t => t.id === tabId);
     return tab?.title || 'Geronimo';
@@ -144,10 +151,8 @@ export const AppShell: React.FC = () => {
 
   // Get personalized subtitle for current tab
   const getCurrentTabSubtitle = (): string => {
-    const userName = 'David'; // TODO: Get from auth context when user profile is added
-    
     const subtitles: Record<ModuleId, string> = {
-      home: `Welcome back, ${userName}`,
+      home: 'Your productivity dashboard at a glance',
       todos: 'Manage your tasks and get things done',
       ideas: 'Capture and organize your thoughts',
       priorities: 'Focus on what matters most',
