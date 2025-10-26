@@ -56,6 +56,7 @@ export async function toggleCommit(milestoneId: string): Promise<void> {
   setCachedData(OVERVIEW_CACHE_KEY, null as any);
   try {
     if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
+      console.log('[priorities.ts] Dispatching commit events for milestone:', milestoneId);
       window.dispatchEvent(new CustomEvent('dashboard:priorities-committed-updated', { detail: { id: milestoneId, ts: Date.now() } }));
       window.dispatchEvent(new CustomEvent('dashboard:priorities-refresh'));
     }
@@ -78,6 +79,17 @@ export async function togglePriorityCommit(priorityId: string): Promise<void> {
 
 export async function toggleComplete(milestoneId: string): Promise<void> {
   await apiClient.toggleMilestoneComplete(milestoneId);
+  // Invalidate caches so next reads are fresh
+  setCachedData(ACTIVE_FOCUS_CACHE_KEY, null as any);
+  setCachedData(OVERVIEW_CACHE_KEY, null as any);
+  try {
+    if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
+      console.log('[priorities.ts] Dispatching completion events for milestone:', milestoneId);
+      window.dispatchEvent(new CustomEvent('dashboard:priorities-completed-updated', { detail: { id: milestoneId, ts: Date.now() } }));
+      window.dispatchEvent(new CustomEvent('dashboard:priorities-refresh'));
+      window.dispatchEvent(new CustomEvent('dashboard:active-focus-refresh'));
+    }
+  } catch {}
 }
 
 export async function createPriority(record: PriorityRecord): Promise<string> {

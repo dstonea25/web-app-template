@@ -7,6 +7,7 @@ import { Pencil } from 'lucide-react';
 
 interface OKRModuleProps {
   isVisible?: boolean;
+  hideHeader?: boolean;
 }
 
 const PILLARS: OkrPillar[] = ['Power', 'Passion', 'Purpose', 'Production'];
@@ -239,7 +240,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   );
 }
 
-export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
+export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHeader = false }) => {
   const [okrs, setOkrs] = useState<Okr[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -456,11 +457,13 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
 
   return (
     <div className={cn(!isVisible && 'hidden')}>
-      <div className="mb-4">
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-          Quarterly OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
-        </h2>
-      </div>
+      {!hideHeader && (
+        <div className="mb-4">
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Quarterly OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
+          </h2>
+        </div>
+      )}
       {loading ? (
         <div className={cn(tokens.card.base, 'flex items-center justify-center py-8 text-neutral-400')}>Loading OKRs…</div>
       ) : error ? (
