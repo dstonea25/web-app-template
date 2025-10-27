@@ -22,17 +22,44 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
     
     setLoading(true);
     try {
-      // TODO: Replace with actual webhook call
-      // For now, show placeholder content
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+      // Use proxy in development, direct URL in production
+      const webhookUrl = import.meta.env.DEV 
+        ? '/api/challenges' 
+        : 'https://geronimo.askdavidstone.com/webhook/challenges';
+        
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_N8N_WEBHOOK_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: challengeType,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
       
-      const placeholderChallenges = {
-        journal: "Reflect on a moment this week when you felt most aligned with your values. What made that experience meaningful, and how can you create more opportunities for similar alignment?",
-        product: "Design a mobile app feature that helps users reduce their daily screen time by 30%. Consider user motivation, behavioral psychology, and technical constraints.",
-        business: "Identify three underserved markets in the remote work ecosystem. Choose one and outline a minimum viable product that could serve this market within 90 days."
-      };
+      // Debug: Log the actual response structure
+      console.log('n8n response:', JSON.stringify(data, null, 2));
       
-      setCurrentChallenge(placeholderChallenges[challengeType]);
+      // Handle n8n response format: [{ message: { content: "..." } }]
+      let challengeText;
+      if (Array.isArray(data) && data.length > 0 && data[0].message?.content) {
+        challengeText = data[0].message.content;
+      } else if (data.challenge) {
+        challengeText = data.challenge;
+      } else {
+        console.error('Response structure:', data);
+        throw new Error('Invalid response format: expected challenge or message.content field');
+      }
+      
+      setCurrentChallenge(challengeText);
       setUserResponse(''); // Clear previous response
       setAiFeedback(''); // Clear previous feedback
       toast.success('New challenge generated!');
@@ -49,21 +76,11 @@ export const ChallengesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = t
     
     setSubmittingResponse(true);
     try {
-      // TODO: Replace with actual webhook call
-      // For now, show placeholder feedback
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
-      
-      const placeholderFeedback = {
-        journal: "Your reflection shows good self-awareness and value alignment. Consider exploring specific actions you could take to create more meaningful moments. What small daily practices could help you stay connected to these values?",
-        product: "Your approach demonstrates solid product thinking. The behavioral psychology angle is particularly strong. Consider adding specific metrics for measuring the 30% reduction goal and exploring potential user segments who might resist this change.",
-        business: "Your market analysis shows good strategic thinking. The MVP timeline is realistic. Consider adding more detail about customer acquisition strategy and potential revenue models for the chosen market segment."
-      };
-      
-      setAiFeedback(placeholderFeedback[challengeType]);
-      toast.success('Response submitted and feedback received!');
+      // TODO: Implement response submission webhook when ready
+      throw new Error('Response submission not yet implemented');
     } catch (error) {
       console.error('Failed to submit response:', error);
-      toast.error('Failed to submit response. Please try again.');
+      toast.error('Response submission not yet implemented');
     } finally {
       setSubmittingResponse(false);
     }

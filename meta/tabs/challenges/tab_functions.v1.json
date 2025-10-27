@@ -6,10 +6,10 @@
       "description": "Generate a new challenge based on selected type",
       "parameters": {
         "type": "journal | product | business",
-        "webhook_url": "string (environment variable)"
+        "webhook_url": "https://geronimo.askdavidstone.com/webhook/challenges"
       },
       "returns": "Generated challenge text",
-      "error_handling": "Toast notifications for success/failure"
+      "error_handling": "Toast notifications for success/failure, fails cleanly on webhook errors"
     },
     "submitResponse": {
       "description": "Submit user response to challenge for AI feedback",
@@ -41,14 +41,17 @@
     "generate_challenge": {
       "description": "Generate challenge prompt",
       "method": "POST",
-      "url": "TBD - to be configured",
+      "url": "https://geronimo.askdavidstone.com/webhook/challenges",
       "headers": {
-        "Authorization": "Bearer {token}",
+        "Authorization": "Bearer {VITE_N8N_WEBHOOK_TOKEN}",
         "Content-Type": "application/json"
       },
       "body": {
         "type": "journal | product | business",
         "timestamp": "ISO string"
+      },
+      "response_format": {
+        "challenge": "string (the generated challenge text)"
       }
     },
     "submit_response": {
