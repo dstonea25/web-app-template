@@ -283,11 +283,9 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
             </button>
             <SessionTimerInline />
           </div>
-          {sectionsVisible.dailyIntentions && (
-            <div className="mt-4">
-              <DailyIntentionsModule isVisible={isVisible} />
-            </div>
-          )}
+          <div className="mt-4">
+            <DailyIntentionsModule isVisible={sectionsVisible.dailyIntentions} />
+          </div>
         </section>
 
         <section>
@@ -310,11 +308,9 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          {sectionsVisible.committedPriorities && (
-            <div className="mt-4">
-              <CommittedPrioritiesModule isVisible={isVisible} />
-            </div>
-          )}
+          <div className="mt-4">
+            <CommittedPrioritiesModule isVisible={sectionsVisible.committedPriorities} />
+          </div>
         </section>
 
         <section>
@@ -354,11 +350,9 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               </button>
             )}
           </div>
-          {sectionsVisible.okrs && (
-            <div className="mt-4">
-              <OKRModule key={okrsKey} isVisible={isVisible} hideHeader={true} />
-            </div>
-          )}
+          <div className="mt-4">
+            <OKRModule key={okrsKey} isVisible={sectionsVisible.okrs} hideHeader={true} />
+          </div>
         </section>
 
         <section>
@@ -381,18 +375,16 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          {sectionsVisible.importantTasks && (
-            <div className="mt-4">
-              <HomeTodosTable
-                todos={priorityFiltered}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                onSortChange={setSortBy}
-                onSortOrderChange={setSortOrder}
-                onComplete={completeImmediately}
-              />
-            </div>
-          )}
+          <div className={cn('mt-4', !sectionsVisible.importantTasks && 'hidden')}>
+            <HomeTodosTable
+              todos={priorityFiltered}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={setSortBy}
+              onSortOrderChange={setSortOrder}
+              onComplete={completeImmediately}
+            />
+          </div>
         </section>
 
         {showQuarterlySetup && nextQuarter && (
