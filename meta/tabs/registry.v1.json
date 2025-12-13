@@ -6,7 +6,7 @@
     "enabled": true,
     "storage_key": "dashboard-active-tab",
     "fallback_behavior": "first_enabled_tab_or_default",
-    "validation": ["todos", "ideas", "time_tracking", "allocations", "habit_tracker"]
+    "validation": ["todos", "ideas", "priorities", "time_tracking", "allocations", "habit_tracker", "challenges", "calendar"]
   },
   "tabs": [
     {
@@ -23,6 +23,19 @@
       }
     },
     {
+      "id": "calendar",
+      "title": "Calendar",
+      "route": "/calendar",
+      "icon": "calendar",
+      "order": 12,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/calendar/tab_scope.v1.json",
+        "functions": "/meta/tabs/calendar/tab_functions.v1.json",
+        "styles": "/meta/tabs/calendar/tab_styles.v1.json"
+      }
+    },
+    {
       "id": "ideas",
       "title": "Ideas",
       "route": "/ideas",
@@ -33,6 +46,19 @@
         "scope": "/meta/tabs/ideas/tab_scope.v1.json",
         "functions": "/meta/tabs/ideas/tab_functions.v1.json",
         "styles": "/meta/tabs/ideas/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "priorities",
+      "title": "Priorities",
+      "route": "/priorities",
+      "icon": "target",
+      "order": 18,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/priorities/tab_scope.v1.json",
+        "functions": "/meta/tabs/priorities/tab_functions.v1.json",
+        "styles": "/meta/tabs/priorities/tab_styles.v1.json"
       }
     },
     {
@@ -60,8 +86,7 @@
         "functions": "/meta/tabs/allocations/tab_functions.v1.json",
         "styles": "/meta/tabs/allocations/tab_styles.v1.json"
       }
-    }
-    ,
+    },
     {
       "id": "habit_tracker",
       "title": "Habit Tracker",
@@ -73,6 +98,19 @@
         "scope": "/meta/tabs/habit_tracker/tab_scope.v1.json",
         "functions": "/meta/tabs/habit_tracker/tab_functions.v1.json",
         "styles": "/meta/tabs/habit_tracker/tab_styles.v1.json"
+      }
+    },
+    {
+      "id": "challenges",
+      "title": "Challenges",
+      "route": "/challenges",
+      "icon": "zap",
+      "order": 35,
+      "enabled": true,
+      "meta": {
+        "scope": "/meta/tabs/challenges/tab_scope.v1.json",
+        "functions": "/meta/tabs/challenges/tab_functions.v1.json",
+        "styles": "/meta/tabs/challenges/tab_styles.v1.json"
       }
     }
   ]

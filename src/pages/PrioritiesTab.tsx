@@ -281,6 +281,8 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
     const prevOverview = JSON.parse(JSON.stringify(overview)) as PrioritiesOverviewResponse[];
     const prevActiveFocus = JSON.parse(JSON.stringify(activeFocus)) as ActiveFocusRow[];
     
+    console.log('[PrioritiesTab] Completing milestone:', milestoneId, 'nextVal:', nextVal);
+    
     // Optimistic: mark completed in backlog, and if completing, also decommit
     setOverview(list => list.map(p => ({
       ...p,
@@ -303,9 +305,11 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
     
     try {
       await toggleComplete(milestoneId);
+      console.log('[PrioritiesTab] toggleComplete done');
       if (nextVal === true) {
         // If completed, also decommit so it stays out of Current Priorities
         await toggleCommit(milestoneId);
+        console.log('[PrioritiesTab] toggleCommit done');
         // Don't call loadActiveFocus() to preserve scroll position
         // The optimistic update above handles the UI
       }

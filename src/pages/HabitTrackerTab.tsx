@@ -563,19 +563,30 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       {/* Monthly Overview */}
       {!isInitialLoading && habits.length > 0 && !errorMessage && (
-        <MonthlyHabitOverview
-          habits={habits}
-          calendarData={calendarData}
-          onToggleDay={toggleDay}
-          isVisible={isVisible}
-        />
+        <section className="mb-6">
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Monthly Overview
+          </h2>
+          <div className="mt-4">
+            <MonthlyHabitOverview
+              habits={habits}
+              calendarData={calendarData}
+              onToggleDay={toggleDay}
+              isVisible={isVisible}
+            />
+          </div>
+        </section>
       )}
 
       {/* Yearly Calendar */}
-      <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
+      <section className="mb-6">
+        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+          Yearly Overview
+        </h2>
+        <div className="mt-4">
+          <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
         <header className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-neutral-100">Yearly Overview</h3>
             {(isSaving || isInitialLoading || isHabitLoading) && (
               <div className="text-xs text-neutral-400">
                 {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
@@ -599,7 +610,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
             )}
           </>
         )}
-      </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

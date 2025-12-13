@@ -5,11 +5,77 @@ import RecentRedemptionsTable from '../components/RecentRedemptionsTable';
 import { getCachedData, setCachedData } from '../lib/storage';
 import { toast } from '../lib/notifications/toast';
 
+// Emoji rain animation - like Slack/Messenger reactions
+const createEmojiRain = (buttonElement: HTMLElement) => {
+  const emojis = ['🎉', '✨', '💚', '🎊', '⭐', '💰', '🌟', '💸'];
+  const rect = buttonElement.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  
+  // Create 25-30 emojis that rain from the button
+  const count = 25 + Math.floor(Math.random() * 6);
+  
+  for (let i = 0; i < count; i++) {
+    const emoji = document.createElement('div');
+    const selectedEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    emoji.textContent = selectedEmoji;
+    emoji.style.position = 'fixed';
+    emoji.style.left = `${centerX}px`;
+    emoji.style.top = `${centerY}px`;
+    emoji.style.fontSize = `${20 + Math.random() * 20}px`;
+    emoji.style.pointerEvents = 'none';
+    emoji.style.zIndex = '9999';
+    emoji.style.opacity = '1';
+    emoji.style.userSelect = 'none';
+    
+    document.body.appendChild(emoji);
+    
+    // Random spread angle
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+    const velocity = 150 + Math.random() * 150;
+    const tx = Math.cos(angle) * velocity;
+    const ty = Math.sin(angle) * velocity - 50; // Slight upward bias
+    
+    // Stagger start times for more natural flow
+    const delay = Math.random() * 100;
+    
+    setTimeout(() => {
+      const animation = emoji.animate([
+        { 
+          transform: 'translate(0, 0) scale(0.3)',
+          opacity: 0 
+        },
+        { 
+          transform: 'translate(0, 0) scale(1)',
+          opacity: 1,
+          offset: 0.1
+        },
+        { 
+          transform: `translate(${tx}px, ${ty}px) scale(1.2)`,
+          opacity: 0.8,
+          offset: 0.5
+        },
+        { 
+          transform: `translate(${tx}px, ${ty + 200}px) scale(0.8)`,
+          opacity: 0 
+        }
+      ], {
+        duration: 1200 + Math.random() * 400,
+        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      });
+      
+      animation.onfinish = () => emoji.remove();
+    }, delay);
+  }
+};
+
 export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const [state, setState] = useState<AllocationState | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [recentRows, setRecentRows] = useState<{ id: string; item: string; ts: string; qty?: number }[]>([]);
+  const [celebratingItem, setCelebratingItem] = useState<string | null>(null);
   const UNDO_WINDOW_MS = 2500;
   const commitTimerRef = useRef<number | null>(null);
   const stateRef = useRef<AllocationState | null>(null);
@@ -20,6 +86,21 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   const [newQuota, setNewQuota] = useState('');
   const [newMultiplier, setNewMultiplier] = useState('');
   const [editingCell, setEditingCell] = useState<{ index: number; field: 'type'|'quota'|'cadence'|'multiplier' } | null>(null);
+  // Section visibility state
+  const [sectionsVisible, setSectionsVisible] = useState({
+    available: true,
+    comingUp: true,
+    unavailable: true,
+    currentAllocations: true,
+    recentRedemptions: true,
+  });
+  const toggleSection = (section: keyof typeof sectionsVisible) => {
+    setSectionsVisible(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   const handleSelectAll: React.FocusEventHandler<HTMLInputElement | HTMLSelectElement> = (e) => {
     // Small timeout ensures selection after focus paint
     setTimeout(() => {
@@ -137,7 +218,16 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
     recoveryRan.current = true;
   }, [state]);
 
-  const handleRedeem = async (type: string) => {
+  const handleRedeem = async (type: string, event?: React.MouseEvent<HTMLButtonElement>) => {
+    // Trigger celebration IMMEDIATELY before any state changes
+    if (event?.currentTarget) {
+      createEmojiRain(event.currentTarget);
+    }
+    
+    // Brief animation on the card
+    setCelebratingItem(type);
+    setTimeout(() => setCelebratingItem(null), 600);
+    
     try {
       setLoading(true);
       setError(null);
@@ -351,10 +441,29 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       {/* Available Section - Card layout grouped by cadence */}
-      <div className={cn(tokens.card.base, 'mb-6')}>
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
-          Available ({state.available.length})
-        </h2>
+      <section className="mb-6">
+        <button
+          onClick={() => toggleSection('available')}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Available ({state.available.length})
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              sectionsVisible.available ? "rotate-180" : "rotate-0"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {sectionsVisible.available && (
+          <div className="mt-4">
+            <div className={cn(tokens.card.base)}>
         {(() => {
           // Group available items by cadence (weekly, monthly, yearly). Quarterly rolls into monthly.
           const cadenceByType = new Map(sortedItems.map(it => [it.type, it.cadence as 'weekly'|'monthly'|'quarterly'|'yearly']));
@@ -380,15 +489,22 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
                   <div className="col-span-full text-center text-neutral-400 py-6">No items</div>
                 ) : (
                   items.map(item => (
-                    <div key={item.type} className="p-6 rounded-2xl border border-neutral-800 bg-neutral-900 flex flex-col items-center justify-center text-center min-h-[120px]">
-                      <h4 className="font-semibold text-neutral-100 text-lg mb-2">{item.type}</h4>
-                      <div className="text-neutral-400 mb-4">
-                        <span className="font-semibold text-lg">{item.remaining} Available</span>
+                    <div 
+                      key={item.type} 
+                      className={cn(
+                        "group p-6 rounded-2xl border-2 border-emerald-500/30 bg-neutral-900 flex flex-col items-center justify-center text-center min-h-[120px] transition-all duration-200 hover:border-emerald-500/60 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1 hover:bg-neutral-900/80 cursor-pointer",
+                        celebratingItem === item.type && "celebrate-pulse"
+                      )}
+                    >
+                      <h4 className="font-semibold text-neutral-100 text-lg mb-2 group-hover:text-emerald-400 transition-colors">{item.type}</h4>
+                      <div className="text-emerald-400 mb-4">
+                        <span className="font-semibold text-xl">{item.remaining}</span>
+                        <span className="text-sm ml-1">Available</span>
                       </div>
                       <button
-                        onClick={() => handleRedeem(item.type)}
+                        onClick={(e) => handleRedeem(item.type, e)}
                         disabled={loading}
-                        className={cn(tokens.button.base, tokens.button.success, 'text-sm')}
+                        className={cn(tokens.button.base, tokens.button.success, 'text-sm group-hover:scale-105 transition-transform')}
                       >
                         Redeem
                       </button>
@@ -411,13 +527,35 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
             </div>
           );
         })()}
-      </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Coming Up Section - Card layout matching Available style */}
-      <div className={cn(tokens.card.base, 'mb-6')}>
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
-          Coming Up ({comingSoon.length})
-        </h2>
+      <section className="mb-6">
+        <button
+          onClick={() => toggleSection('comingUp')}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Coming Up ({comingSoon.length})
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              sectionsVisible.comingUp ? "rotate-180" : "rotate-0"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {sectionsVisible.comingUp && (
+          <div className="mt-4">
+            <div className={cn(tokens.card.base)}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {comingSoon.length === 0 ? (
             <div className="col-span-full text-center text-neutral-400 py-8">
@@ -425,49 +563,83 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
             </div>
           ) : (
             comingSoon.map(item => (
-              <div key={item.type} className="p-6 rounded-2xl border border-neutral-800 bg-neutral-900 flex flex-col justify-center min-h-[120px]">
-                <h3 className="font-semibold text-neutral-100 text-lg mb-2">{item.type}</h3>
-                <div className="text-amber-200">
-                  <span className="font-semibold text-lg">{item.quotaAvailable}</span> available in <span className="font-semibold text-lg">{item.daysUntil}</span> days
+              <div 
+                key={item.type} 
+                className="group p-6 rounded-2xl border-2 border-amber-400/30 bg-neutral-900 flex flex-col justify-center min-h-[120px] transition-all duration-200 hover:border-amber-400/60 hover:shadow-lg hover:shadow-amber-400/10 hover:-translate-y-1 hover:bg-neutral-900/80"
+              >
+                <h3 className="font-semibold text-neutral-100 text-lg mb-2 group-hover:text-amber-400 transition-colors">{item.type}</h3>
+                <div className="text-amber-400">
+                  <span className="font-semibold text-xl">{item.quotaAvailable}</span>
+                  <span className="text-sm"> available in </span>
+                  <span className="font-semibold text-xl">{item.daysUntil}</span>
+                  <span className="text-sm"> {item.daysUntil === 1 ? 'day' : 'days'}</span>
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Unavailable Section - Compact list with last redeemed date and count */}
-      <div className={cn(tokens.card.base)}>
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
-          Unavailable ({unavailableList.length})
-        </h2>
-        {/* Mobile cards */}
-        <div className="sm:hidden space-y-3">
+      <section className="mb-6">
+        <button
+          onClick={() => toggleSection('unavailable')}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Unavailable ({unavailableList.length})
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              sectionsVisible.unavailable ? "rotate-180" : "rotate-0"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {sectionsVisible.unavailable && (
+          <div className="mt-4">
+            <div className={cn(tokens.card.base)}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {unavailableList.length === 0 ? (
-            <div className={cn(tokens.card.base, 'text-center text-neutral-400')}>No unavailable items</div>
+            <div className="col-span-full text-center text-neutral-400 py-8">
+              No unavailable items
+            </div>
           ) : (
             unavailableList.map(item => (
-              <div key={item.type} className={cn(tokens.card.base, 'flex flex-col gap-3 text-neutral-100')}>
-                <div className="font-medium">{item.type}</div>
-                <div className="grid grid-cols-1 gap-2 text-sm">
-                  <div>
-                    <span className="text-neutral-400 mr-1">Last Redeemed:</span>
-                    <span className="text-neutral-100">{item.lastRedeemed}</span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-400 mr-1">Next Available:</span>
-                    <span className="text-neutral-100">{state.stats?.nextReset?.[item.type] || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-400 mr-1">Count This Year:</span>
-                    <span className="text-neutral-100">{item.countThisYear}</span>
+              <div 
+                key={item.type} 
+                className="group p-6 rounded-2xl border-2 border-neutral-700/40 bg-neutral-900 flex flex-col justify-between min-h-[180px] transition-all duration-200 hover:border-neutral-600/60 hover:shadow-lg hover:shadow-neutral-700/10 hover:-translate-y-1 hover:bg-neutral-900/80"
+              >
+                <div>
+                  <h3 className="font-semibold text-neutral-100 text-lg mb-4 group-hover:text-neutral-50 transition-colors">{item.type}</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-400">Last Redeemed:</span>
+                      <span className="text-neutral-200 font-medium">{item.lastRedeemed}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-400">Next Available:</span>
+                      <span className="text-neutral-200 font-medium">{state.stats?.nextReset?.[item.type] || '-'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-400">Count This Year:</span>
+                      <span className="text-neutral-200 font-medium">{item.countThisYear}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="mt-4 pt-4 border-t border-neutral-800">
                   <button
                     onClick={() => handleAdmitDefeat(item.type)}
                     disabled={loading}
-                    className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
+                    className={cn(tokens.button.base, tokens.button.danger, 'text-sm w-full group-hover:scale-105 transition-transform')}
                   >
                     Admit Defeat
                   </button>
@@ -476,62 +648,35 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
             ))
           )}
         </div>
-        {/* Desktop table */}
-        <div className={cn(tokens.table.wrapper, 'hidden sm:block')}>
-          <table className={tokens.table.table}>
-            <thead className={tokens.table.thead}>
-              <tr>
-                <th className={tokens.table.th}>Item</th>
-                <th className={tokens.table.th}>Last Redeemed</th>
-                <th className={tokens.table.th}>Next Available</th>
-                <th className={tokens.table.th}>Count This Year</th>
-                <th className={tokens.table.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unavailableList.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className={tokens.table.empty_state}>
-                    No unavailable items
-                  </td>
-                </tr>
-              ) : (
-                unavailableList.map(item => (
-                  <tr key={item.type} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
-                    <td className={tokens.table.td}>
-                      <span className="font-medium text-neutral-400">{item.type}</span>
-                    </td>
-                    <td className={tokens.table.td}>
-                      <span className="text-neutral-400">{item.lastRedeemed}</span>
-                    </td>
-                    <td className={tokens.table.td}>
-                      <span className="text-neutral-400">{state.stats?.nextReset?.[item.type] || '-'}</span>
-                    </td>
-                    <td className={tokens.table.td}>
-                      <span className="text-neutral-400">{item.countThisYear}</span>
-                    </td>
-                    <td className={tokens.table.td}>
-                      <button
-                        onClick={() => handleAdmitDefeat(item.type)}
-                        disabled={loading}
-                        className={cn(tokens.button.base, tokens.button.danger, 'text-sm')}
-                      >
-                        Admit Defeat
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Current Allocations + Manual Add */}
-      <div className={cn(tokens.card.base, 'mt-6')}>
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'mb-4', tokens.palette.dark.text)}>
-          Current Allocations
-        </h2>
+      <section className="mt-6 mb-6">
+        <button
+          onClick={() => toggleSection('currentAllocations')}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Current Allocations
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              sectionsVisible.currentAllocations ? "rotate-180" : "rotate-0"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {sectionsVisible.currentAllocations && (
+          <div className="mt-4">
+            <div className={cn(tokens.card.base)}>
 
         {/* Manual Add Row */}
         <div className="mb-4">
@@ -773,28 +918,58 @@ export const AllocationsTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = 
         </div>
 
         {/* Auto-commit active; explicit Save/Cancel removed */}
-      </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Recent Redemptions */}
-      <RecentRedemptionsTable
-        rows={recentRows}
-        onDelete={async (id) => {
-          try {
-            await deleteRedemptionById(id);
-            const [s, list] = await Promise.all([
-              loadLedgerAndAllotments(),
-              fetchRecentRedemptions(5),
-            ]);
-            setState(s);
-            setCachedData('allocations-cache', s);
-            setRecentRows(list);
-            toast.success('Redemption deleted');
-          } catch (err) {
-            console.error(err);
-            toast.error('Failed to delete redemption');
-          }
-        }}
-      />
+      <section className="mb-6">
+        <button
+          onClick={() => toggleSection('recentRedemptions')}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Recent Redemptions
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              sectionsVisible.recentRedemptions ? "rotate-180" : "rotate-0"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {sectionsVisible.recentRedemptions && (
+          <div className="mt-4">
+            <div className={cn(tokens.card.base)}>
+              <RecentRedemptionsTable
+                rows={recentRows}
+                onDelete={async (id) => {
+                  try {
+                    await deleteRedemptionById(id);
+                    const [s, list] = await Promise.all([
+                      loadLedgerAndAllotments(),
+                      fetchRecentRedemptions(5),
+                    ]);
+                    setState(s);
+                    setCachedData('allocations-cache', s);
+                    setRecentRows(list);
+                    toast.success('Redemption deleted');
+                  } catch (err) {
+                    console.error(err);
+                    toast.error('Failed to delete redemption');
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

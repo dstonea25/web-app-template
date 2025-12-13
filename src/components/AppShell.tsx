@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home, Target } from 'lucide-react';
+import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home, Target, Zap, Calendar } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import WorkModeToggle from './WorkModeToggle';
@@ -13,6 +13,8 @@ import { AllocationsTab } from '../pages/AllocationsTab';
 import { tokens, cn } from '../theme/config';
 import { PrioritiesTab } from '../pages/PrioritiesTab';
 import { HabitTrackerTab } from '../pages/HabitTrackerTab';
+import { ChallengesTab } from '../pages/ChallengesTab';
+import { CalendarTab } from '../pages/CalendarTab';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,13 +48,20 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'priorities', 'time_tracking', 'allocations', 'habit_tracker'].includes(savedTab);
+      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'priorities', 'time_tracking', 'allocations', 'habit_tracker', 'challenges', 'calendar'].includes(savedTab);
       return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'home')) as ModuleId;
     } catch {
       return 'home';
     }
   });
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-collapsed');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [visitedTabs, setVisitedTabs] = useState<Set<ModuleId>>(() => new Set<ModuleId>([activeModule]));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -95,7 +104,9 @@ export const AppShell: React.FC = () => {
       'target': <Target className={cn('w-5 h-5', tokens.icon?.default)} />,
       'timer': <Timer className={cn('w-5 h-5', tokens.icon?.default)} />,
       'layers': <Layers className={cn('w-5 h-5', tokens.icon?.default)} />,
-      'activity': <Activity className={cn('w-5 h-5', tokens.icon?.default)} />
+      'activity': <Activity className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'zap': <Zap className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'calendar': <Calendar className={cn('w-5 h-5', tokens.icon?.default)} />
     };
     
     return {
@@ -113,6 +124,8 @@ export const AppShell: React.FC = () => {
   const TimeTrackingTabAny = TimeTrackingTab as React.FC<any>;
   const AllocationsTabAny = AllocationsTab as React.FC<any>;
   const HabitTrackerTabAny = HabitTrackerTab as React.FC<any>;
+  const ChallengesTabAny = ChallengesTab as React.FC<any>;
+  const CalendarTabAny = CalendarTab as React.FC<any>;
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
@@ -125,11 +138,48 @@ export const AppShell: React.FC = () => {
   };
 
   const handleToggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
+    setSidebarCollapsed(prev => {
+      const newValue = !prev;
+      try {
+        localStorage.setItem('sidebar-collapsed', String(newValue));
+      } catch {}
+      return newValue;
+    });
   };
 
   const handleOpenMobileDrawer = () => {
     setMobileDrawerOpen(true);
+  };
+
+  // Get current tab title
+  const getCurrentTabTitle = (): string => {
+    const userName = 'David'; // TODO: Get from auth context when user profile is added
+    
+    // Special case for Home - use personalized greeting
+    if (activeModule === 'home') {
+      return `Welcome back, ${userName}`;
+    }
+    
+    const tabId = activeModule === 'time_tracking' ? 'time' : activeModule;
+    const tab = TAB_REGISTRY.find(t => t.id === tabId);
+    return tab?.title || 'Geronimo';
+  };
+
+  // Get personalized subtitle for current tab
+  const getCurrentTabSubtitle = (): string => {
+    const subtitles: Record<ModuleId, string> = {
+      home: 'Your productivity dashboard at a glance',
+      todos: 'Manage your tasks and get things done',
+      calendar: 'Plan your days and track events',
+      ideas: 'Capture and organize your thoughts',
+      priorities: 'Focus on what matters most',
+      time_tracking: 'Track your productive hours',
+      allocations: 'Manage your rewards and indulgences',
+      habit_tracker: 'Build better habits, one day at a time',
+      challenges: 'Push yourself with new challenges',
+    };
+
+    return subtitles[activeModule] || '';
   };
 
   const handleCloseMobileDrawer = () => {
@@ -154,19 +204,26 @@ export const AppShell: React.FC = () => {
   );
 
   return (
-    <div className={cn('min-h-screen overflow-x-hidden', tokens.palette.dark.bg)}>
+    <div className={cn('h-screen overflow-hidden', tokens.palette.dark.bg)}>
       <ToastHost />
       {/* Desktop Layout */}
-      <div className={cn(tokens.app_shell.grid, 'hidden sm:grid')}>
-        <Sidebar
-          items={navigationItems}
-          activeModule={activeModule}
-          collapsed={sidebarCollapsed}
-          onModuleChange={handleModuleChange}
-          onToggleCollapse={handleToggleSidebar}
-        />
-        <div className={tokens.app_shell.content}>
-          <TopBanner onOpenTimeTab={openTimeTab} isOnTimeTab={activeModule === 'time_tracking'} />
+      <div className={cn(tokens.app_shell.grid, 'hidden sm:grid h-full')}>
+        <div className="relative z-30">
+          <Sidebar
+            items={navigationItems}
+            activeModule={activeModule}
+            collapsed={sidebarCollapsed}
+            onModuleChange={handleModuleChange}
+            onToggleCollapse={handleToggleSidebar}
+          />
+        </div>
+        <div className={cn(tokens.app_shell.content, 'overflow-y-auto')}>
+          <TopBanner 
+            title={getCurrentTabTitle()} 
+            subtitle={getCurrentTabSubtitle()} 
+            onOpenTimeTab={openTimeTab} 
+            isOnTimeTab={activeModule === 'time_tracking'} 
+          />
           <main className="p-6">
             {visitedTabs.has('home') && (
               <section style={{ display: activeModule === 'home' ? 'block' : 'none' }}>
@@ -176,6 +233,11 @@ export const AppShell: React.FC = () => {
             {visitedTabs.has('todos') && (
               <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
                 <TodosTabAny isVisible={activeModule === 'todos'} />
+              </section>
+            )}
+            {visitedTabs.has('calendar') && (
+              <section style={{ display: activeModule === 'calendar' ? 'block' : 'none' }}>
+                <CalendarTabAny isVisible={activeModule === 'calendar'} />
               </section>
             )}
             {visitedTabs.has('ideas') && (
@@ -203,15 +265,21 @@ export const AppShell: React.FC = () => {
                 <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
               </section>
             )}
+            {visitedTabs.has('challenges') && (
+              <section style={{ display: activeModule === 'challenges' ? 'block' : 'none' }}>
+                <ChallengesTabAny isVisible={activeModule === 'challenges'} />
+              </section>
+            )}
           </main>
         </div>
       </div>
 
       {/* Mobile Layout */}
-      <div className="sm:hidden overflow-x-hidden">
+      <div className="sm:hidden h-screen overflow-hidden flex flex-col">
         <TopNav 
           onHamburger={handleOpenMobileDrawer} 
           mobileOpen={mobileDrawerOpen}
+          title={getCurrentTabTitle()}
           rightSlot={(
             <div className="flex items-center gap-2">
               <WorkModeToggle compact />
@@ -219,7 +287,7 @@ export const AppShell: React.FC = () => {
             </div>
           )}
         />
-        <main className="p-4">
+        <main className="p-4 flex-1 overflow-y-auto">
           {visitedTabs.has('home') && (
             <section style={{ display: activeModule === 'home' ? 'block' : 'none' }}>
               <HomeTabAny isVisible={activeModule === 'home'} />
@@ -228,6 +296,11 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('todos') && (
             <section style={{ display: activeModule === 'todos' ? 'block' : 'none' }}>
               <TodosTabAny isVisible={activeModule === 'todos'} />
+            </section>
+          )}
+          {visitedTabs.has('calendar') && (
+            <section style={{ display: activeModule === 'calendar' ? 'block' : 'none' }}>
+              <CalendarTabAny isVisible={activeModule === 'calendar'} />
             </section>
           )}
           {visitedTabs.has('ideas') && (
@@ -253,6 +326,11 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('habit_tracker') && (
             <section style={{ display: activeModule === 'habit_tracker' ? 'block' : 'none' }}>
               <HabitTrackerTabAny isVisible={activeModule === 'habit_tracker'} />
+            </section>
+          )}
+          {visitedTabs.has('challenges') && (
+            <section style={{ display: activeModule === 'challenges' ? 'block' : 'none' }}>
+              <ChallengesTabAny isVisible={activeModule === 'challenges'} />
             </section>
           )}
         </main>

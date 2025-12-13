@@ -3,7 +3,6 @@ import { cn, tokens } from '../../theme/config';
 import type { IntentionPillar, IntentionStatsRow } from '../../types';
 import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted, fetchIntentionStats, getTodayCompletionStatus, markIntentionCompleted } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
-import { SessionTimer } from './SessionTimer';
 
 const PILLARS: { key: IntentionPillar; label: string; emoji: string }[] = [
   { key: 'Power', label: 'Power', emoji: '💪' },
@@ -156,15 +155,6 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   return (
     <div className={cn('grid gap-4', !isVisible && 'hidden')}>
       <div className={cn(tokens.card.base, 'p-6')}> {/* Single unified card */}
-        <SessionTimer embedded />
-
-        <div className="mt-6 flex items-center justify-between">
-          <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'text-neutral-100')}>
-            Daily Intentions
-          </h3>
-        </div>
-        <div className="mt-3" />
-
         {loading ? (
           <div className="py-4 text-center text-neutral-100">Loading intentions…</div>
         ) : (

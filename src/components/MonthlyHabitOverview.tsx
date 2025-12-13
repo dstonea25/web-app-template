@@ -202,10 +202,8 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className="mb-8 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
+    <div className="p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
       <header className="mb-6">
-        <h3 className="text-lg font-semibold text-neutral-100 mb-4">Monthly Overview</h3>
-        
         {/* Month Selector */}
         <div className="flex items-center gap-3">
           <label htmlFor="month-selector" className="text-sm text-neutral-300">

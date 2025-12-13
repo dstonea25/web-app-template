@@ -24,8 +24,7 @@ export const RecentRedemptionsTable: React.FC<RecentRedemptionsTableProps> = ({ 
   };
 
   return (
-    <div className="mt-8">
-      <h3 className="text-lg font-semibold mb-4 text-neutral-100">Recent Redemptions</h3>
+    <div>
       {/* Mobile cards */}
       <div className="sm:hidden space-y-3">
         {(!rows || rows.length === 0) ? (

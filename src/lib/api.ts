@@ -659,6 +659,81 @@ export class ApiClient {
     return { success: true };
   }
 
+  // ===== Calendar Events =====
+  async fetchCalendarEventsForYear(year: number): Promise<import('../types').CalendarEvent[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+    
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true });
+    
+    if (error) throw error;
+    return (data || []) as import('../types').CalendarEvent[];
+  }
+
+  async fetchCalendarEventsForDate(date: string): Promise<import('../types').CalendarEvent[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('date', date)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return (data || []) as import('../types').CalendarEvent[];
+  }
+
+  async createCalendarEvent(input: import('../types').CalendarEventInput): Promise<string> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .insert({
+        date: input.date,
+        title: input.title,
+        category: input.category ?? null,
+        notes: input.notes ?? null,
+      })
+      .select('id')
+      .single();
+    
+    if (error) throw error;
+    return String((data as any).id);
+  }
+
+  async updateCalendarEvent(id: string, patch: Partial<import('../types').CalendarEventInput>): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('calendar_events')
+      .update(patch)
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('calendar_events')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
 
   // Future webhook endpoints (disabled in MVP)
   // private async makeRequest<T>(

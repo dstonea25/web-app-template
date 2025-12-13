@@ -74,8 +74,7 @@ export const RecentSessionsTable: React.FC<RecentSessionsTableProps> = ({
   };
 
   return (
-    <div className="mt-8">
-      <h3 className="text-lg font-semibold mb-4 text-neutral-100">Recent Sessions</h3>
+    <div className="p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
       {/* Mobile cards (show on small screens only) */}
       <div className="sm:hidden space-y-3">
         {(!sessions || sessions.length === 0) ? (
