@@ -120,6 +120,8 @@ export interface AuthContextType {
 // Personal OKRs
 export type OkrPillar = 'Power' | 'Passion' | 'Purpose' | 'Production';
 export type KeyResultKind = 'boolean' | 'count' | 'percent' | 'duration';
+export type OkrDirection = 'up' | 'down'; // 'up' = maximize (default), 'down' = minimize (weight loss, etc)
+export type OkrDataSource = 'manual' | 'habit' | 'metric';
 
 export interface OkrKeyResult {
   id: string;
@@ -130,6 +132,16 @@ export interface OkrKeyResult {
   current_value: number | boolean | null;
   // Optional, may be provided by the view as 0..1 or 0..100
   progress?: number | null;
+  // Direction: 'up' for count-up (can exceed 100%), 'down' for countdown (weight loss)
+  direction?: OkrDirection;
+  // Baseline value for countdown KRs (e.g., starting weight)
+  baseline_value?: number | null;
+  // Data source for current_value
+  data_source?: OkrDataSource;
+  // Linked habit ID for auto-sync
+  linked_habit_id?: string | null;
+  // Whether to auto-sync from linked source
+  auto_sync?: boolean;
 }
 
 export interface Okr {
@@ -140,6 +152,13 @@ export interface Okr {
   progress?: number | null;
   // When coming from okrs_with_progress, key results often arrive as JSON
   key_results?: OkrKeyResult[];
+  // Quarter identifier (e.g., "Q4 2025", "Q1 2026")
+  quarter?: string;
+  // Start and end dates for the quarter
+  start_date?: string;
+  end_date?: string;
+  // Whether archived (not currently active)
+  archived?: boolean;
 }
 
 // Daily Intentions
@@ -249,4 +268,22 @@ export interface MilestoneRecord {
   due_date?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+// Calendar Events
+export interface CalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  category: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventInput {
+  date: string; // YYYY-MM-DD
+  title: string;
+  category: string | null;
+  notes: string | null;
 }

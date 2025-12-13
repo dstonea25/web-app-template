@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { Todo } from '../types';
+import type { Todo, Okr } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
 import { OKRModule } from '../components/okrs/OKRModule';
+import { QuarterlySetupModal } from '../components/okrs/QuarterlySetupModal';
 import { DailyIntentionsModule } from '../components/intentions/DailyIntentionsModule';
+import { SessionTimerInline } from '../components/intentions/SessionTimerInline';
+import { CommittedPrioritiesModule } from '../components/CommittedPrioritiesModule';
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
+import { fetchOkrsWithProgress, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const { workMode } = useWorkMode();
@@ -19,12 +23,69 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   const [/* editingId */, /* setEditingId */] = useState<string | null>(null);
   const [stagedCount, setStagedCount] = useState<number>(0);
   const hasLoadedRef = useRef(false);
+  
+  // OKR quarter management
+  const [currentQuarter, setCurrentQuarter] = useState<string | null>(null);
+  const [nextQuarter, setNextQuarter] = useState<{ quarter: string; start_date: string; end_date: string } | null>(null);
+  const [previousOkrs, setPreviousOkrs] = useState<Okr[]>([]);
+  const [showQuarterlySetup, setShowQuarterlySetup] = useState(false);
+  const [okrsKey, setOkrsKey] = useState(0); // Force OKR module refresh
+  
+  // Section visibility state
+  const [sectionsVisible, setSectionsVisible] = useState({
+    dailyIntentions: true,
+    committedPriorities: true,
+    importantTasks: true,
+    okrs: true,
+  });
+  
+  const toggleSection = (section: keyof typeof sectionsVisible) => {
+    setSectionsVisible(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   useEffect(() => {
     if (!isVisible || hasLoadedRef.current) return;
     hasLoadedRef.current = true;
     loadTodos();
+    loadQuarterInfo();
   }, [isVisible]);
+
+  const loadQuarterInfo = async () => {
+    try {
+      const okrs = await fetchOkrsWithProgress();
+      if (okrs.length > 0) {
+        const quarter = okrs[0].quarter;
+        setCurrentQuarter(quarter || null);
+        setPreviousOkrs(okrs);
+      }
+      const next = await getNextQuarter();
+      setNextQuarter(next);
+    } catch (error) {
+      console.error('Failed to load quarter info:', error);
+    }
+  };
+
+  const handleCreateQuarterOKRs = async (okrsData: any[]) => {
+    if (!nextQuarter) return;
+    try {
+      await createQuarterOKRs(
+        nextQuarter.quarter,
+        nextQuarter.start_date,
+        nextQuarter.end_date,
+        okrsData
+      );
+      // Refresh
+      await loadQuarterInfo();
+      setOkrsKey(prev => prev + 1); // Force OKR module refresh
+      setShowQuarterlySetup(false);
+    } catch (error) {
+      console.error('Failed to create quarterly OKRs:', error);
+      throw error;
+    }
+  };
 
   // Cross-tab sync: refresh when storage broadcasts updates
   useEffect(() => {
@@ -150,6 +211,18 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     return base.filter(t => String(t.category || '').toLowerCase() === 'work');
   }, [todos, workMode]);
 
+  const daysLeftInQuarter = useMemo(() => {
+    const now = new Date();
+    const startMonth = Math.floor(now.getMonth() / 3) * 3;
+    const end = new Date(now.getFullYear(), startMonth + 3, 0);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endMid = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const diffMs = endMid.getTime() - today.getTime();
+    const oneDay = 24 * 60 * 60 * 1000;
+    const days = Math.max(0, Math.ceil(diffMs / oneDay));
+    return days;
+  }, []);
+
   if (loading && isVisible) {
     return (
       <div className={tokens.layout.container}>
@@ -188,27 +261,148 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="grid gap-6">
         <section>
-          <DailyIntentionsModule isVisible={isVisible} />
-        </section>
-        <section>
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-            Important Tasks ({priorityFiltered.length})
-          </h2>
-          <div className="mt-4">
-            <HomeTodosTable
-              todos={priorityFiltered}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={setSortBy}
-              onSortOrderChange={setSortOrder}
-              onComplete={completeImmediately}
-            />
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => toggleSection('dailyIntentions')}
+              className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+            >
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+                Daily Intentions
+              </h2>
+              <svg
+                className={cn(
+                  "w-5 h-5 transition-transform duration-200",
+                  sectionsVisible.dailyIntentions ? "rotate-180" : "rotate-0"
+                )}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <SessionTimerInline />
           </div>
+          {sectionsVisible.dailyIntentions && (
+            <div className="mt-4">
+              <DailyIntentionsModule isVisible={isVisible} />
+            </div>
+          )}
         </section>
 
         <section>
-          <OKRModule isVisible={isVisible} />
+          <button
+            onClick={() => toggleSection('committedPriorities')}
+            className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+          >
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+              Committed Priorities
+            </h2>
+            <svg
+              className={cn(
+                "w-5 h-5 transition-transform duration-200",
+                sectionsVisible.committedPriorities ? "rotate-180" : "rotate-0"
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {sectionsVisible.committedPriorities && (
+            <div className="mt-4">
+              <CommittedPrioritiesModule isVisible={isVisible} />
+            </div>
+          )}
         </section>
+
+        <section>
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={() => toggleSection('okrs')}
+              className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors min-w-0 flex-1"
+            >
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+                {currentQuarter ? currentQuarter.split(' ')[0] : ''} OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
+              </h2>
+              <svg
+                className={cn(
+                  "w-5 h-5 transition-transform duration-200",
+                  sectionsVisible.okrs ? "rotate-180" : "rotate-0"
+                )}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {nextQuarter && (
+              <button
+                onClick={() => setShowQuarterlySetup(true)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
+                  'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+                )}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Set {nextQuarter.quarter} OKRs
+              </button>
+            )}
+          </div>
+          {sectionsVisible.okrs && (
+            <div className="mt-4">
+              <OKRModule key={okrsKey} isVisible={isVisible} hideHeader={true} />
+            </div>
+          )}
+        </section>
+
+        <section>
+          <button
+            onClick={() => toggleSection('importantTasks')}
+            className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+          >
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+              Important Tasks ({priorityFiltered.length})
+            </h2>
+            <svg
+              className={cn(
+                "w-5 h-5 transition-transform duration-200",
+                sectionsVisible.importantTasks ? "rotate-180" : "rotate-0"
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {sectionsVisible.importantTasks && (
+            <div className="mt-4">
+              <HomeTodosTable
+                todos={priorityFiltered}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSortChange={setSortBy}
+                onSortOrderChange={setSortOrder}
+                onComplete={completeImmediately}
+              />
+            </div>
+          )}
+        </section>
+
+        {showQuarterlySetup && nextQuarter && (
+          <QuarterlySetupModal
+            nextQuarter={nextQuarter.quarter}
+            previousOkrs={previousOkrs}
+            onClose={() => setShowQuarterlySetup(false)}
+            onCreate={handleCreateQuarterOKRs}
+          />
+        )}
       </div>
     </div>
   );

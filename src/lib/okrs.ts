@@ -23,25 +23,56 @@ function ensureArray<T>(val: any): T[] {
 }
 
 export function normalizeKrProgress(kr: OkrKeyResult): number {
-  if (kr.progress != null) return normalizeProgress(kr.progress as number);
+  if (kr.progress != null) {
+    // Don't cap at 100% - allow over-achievement display
+    const val = typeof kr.progress === 'string' ? parseFloat(kr.progress) : kr.progress;
+    if (!isFinite(val)) return 0;
+    // Accept either 0..1 or 0..100; treat <=1 as ratio
+    const normalized = val <= 1 ? Math.round(val * 100) : Math.round(val);
+    return Math.max(0, normalized); // No upper cap for over-achievement
+  }
+  
   const kind = kr.kind as KeyResultKind;
+  const direction = kr.direction || 'up';
+  
   if (kind === 'boolean') {
     return kr.current_value ? 100 : 0;
   }
+  
   if (kind === 'percent') {
     const n = Number(kr.current_value || 0);
-    return normalizeProgress(n);
+    // Allow over 100% for percent type too
+    return Math.max(0, Math.round(n));
   }
+  
   const current = Number(kr.current_value || 0);
   const target = Number(kr.target_value || 0);
+  
+  // Countdown direction (minimize)
+  if (direction === 'down') {
+    const baseline = Number(kr.baseline_value || 0);
+    if (baseline === 0 || baseline === target) return 0;
+    const progress = ((baseline - current) / (baseline - target)) * 100;
+    return Math.max(0, Math.round(progress)); // Can exceed 100% if overachieved
+  }
+  
+  // Count up direction (maximize) - default
   if (target <= 0) return 0;
-  return normalizeProgress((current / target) * 100);
+  const progress = (current / target) * 100;
+  return Math.max(0, Math.round(progress)); // Can exceed 100% for over-achievement
 }
 
 export async function fetchOkrsWithProgress(): Promise<Okr[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from('okrs_with_progress').select('*');
   if (error) throw error;
+
+  // Define pillar order for consistent display
+  const PILLAR_ORDER = ['Power', 'Passion', 'Purpose', 'Production'];
+  const getPillarIndex = (pillar: string) => {
+    const index = PILLAR_ORDER.indexOf(pillar);
+    return index === -1 ? 999 : index; // Unknown pillars go to end
+  };
 
   const okrs = (data || []).map((row: any) => {
     const keyResultsRaw = row.key_results ?? row.keyResults ?? row.krs;
@@ -62,7 +93,8 @@ export async function fetchOkrsWithProgress(): Promise<Okr[]> {
     return okr;
   });
 
-  return okrs;
+  // Sort by pillar order for consistent display
+  return okrs.sort((a, b) => getPillarIndex(a.pillar) - getPillarIndex(b.pillar));
 }
 
 export async function fetchOkrById(id: string): Promise<Okr | null> {
@@ -106,6 +138,188 @@ export async function updateKrTarget(krId: string, target_value: number): Promis
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
   const { error } = await supabase.from('okr_key_results').update({ target_value }).eq('id', krId);
   if (error) throw error;
+}
+
+export async function updateKrBaseline(krId: string, baseline_value: number): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('okr_key_results').update({ baseline_value }).eq('id', krId);
+  if (error) throw error;
+}
+
+export async function updateKrDirection(krId: string, direction: 'up' | 'down'): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('okr_key_results').update({ direction }).eq('id', krId);
+  if (error) throw error;
+}
+
+export async function updateKrDataSource(
+  krId: string, 
+  data_source: 'manual' | 'habit' | 'metric',
+  linked_habit_id?: string | null,
+  auto_sync?: boolean
+): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase
+    .from('okr_key_results')
+    .update({ 
+      data_source, 
+      linked_habit_id: data_source === 'habit' ? linked_habit_id : null,
+      auto_sync: data_source === 'habit' ? auto_sync : false
+    })
+    .eq('id', krId);
+  if (error) throw error;
+}
+
+export async function syncHabitToKR(krId: string): Promise<number> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  // Get KR with habit link and OKR dates
+  const { data: kr, error: krError } = await supabase
+    .from('okr_key_results')
+    .select(`
+      id,
+      linked_habit_id,
+      auto_sync,
+      data_source,
+      okr_id,
+      okrs!inner(start_date, end_date)
+    `)
+    .eq('id', krId)
+    .single();
+  
+  if (krError) throw krError;
+  if (!kr || kr.data_source !== 'habit' || !kr.linked_habit_id) {
+    return 0;
+  }
+  
+  const okr = (kr as any).okrs;
+  
+  // Count habit completions in date range
+  const { count, error: countError } = await supabase
+    .from('habit_entries')
+    .select('date', { count: 'exact', head: true })
+    .eq('habit_id', kr.linked_habit_id)
+    .eq('is_done', true)
+    .gte('date', okr.start_date)
+    .lte('date', okr.end_date);
+  
+  if (countError) throw countError;
+  
+  const syncedCount = count || 0;
+  
+  // Update current_value
+  await updateKeyResultValue(krId, syncedCount);
+  
+  return syncedCount;
+}
+
+export async function getNextQuarter(): Promise<{ quarter: string; start_date: string; end_date: string } | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  
+  // Get the most recent quarter
+  const { data, error } = await supabase
+    .from('okrs')
+    .select('quarter, end_date')
+    .order('end_date', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (error || !data) return null;
+  
+  // Parse current quarter
+  const endDate = new Date(data.end_date);
+  const nextStart = new Date(endDate);
+  nextStart.setDate(nextStart.getDate() + 1); // Day after end
+  
+  const nextEnd = new Date(nextStart);
+  nextEnd.setMonth(nextEnd.getMonth() + 3);
+  nextEnd.setDate(nextEnd.getDate() - 1); // Last day of quarter
+  
+  // Determine quarter name
+  const month = nextStart.getMonth();
+  const year = nextStart.getFullYear();
+  const quarterNum = Math.floor(month / 3) + 1;
+  const quarter = `Q${quarterNum} ${year}`;
+  
+  // Check if OKRs for this quarter already exist
+  const { data: existingOkrs } = await supabase
+    .from('okrs')
+    .select('id')
+    .eq('quarter', quarter)
+    .limit(1);
+  
+  // If OKRs already exist for this quarter, return null (don't show button)
+  if (existingOkrs && existingOkrs.length > 0) {
+    return null;
+  }
+  
+  return {
+    quarter,
+    start_date: nextStart.toISOString().split('T')[0],
+    end_date: nextEnd.toISOString().split('T')[0]
+  };
+}
+
+export async function createQuarterOKRs(
+  quarter: string,
+  start_date: string,
+  end_date: string,
+  okrsData: Array<{
+    pillar: string;
+    objective: string;
+    key_results: Array<{
+      description: string;
+      type: string;
+      target_value: number;
+      direction?: string;
+      baseline_value?: number | null;
+      data_source?: string;
+      linked_habit_id?: string | null;
+      auto_sync?: boolean;
+    }>;
+  }>
+): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  for (const okrData of okrsData) {
+    // Create OKR
+    const { data: okr, error: okrError } = await supabase
+      .from('okrs')
+      .insert({
+        pillar: okrData.pillar,
+        objective: okrData.objective,
+        quarter,
+        start_date,
+        end_date,
+        status: 'active',
+        archived: false
+      })
+      .select()
+      .single();
+    
+    if (okrError) throw okrError;
+    
+    // Create KRs
+    for (const kr of okrData.key_results) {
+      const { error: krError } = await supabase
+        .from('okr_key_results')
+        .insert({
+          okr_id: okr.id,
+          description: kr.description,
+          type: kr.type,
+          target_value: kr.target_value,
+          current_value: 0, // Always start at 0
+          direction: kr.direction || 'up',
+          baseline_value: kr.baseline_value || null,
+          data_source: kr.data_source || 'manual',
+          linked_habit_id: kr.linked_habit_id || null,
+          auto_sync: kr.auto_sync || false,
+          status: 'active'
+        });
+      
+      if (krError) throw krError;
+    }
+  }
 }
 
 

@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Okr, OkrKeyResult, OkrPillar } from '../../types';
 import { tokens, cn } from '../../theme/config';
-import { fetchOkrsWithProgress, fetchOkrById, updateKeyResultValue, updateObjective, updateKrDescription, updateKrTarget, normalizeKrProgress } from '../../lib/okrs';
+import { fetchOkrsWithProgress, fetchOkrById, updateKeyResultValue, updateObjective, updateKrDescription, updateKrTarget, updateKrBaseline, updateKrDirection, updateKrDataSource, syncHabitToKR, normalizeKrProgress } from '../../lib/okrs';
 import toast from '../../lib/notifications/toast';
-import { Pencil } from 'lucide-react';
+import { Pencil, TrendingUp, TrendingDown, Settings } from 'lucide-react';
 
 interface OKRModuleProps {
   isVisible?: boolean;
+  hideHeader?: boolean;
 }
 
 const PILLARS: OkrPillar[] = ['Power', 'Passion', 'Purpose', 'Production'];
@@ -19,21 +20,211 @@ const PILLAR_COLORS: Record<OkrPillar, { base: string; glow: string }> = {
 };
 
 function ProgressBar({ value, flash, color }: { value: number; flash?: boolean; color: string }) {
-  const clamped = Math.max(0, Math.min(100, Math.round(value || 0)));
+  const rounded = Math.max(0, Math.round(value || 0));
+  const isOverAchieved = rounded > 100;
+  
+  // For over-achievement, show full bar with special styling
+  const displayWidth = Math.min(100, rounded);
+  const overColor = isOverAchieved ? '#FFD700' : color; // Gold for over-achievement
+  
   return (
-    <div className={cn('h-2 w-full rounded-full bg-neutral-800 overflow-hidden', flash && 'ring-2 ring-offset-2 ring-offset-neutral-950')} style={flash ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={clamped} role="progressbar">
-      <div className={cn('h-full transition-[width]')} style={{ width: `${clamped}%`, backgroundColor: color }} />
+    <div className={cn('h-2 w-full rounded-full bg-neutral-800 overflow-hidden relative', flash && 'ring-2 ring-offset-2 ring-offset-neutral-950', isOverAchieved && 'ring-1 ring-yellow-500/50')} style={flash ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={rounded} role="progressbar">
+      <div className={cn('h-full transition-[width]', isOverAchieved && 'animate-pulse')} style={{ width: `${displayWidth}%`, backgroundColor: overColor }} />
+      {isOverAchieved && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+      )}
     </div>
   );
 }
 
-function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, onUpdateTarget }: { pillar: OkrPillar; okr: Okr | null; onUpdateKr: (kr: OkrKeyResult, value: number | boolean) => Promise<void>; onUpdateObjective: (okrId: string, value: string) => void; onUpdateDesc: (kr: OkrKeyResult, value: string) => void; onUpdateTarget: (kr: OkrKeyResult, value: number) => void; }) {
+function OKRSettingsModal({ okr, pillar, onClose, onUpdateDirection, onUpdateBaseline, onUpdateDataSource }: { okr: Okr | null; pillar: OkrPillar; onClose: () => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; }) {
+  const accent = PILLAR_COLORS[pillar]?.base || '#5EEAD4';
+  const [habits, setHabits] = useState<Array<{ id: string; name: string }>>([]);
+  
+  useEffect(() => {
+    const loadHabits = async () => {
+      const { supabase } = await import('../../lib/supabase');
+      if (!supabase) return;
+      const { data } = await supabase.from('habits').select('id, name').order('name');
+      if (data) setHabits(data);
+    };
+    loadHabits();
+  }, []);
+  
+  if (!okr) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm text-neutral-400">{pillar}</div>
+            <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'text-neutral-100 mt-1')}>
+              OKR Settings
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-100 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-4 space-y-4">
+          <div className="text-sm text-neutral-400 mb-4">
+            Configure direction and baseline values for each key result
+          </div>
+
+          {(okr.key_results || []).map((kr) => (
+            <div key={kr.id} className="bg-neutral-800/50 rounded-lg p-4 space-y-3">
+              <div className="font-medium text-neutral-100">{kr.description}</div>
+              
+              {kr.kind !== 'boolean' && (
+                <>
+                  {/* Direction Toggle */}
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm text-neutral-400 w-24">Direction:</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onUpdateDirection(kr, 'up')}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                          kr.direction !== 'down'
+                            ? 'bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/50'
+                            : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'
+                        )}
+                      >
+                        <TrendingUp className="w-4 h-4" />
+                        <span>Count Up</span>
+                      </button>
+                      <button
+                        onClick={() => onUpdateDirection(kr, 'down')}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                          kr.direction === 'down'
+                            ? 'bg-orange-500/20 text-orange-400 ring-2 ring-orange-500/50'
+                            : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'
+                        )}
+                      >
+                        <TrendingDown className="w-4 h-4" />
+                        <span>Countdown</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Baseline (only for countdown) */}
+                  {kr.direction === 'down' && (
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm text-neutral-400 w-24">Baseline:</label>
+                      <input
+                        type="number"
+                        value={kr.baseline_value || 0}
+                        onChange={(e) => onUpdateBaseline(kr, Number(e.target.value))}
+                        className="w-20 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950"
+                        placeholder="Start"
+                        min={0}
+                        step={1}
+                      />
+                      <span className="text-xs text-neutral-500">Starting value before goal</span>
+                    </div>
+                  )}
+
+                  {/* Data Source Selection */}
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm text-neutral-400 w-24">Data Source:</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`data-source-${kr.id}`}
+                          checked={kr.data_source !== 'habit'}
+                          onChange={() => onUpdateDataSource(kr, 'manual')}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-neutral-300">Manual tracking</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`data-source-${kr.id}`}
+                          checked={kr.data_source === 'habit'}
+                          onChange={() => {
+                            if (habits.length > 0) {
+                              onUpdateDataSource(kr, 'habit', habits[0].id);
+                            }
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-neutral-300">Link to habit:</span>
+                        {kr.data_source === 'habit' && (
+                          <select
+                            value={kr.linked_habit_id || ''}
+                            onChange={(e) => onUpdateDataSource(kr, 'habit', e.target.value)}
+                            className="px-2 py-1 text-xs rounded border bg-neutral-900 border-neutral-700 text-neutral-100"
+                          >
+                            {habits.map((habit) => (
+                              <option key={habit.id} value={habit.id}>
+                                {habit.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="text-xs text-neutral-500 bg-neutral-900/50 rounded p-2">
+                    {kr.data_source === 'habit' ? (
+                      <>
+                        <span className="font-medium text-teal-400">🔗 Habit-linked:</span> Auto-syncs from habit tracker. Current value updates automatically.
+                      </>
+                    ) : kr.direction === 'down' ? (
+                      <>
+                        <span className="font-medium text-orange-400">Countdown:</span> Progress from baseline ({kr.baseline_value || '?'}) down to target ({kr.target_value || 0})
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-emerald-400">Count-up:</span> Progress from 0 up to target ({kr.target_value || 0}), can exceed 100%
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-neutral-900 border-t border-neutral-800 px-6 py-4">
+          <button
+            onClick={onClose}
+            className={cn(tokens.button.base, tokens.button.primary, 'w-full')}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline, onUpdateDataSource, onRefresh }: { pillar: OkrPillar; okr: Okr | null; onUpdateKr: (kr: OkrKeyResult, value: number | boolean) => Promise<void>; onUpdateObjective: (okrId: string, value: string) => void; onUpdateDesc: (kr: OkrKeyResult, value: string) => void; onUpdateTarget: (kr: OkrKeyResult, value: number) => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; onRefresh: () => Promise<void>; }) {
   const accent = PILLAR_COLORS[pillar]?.base || '#5EEAD4';
   const [editingObjective, setEditingObjective] = useState(false);
   const [objectiveDraft, setObjectiveDraft] = useState<string>(okr?.objective || '');
   const objectiveRef = useRef<HTMLInputElement | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => { setObjectiveDraft(okr?.objective || ''); }, [okr?.id, okr?.objective]);
+
+  const handleCloseSettings = async () => {
+    setShowSettings(false);
+    // Refresh OKRs after settings changes
+    await onRefresh();
+  };
 
   const commitObjective = () => {
     if (!okr) return;
@@ -43,9 +234,30 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
     setEditingObjective(false);
   };
   return (
-    <div className={cn(tokens.card.base)}>
+    <>
+      {showSettings && (
+        <OKRSettingsModal
+          okr={okr}
+          pillar={pillar}
+          onClose={handleCloseSettings}
+          onUpdateDirection={onUpdateDirection}
+          onUpdateBaseline={onUpdateBaseline}
+          onUpdateDataSource={onUpdateDataSource}
+        />
+      )}
+      
+      <div className={cn(tokens.card.base, 'relative')}>
+        {/* Settings cog - top right */}
+        <button
+          onClick={() => setShowSettings(true)}
+          className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-300 transition-colors p-1.5 rounded hover:bg-neutral-800"
+          title="OKR Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+          <div className="min-w-0 flex-1">
           <div className={cn('text-sm text-neutral-400')}>{pillar}</div>
           <div className="mt-1 sm:min-h-[72px] flex items-end">
             {editingObjective ? (
@@ -73,7 +285,7 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
       </div>
       <div className="mt-3 divide-y divide-neutral-800">
         {(okr?.key_results || []).map((kr) => (
-          <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} />
+          <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} />
         ))}
         {(!okr || !okr.key_results || okr.key_results.length === 0) && (
           <div className="py-3 text-sm text-neutral-400">No key results.</div>
@@ -82,10 +294,11 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
         <div className="hidden sm:block h-2" aria-hidden></div>
       </div>
     </div>
+    </>
   );
 }
 
-function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; }) {
+function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; }) {
   const [localValue, setLocalValue] = useState<number | boolean | ''>(() => {
     if (kr.kind === 'boolean') return Boolean(kr.current_value);
     if (kr.kind === 'percent') return Number(kr.current_value || 0);
@@ -99,19 +312,25 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   const [targetDraft, setTargetDraft] = useState<number>(Number(kr.target_value || 0));
   const targetRef = useRef<HTMLInputElement | null>(null);
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
+  const [editingBaseline, setEditingBaseline] = useState(false);
+  const [baselineDraft, setBaselineDraft] = useState<number>(Number(kr.baseline_value || 0));
+  const baselineRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (kr.kind === 'boolean') setLocalValue(Boolean(kr.current_value));
     else setLocalValue(Number(kr.current_value || 0));
     setDescDraft(kr.description || '');
     setTargetDraft(Number(kr.target_value || 0));
-  }, [kr.id, kr.current_value, kr.kind]);
+    setBaselineDraft(Number(kr.baseline_value || 0));
+  }, [kr.id, kr.current_value, kr.kind, kr.baseline_value]);
 
   const clampNumber = (val: number) => {
-    if (kr.kind === 'percent') return Math.max(0, Math.min(100, val));
-    const target = Number(kr.target_value || 0);
-    const max = Number.isFinite(target) && target > 0 ? target : Infinity;
-    return Math.max(0, Math.min(max, val));
+    if (kr.kind === 'percent') {
+      // Allow over 100% for percent type
+      return Math.max(0, val);
+    }
+    // For count type, allow over-achievement (no upper cap)
+    return Math.max(0, val);
   };
 
   const commitIfChanged = () => {
@@ -127,11 +346,26 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
 
   const calcProgress = () => {
     if (kr.kind === 'boolean') return Boolean(isEditingCurrent ? localValue : kr.current_value) ? 100 : 0;
-    if (kr.kind === 'percent') return Math.max(0, Math.min(100, Math.round(Number(isEditingCurrent ? localValue : kr.current_value || 0))));
+    if (kr.kind === 'percent') {
+      // Allow over 100% for percent type
+      return Math.max(0, Math.round(Number(isEditingCurrent ? localValue : kr.current_value || 0)));
+    }
+    
     const currentNum = Number(isEditingCurrent ? localValue || 0 : kr.current_value || 0);
     const targetNumLive = Number(editingTarget ? targetDraft || 0 : kr.target_value || 0);
+    
+    // Countdown direction (minimize)
+    if (kr.direction === 'down') {
+      const baseline = Number(kr.baseline_value || 0);
+      if (baseline === 0 || baseline === targetNumLive) return 0;
+      // Progress = (baseline - current) / (baseline - target)
+      const progress = ((baseline - currentNum) / (baseline - targetNumLive)) * 100;
+      return Math.max(0, Math.round(progress)); // Can exceed 100%
+    }
+    
+    // Count up direction (maximize) - NO CAP for over-achievement
     if (targetNumLive <= 0) return 0;
-    return Math.max(0, Math.min(100, Math.round((currentNum / targetNumLive) * 100)));
+    return Math.max(0, Math.round((currentNum / targetNumLive) * 100));
   };
   const progress = calcProgress();
   const targetNum = Number(kr.target_value || 0);
@@ -151,8 +385,15 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
           autoFocus
         />
       ) : (
-        <div className="text-neutral-100 font-medium line-clamp-2 leading-[1.3] cursor-text pb-2" onClick={() => setEditingDesc(true)} title="Click to edit">
-          {kr.description}
+        <div className="flex items-center gap-2">
+          <div className="text-neutral-100 font-medium line-clamp-2 leading-[1.3] cursor-text pb-2 flex-1" onClick={() => setEditingDesc(true)} title="Click to edit">
+            {kr.description}
+          </div>
+          {kr.data_source === 'habit' && kr.linked_habit_id && (
+            <span className="text-teal-400 text-sm shrink-0" title="Auto-synced from habit tracker">
+              🔗
+            </span>
+          )}
         </div>
       )}
       {/* Line 2: Progress bar */}
@@ -161,7 +402,16 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
       </div>
       {/* Line 3: left percent, right current/target or control */}
       <div className="mt-2 sm:mt-2 flex items-center justify-between gap-3">
-        <div className="text-xs" style={{ color: accent }}>{progress}%</div>
+        <div className="flex items-center gap-1.5">
+          <div className={cn('text-xs font-medium', progress > 100 ? 'text-yellow-400' : '')} style={progress <= 100 ? { color: accent } : undefined}>
+            {progress}%
+          </div>
+          {progress > 100 && (
+            <div className="text-xs text-yellow-400 font-bold" title="Over-achieved!">
+              🎉
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {kr.kind === 'boolean' ? (
             <input
@@ -176,7 +426,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
             <div role="group" tabIndex={0} className="flex items-center gap-2 text-sm group cursor-text outline-none" onClick={() => inputRef.current?.focus()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.focus(); } }}>
               <input
                 type="number"
-                className={cn(tokens.input.base, tokens.input.focus, 'w-20 cursor-text pointer-events-auto relative z-10')}
+                className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950 cursor-text"
                 value={String(localValue)}
                 onChange={(e) => setLocalValue(e.target.value === '' ? '' : Number(e.target.value))}
                 onFocus={() => setIsEditingCurrent(true)}
@@ -194,18 +444,78 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
               <span className="text-neutral-400">%</span>
               <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
             </div>
-          ) : (
-            <div role="group" tabIndex={0} className="flex items-center gap-2 text-sm group cursor-text outline-none" onClick={() => inputRef.current?.focus()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.focus(); } }}>
+          ) : kr.direction === 'down' ? (
+            // Countdown display: baseline → current → target (e.g., 252 → 250 → 245)
+            <div role="group" tabIndex={0} className="flex items-center gap-1.5 text-sm group cursor-text outline-none" onClick={() => inputRef.current?.focus()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.focus(); } }}>
+              {editingBaseline ? (
+                <input
+                  ref={baselineRef}
+                  type="number"
+                  value={String(baselineDraft)}
+                  onChange={(e) => setBaselineDraft(Number(e.target.value || 0))}
+                  onBlur={() => { onUpdateBaseline && onUpdateBaseline(kr, Math.max(0, Number(baselineDraft || 0))); setEditingBaseline(false); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { onUpdateBaseline && onUpdateBaseline(kr, Math.max(0, Number(baselineDraft || 0))); setEditingBaseline(false); } if (e.key === 'Escape') { setBaselineDraft(Number(kr.baseline_value || 0)); setEditingBaseline(false); } }}
+                  className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950"
+                  min={0}
+                  step={1}
+                  aria-label="Baseline value"
+                  autoFocus
+                />
+              ) : (
+                <span className="text-neutral-500 text-xs cursor-pointer hover:text-neutral-400" onClick={(e) => { e.stopPropagation(); setEditingBaseline(true); }} title="Click to edit baseline">
+                  {kr.baseline_value ?? '?'}
+                </span>
+              )}
+              <span className="text-neutral-600">→</span>
               <input
                 type="number"
-                className={cn(tokens.input.base, tokens.input.focus, 'w-24 cursor-text pointer-events-auto relative z-10')}
+                className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950 cursor-text"
                 value={String(localValue)}
                 onChange={(e) => setLocalValue(e.target.value === '' ? '' : Number(e.target.value))}
                 onFocus={() => setIsEditingCurrent(true)}
                 onBlur={() => { setIsEditingCurrent(false); commitIfChanged(); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') commitIfChanged(); }}
                 min={0}
-                max={Number.isFinite(targetNum) && targetNum > 0 ? targetNum : undefined}
+                step={1}
+                disabled={saving}
+                aria-label="Current value"
+                ref={inputRef}
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+              <span className="text-neutral-600">→</span>
+              {editingTarget ? (
+                <input
+                  ref={targetRef}
+                  type="number"
+                  value={String(targetDraft)}
+                  onChange={(e) => setTargetDraft(Number(e.target.value || 0))}
+                  onBlur={() => { onUpdateTarget && onUpdateTarget(kr, Math.max(0, Number(targetDraft || 0))); setEditingTarget(false); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { onUpdateTarget && onUpdateTarget(kr, Math.max(0, Number(targetDraft || 0))); setEditingTarget(false); } if (e.key === 'Escape') { setTargetDraft(Number(kr.target_value || 0)); setEditingTarget(false); } }}
+                  className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 text-right focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950"
+                  min={0}
+                  step={1}
+                  aria-label="Target value"
+                  autoFocus
+                />
+              ) : (
+                <span className="text-emerald-400 font-medium cursor-text" aria-label="Target value" onClick={() => setEditingTarget(true)} title="Click to edit target">{String(kr.target_value ?? 0)}</span>
+              )}
+              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
+            </div>
+          ) : (
+            // Count up display: current / target (can exceed target)
+            <div role="group" tabIndex={0} className="flex items-center gap-2 text-sm group cursor-text outline-none" onClick={() => inputRef.current?.focus()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.focus(); } }}>
+              <input
+                type="number"
+                className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950 cursor-text"
+                value={String(localValue)}
+                onChange={(e) => setLocalValue(e.target.value === '' ? '' : Number(e.target.value))}
+                onFocus={() => setIsEditingCurrent(true)}
+                onBlur={() => { setIsEditingCurrent(false); commitIfChanged(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitIfChanged(); }}
+                min={0}
+                max={undefined} // No max - allow over-achievement!
                 step={1}
                 disabled={saving}
                 aria-label="Current value"
@@ -222,7 +532,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
                   onChange={(e) => setTargetDraft(Number(e.target.value || 0))}
                   onBlur={() => { onUpdateTarget && onUpdateTarget(kr, Math.max(0, Number(targetDraft || 0))); setEditingTarget(false); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') { onUpdateTarget && onUpdateTarget(kr, Math.max(0, Number(targetDraft || 0))); setEditingTarget(false); } if (e.key === 'Escape') { setTargetDraft(Number(kr.target_value || 0)); setEditingTarget(false); } }}
-                  className={cn(tokens.input.base, tokens.input.focus, 'w-20 text-right')}
+                  className="w-16 px-2 py-2 border rounded-lg bg-neutral-900 border-neutral-800 text-neutral-100 text-right focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-950"
                   min={0}
                   step={1}
                   aria-label="Target value"
@@ -231,6 +541,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
               ) : (
                 <span className="text-neutral-300 cursor-text" aria-label="Target value" onClick={() => setEditingTarget(true)} title="Click to edit target">{String(kr.target_value ?? 0)}</span>
               )}
+              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
             </div>
           )}
         </div>
@@ -239,7 +550,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   );
 }
 
-export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
+export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHeader = false }) => {
   const [okrs, setOkrs] = useState<Okr[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -269,7 +580,29 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
     }
   };
 
-  useEffect(() => { if (isVisible) load(); }, [isVisible]);
+  useEffect(() => { 
+    if (isVisible) {
+      load();
+      // Background sync habit-linked KRs
+      syncHabitLinkedKRs();
+    }
+  }, [isVisible]);
+
+  const syncHabitLinkedKRs = async () => {
+    try {
+      // Find all habit-linked KRs
+      const habitLinkedKRs = okrs.flatMap(o => 
+        (o.key_results || []).filter(kr => kr.data_source === 'habit' && kr.auto_sync)
+      );
+      
+      // Sync each one (in background, don't await)
+      for (const kr of habitLinkedKRs) {
+        syncHabitToKR(kr.id).catch(e => console.error('Failed to sync habit KR:', e));
+      }
+    } catch (e) {
+      console.error('Failed to sync habit-linked KRs:', e);
+    }
+  };
 
   const byPillar: Record<OkrPillar, Okr | null> = useMemo(() => {
     const map: Record<OkrPillar, Okr | null> = { Power: null, Passion: null, Purpose: null, Production: null };
@@ -441,6 +774,63 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
     }, UNDO_WINDOW_MS);
   };
 
+  const handleUpdateDirection = (kr: OkrKeyResult, direction: 'up' | 'down') => {
+    // Optimistic update
+    setOkrs(prevOkrs => prevOkrs.map(o => (
+      o.key_results?.some(k => k.id === kr.id)
+        ? { ...o, key_results: (o.key_results || []).map(k => k.id === kr.id ? { ...k, direction, progress: normalizeKrProgress({ ...k, direction } as any) } : k) }
+        : o
+    )));
+    
+    toast.info(`Changed to ${direction === 'down' ? 'countdown' : 'count-up'} mode`, { ttlMs: 1500 });
+    
+    // Immediate save (no undo for direction changes)
+    updateKrDirection(kr.id, direction).then(() => refetchSingle(kr.okr_id)).catch((e: any) => {
+      toast.error(e?.message || 'Failed to update direction');
+    });
+  };
+
+  const handleUpdateBaseline = (kr: OkrKeyResult, baseline: number) => {
+    // Optimistic update
+    setOkrs(prevOkrs => prevOkrs.map(o => (
+      o.key_results?.some(k => k.id === kr.id)
+        ? { ...o, key_results: (o.key_results || []).map(k => k.id === kr.id ? { ...k, baseline_value: baseline, progress: normalizeKrProgress({ ...k, baseline_value: baseline } as any) } : k) }
+        : o
+    )));
+    
+    toast.info(`Baseline set to ${baseline}`, { ttlMs: 1500 });
+    
+    // Immediate save
+    updateKrBaseline(kr.id, baseline).then(() => refetchSingle(kr.okr_id)).catch((e: any) => {
+      toast.error(e?.message || 'Failed to update baseline');
+    });
+  };
+
+  const handleUpdateDataSource = async (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => {
+    // Optimistic update
+    setOkrs(prevOkrs => prevOkrs.map(o => (
+      o.key_results?.some(k => k.id === kr.id)
+        ? { ...o, key_results: (o.key_results || []).map(k => k.id === kr.id ? { ...k, data_source, linked_habit_id: linked_habit_id || null, auto_sync: data_source === 'habit' } : k) }
+        : o
+    )));
+    
+    try {
+      await updateKrDataSource(kr.id, data_source, linked_habit_id, data_source === 'habit');
+      
+      if (data_source === 'habit' && linked_habit_id) {
+        // Sync immediately
+        const count = await syncHabitToKR(kr.id);
+        toast.info(`Linked to habit! Synced ${count} completions`, { ttlMs: 2000 });
+      } else {
+        toast.info('Changed to manual tracking', { ttlMs: 1500 });
+      }
+      
+      await refetchSingle(kr.okr_id);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update data source');
+    }
+  };
+
   const daysLeftInQuarter = useMemo(() => {
     const now = new Date();
     const startMonth = Math.floor(now.getMonth() / 3) * 3; // 0,3,6,9
@@ -456,19 +846,21 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true }) => {
 
   return (
     <div className={cn(!isVisible && 'hidden')}>
-      <div className="mb-4">
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-          Quarterly OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
-        </h2>
-      </div>
+      {!hideHeader && (
+        <div className="mb-4">
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Quarterly OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
+          </h2>
+        </div>
+      )}
       {loading ? (
         <div className={cn(tokens.card.base, 'flex items-center justify-center py-8 text-neutral-400')}>Loading OKRs…</div>
       ) : error ? (
         <div className={cn(tokens.card.base, 'text-red-400')}>{error}</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-fr">
           {PILLARS.map((p) => (
-            <PillarCard key={p} pillar={p} okr={byPillar[p]} onUpdateKr={handleUpdateKr} onUpdateObjective={handleUpdateObjective} onUpdateDesc={handleUpdateDesc} onUpdateTarget={handleUpdateTarget} />
+            <PillarCard key={p} pillar={p} okr={byPillar[p]} onUpdateKr={handleUpdateKr} onUpdateObjective={handleUpdateObjective} onUpdateDesc={handleUpdateDesc} onUpdateTarget={handleUpdateTarget} onUpdateDirection={handleUpdateDirection} onUpdateBaseline={handleUpdateBaseline} onUpdateDataSource={handleUpdateDataSource} onRefresh={load} />
           ))}
         </div>
       )}
