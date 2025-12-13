@@ -1098,7 +1098,7 @@ const getTodayLocalDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const fetchCurrentIntentions = async (): Promise<CurrentIntentionRow[]> => {
+export const fetchDailyIntentions = async (): Promise<CurrentIntentionRow[]> => {
   const mod = await import('./supabase');
   const supabase = (mod as any).supabase as any | null;
   const isSupabaseConfigured = Boolean((mod as any).isSupabaseConfigured);

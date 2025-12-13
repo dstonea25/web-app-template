@@ -25,10 +25,10 @@ function ProgressBar({ value, flash, color }: { value: number; flash?: boolean; 
   
   // For over-achievement, show full bar with special styling
   const displayWidth = Math.min(100, rounded);
-  const overColor = isOverAchieved ? '#FFD700' : color; // Gold for over-achievement
+  const overColor = isOverAchieved ? '#34D399' : color; // Emerald-400 for over-achievement
   
   return (
-    <div className={cn('h-2 w-full rounded-full bg-neutral-800 overflow-hidden relative', flash && 'ring-2 ring-offset-2 ring-offset-neutral-950', isOverAchieved && 'ring-1 ring-yellow-500/50')} style={flash ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={rounded} role="progressbar">
+    <div className={cn('h-2 w-full rounded-full bg-neutral-800 overflow-hidden relative', flash && 'ring-2 ring-offset-2 ring-offset-neutral-950', isOverAchieved && 'ring-1 ring-emerald-400/50')} style={flash ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={rounded} role="progressbar">
       <div className={cn('h-full transition-[width]', isOverAchieved && 'animate-pulse')} style={{ width: `${displayWidth}%`, backgroundColor: overColor }} />
       {isOverAchieved && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
@@ -247,19 +247,10 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
       )}
       
       <div className={cn(tokens.card.base, 'relative')}>
-        {/* Settings cog - top right */}
-        <button
-          onClick={() => setShowSettings(true)}
-          className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-300 transition-colors p-1.5 rounded hover:bg-neutral-800"
-          title="OKR Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
       <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-          <div className={cn('text-sm text-neutral-400')}>{pillar}</div>
-          <div className="mt-1 sm:min-h-[72px] flex items-end">
+          {/* Objective first - the hero content */}
+          <div className="sm:min-h-[72px] flex items-start">
             {editingObjective ? (
               <textarea
                 ref={objectiveRef as any}
@@ -272,18 +263,31 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
                 autoFocus
               />
             ) : (
-              <div
-                className={cn('text-neutral-100 line-clamp-2', tokens.typography.scale.h3, tokens.typography.weights.semibold, 'cursor-text pb-1')}
-                onClick={() => setEditingObjective(true)}
-                title="Click to edit objective"
-              >
-                {okr?.objective || 'No objective set'}
+              <div className="flex-1">
+                <div
+                  className={cn('text-neutral-100 line-clamp-2', tokens.typography.scale.h3, tokens.typography.weights.semibold, 'cursor-text')}
+                  onClick={() => setEditingObjective(true)}
+                  title="Click to edit objective"
+                >
+                  {okr?.objective || 'No objective set'}
+                </div>
+                {/* Pillar name as subtext with settings cog */}
+                <div className="flex items-center gap-2 mt-2.5">
+                  <div className={cn('text-xs text-neutral-500 uppercase tracking-wide font-medium')}>{pillar}</div>
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="text-neutral-500 hover:text-neutral-300 transition-colors p-0.5 rounded hover:bg-neutral-800"
+                    title="OKR Settings"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
-      <div className="mt-3 divide-y divide-neutral-800">
+      <div className="mt-2.5 space-y-3">
         {(okr?.key_results || []).map((kr) => (
           <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} />
         ))}
@@ -371,7 +375,13 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   const targetNum = Number(kr.target_value || 0);
 
   return (
-    <div className="py-3 sm:min-h-[104px] sm:flex sm:flex-col sm:justify-between overflow-visible">
+    <div className={cn(
+      "p-3 rounded-xl border border-neutral-800 bg-neutral-900/30",
+      "sm:min-h-[104px] sm:flex sm:flex-col sm:justify-between",
+      "transition-all duration-200",
+      "hover:bg-neutral-800/40 hover:border-neutral-700 hover:shadow-md",
+      "overflow-visible"
+    )}>
       {/* Line 1: KR title (click-to-edit) */}
       {editingDesc ? (
         <textarea
@@ -403,11 +413,11 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
       {/* Line 3: left percent, right current/target or control */}
       <div className="mt-2 sm:mt-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <div className={cn('text-xs font-medium', progress > 100 ? 'text-yellow-400' : '')} style={progress <= 100 ? { color: accent } : undefined}>
+          <div className={cn('text-xs font-medium', progress > 100 ? 'text-emerald-400' : '')} style={progress <= 100 ? { color: accent } : undefined}>
             {progress}%
           </div>
           {progress > 100 && (
-            <div className="text-xs text-yellow-400 font-bold" title="Over-achieved!">
+            <div className="text-xs text-emerald-400 font-bold" title="Over-achieved!">
               🎉
             </div>
           )}

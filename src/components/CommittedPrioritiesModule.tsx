@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn, tokens } from '../theme/config';
 import type { ActiveFocusRow, PrioritiesOverviewResponse } from '../types';
 import { refreshActiveFocus, toggleComplete, toggleCommit, getPrioritiesOverview } from '../lib/priorities';
@@ -14,7 +14,6 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
   const [overview, setOverview] = useState<PrioritiesOverviewResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedPriorities, setExpandedPriorities] = useState<Set<string>>(new Set());
 
   const loadActiveFocus = async () => {
     try {
@@ -26,27 +25,13 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
       ]);
       setActiveFocus(rows);
       setOverview(overviewData);
-      // Default all to expanded
-      setExpandedPriorities(new Set(rows.map(r => r.priority_id)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load committed priorities');
+      setError(e instanceof Error ? e.message : 'Failed to load current priorities');
       setActiveFocus([]);
       setOverview([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const togglePriorityExpanded = (priorityId: string) => {
-    setExpandedPriorities(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(priorityId)) {
-        newSet.delete(priorityId);
-      } else {
-        newSet.add(priorityId);
-      }
-      return newSet;
-    });
   };
 
   // Load data only once on mount, not on every tab switch
@@ -150,13 +135,28 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
       .filter(pillar => pillar.priorities.length > 0);
   }, [overview, groupedByPillar]);
 
+  // Create a map of priority_id -> completion stats (all milestones, not just committed)
+  // This must be here (before early returns) to follow React hooks rules
+  const completionStats = useMemo(() => {
+    const stats = new Map<string, { completed: number; total: number }>();
+    // Use overview data which has ALL milestones (not just committed ones like activeFocus)
+    overview.forEach(pillar => {
+      pillar.priorities.forEach(priority => {
+        const total = priority.milestones.length;
+        const completed = priority.milestones.filter(m => m.completed).length;
+        stats.set(priority.priority_id, { completed, total });
+      });
+    });
+    return stats;
+  }, [overview]);
+
   // Don't render when not visible, but don't reload on visibility change
   if (!isVisible) return null;
 
   if (loading) {
     return (
       <div className={cn(tokens.card.base, 'p-6')}>
-        <div className="text-sm text-neutral-400">Loading committed priorities...</div>
+        <div className="text-sm text-neutral-400">Loading current priorities...</div>
       </div>
     );
   }
@@ -172,81 +172,97 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
   if (displayData.length === 0) {
     return (
       <div className={cn(tokens.card.base, 'p-6')}>
-        <div className="text-sm text-neutral-400">No committed priorities. Visit the Priorities tab to commit some!</div>
+        <div className="text-sm text-neutral-400">No current priorities. Visit the Priorities tab to commit some!</div>
       </div>
     );
   }
 
+  // Flatten all priorities into a single array for the grid
+  const allPriorities = displayData.flatMap(pillar => 
+    pillar.priorities.map(priority => ({
+      ...priority,
+      pillar_name: pillar.pillar_name,
+      pillar_emoji: pillar.emoji,
+      stats: completionStats.get(priority.priority_id) || { completed: 0, total: 0 }
+    }))
+  );
+
   return (
-    <div className="space-y-4">
-      {displayData.map((pillar) => (
-        <div key={pillar.pillar_id} className={tokens.card.base}>
-          {/* Pillar Header */}
-          <div className="flex items-center gap-2">
-            <span className="text-xl" aria-hidden>{pillar.emoji || '🗂️'}</span>
-            <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'text-neutral-100')}>
-              {pillar.pillar_name}
-            </h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {allPriorities.map((priority) => (
+        <div key={priority.priority_id} className={cn(tokens.card.base, 'flex flex-col')}>
+          {/* Priority title first - the hero content */}
+          <h3 
+            className={cn(
+              tokens.typography.scale.h3, 
+              tokens.typography.weights.semibold, 
+              'text-neutral-100',
+              'cursor-pointer hover:text-emerald-400 transition-colors'
+            )}
+            onClick={() => {
+              // Switch to Priorities tab
+              localStorage.setItem('dashboard-active-tab', 'priorities');
+              window.history.pushState({ module: 'priorities' }, '', '/priorities');
+              
+              // Dispatch events to trigger tab switch and scroll
+              window.dispatchEvent(new Event('popstate')); // Trigger tab change
+              
+              // Small delay to ensure tab is switched before scrolling
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('dashboard:navigate-to-priority', { 
+                  detail: { priorityId: priority.priority_id } 
+                }));
+              }, 100);
+            }}
+            title="Click to view in Priorities tab"
+          >
+            {priority.priority_title}
+          </h3>
+          
+          {/* Pillar as subtext with emoji and stats */}
+          <div className="flex items-center justify-between gap-3 mt-2 mb-4">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs text-neutral-500 uppercase tracking-wide font-medium truncate">{priority.pillar_name}</span>
+              <span className="text-sm flex-shrink-0" aria-hidden>{priority.pillar_emoji || '🗂️'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium flex-shrink-0">
+              <span className="text-emerald-400">{priority.stats.completed}</span>
+              <span className="text-neutral-500">/</span>
+              <span className="text-neutral-400">{priority.stats.total}</span>
+            </div>
           </div>
           
-          {/* Priorities under this pillar */}
-          <div className="mt-3 space-y-3">
-            {pillar.priorities.map((group) => (
-              <div key={group.priority_id} className="rounded-2xl border border-neutral-800 p-3 bg-neutral-900">
-                {/* Priority Header */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="min-w-0">
-                      <div className="text-neutral-100 font-medium break-words">
-                        {group.priority_title}
-                      </div>
-                    </div>
-                  </div>
+          {/* Simple milestone list - no collapsing, no heavy borders */}
+          {priority.milestones.length === 0 ? (
+            <div className="text-sm text-neutral-400">No milestones</div>
+          ) : (
+            <div className="space-y-2 flex-1">
+              {priority.milestones.map(m => (
+                <div 
+                  key={m.milestone_id}
+                  className={cn(
+                    "flex items-center justify-between gap-3 p-3 rounded-xl",
+                    "border border-neutral-800 bg-neutral-900/50",
+                    "transition-all duration-300 ease-out",
+                    "hover:bg-neutral-800/60 hover:border-neutral-700 hover:scale-[1.02] cursor-pointer",
+                    (m as any)._removing 
+                      ? "opacity-0 scale-95 h-0 p-0 my-0 overflow-hidden border-0" 
+                      : "opacity-100 scale-100"
+                  )}
+                >
+                  <span className="text-neutral-100 text-sm break-words flex-1">{m.title}</span>
                   <button
-                    className="text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer flex-shrink-0"
-                    onClick={() => togglePriorityExpanded(group.priority_id)}
-                    title={expandedPriorities.has(group.priority_id) ? 'Collapse milestones' : 'Expand milestones'}
+                    className="text-green-500 hover:text-green-400 transition-colors cursor-pointer flex-shrink-0"
+                    onClick={() => handleCompleteToggle(m.milestone_id, m.completed)}
+                    title="Complete milestone"
+                    aria-label="Complete milestone"
                   >
-                    {expandedPriorities.has(group.priority_id) ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                    <Check className="w-5 h-5" />
                   </button>
                 </div>
-                
-                {/* Milestones List (collapsible) */}
-                {expandedPriorities.has(group.priority_id) && (
-                  group.milestones.length === 0 ? (
-                    <div className="mt-2 text-xs text-neutral-400">No committed milestones</div>
-                  ) : (
-                    <ul className="mt-3 pt-3 border-t border-neutral-800 space-y-2">
-                      {group.milestones.map(m => (
-                        <li 
-                          key={m.milestone_id} 
-                          className={cn(
-                            "flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-950 p-3",
-                            "transition-all duration-300 ease-out",
-                            (m as any)._removing 
-                              ? "opacity-0 scale-95 h-0 p-0 my-0 overflow-hidden border-0" 
-                              : "opacity-100 scale-100"
-                          )}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="min-w-0 text-neutral-100 break-words">{m.title}</div>
-                          </div>
-                          <button
-                            className="text-green-500 hover:text-green-400 transition-colors cursor-pointer flex-shrink-0"
-                            onClick={() => handleCompleteToggle(m.milestone_id, m.completed)}
-                            title="Complete milestone"
-                            aria-label="Complete milestone"
-                          >
-                            <Check className="w-5 h-5" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

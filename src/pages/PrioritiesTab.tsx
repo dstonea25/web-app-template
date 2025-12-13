@@ -151,6 +151,18 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
     return () => window.removeEventListener('dashboard:active-focus-refresh', handleAF);
   }, []);
 
+  // Listen for navigation from other components (e.g., Current Priorities on Home tab)
+  React.useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ priorityId: string }>;
+      if (customEvent.detail?.priorityId) {
+        scrollToPriorityInBacklog(customEvent.detail.priorityId);
+      }
+    };
+    window.addEventListener('dashboard:navigate-to-priority', handleNavigate);
+    return () => window.removeEventListener('dashboard:navigate-to-priority', handleNavigate);
+  }, [scrollToPriorityInBacklog]);
+
   // Listen for refresh events
   React.useEffect(() => {
     const handleRefresh = () => {

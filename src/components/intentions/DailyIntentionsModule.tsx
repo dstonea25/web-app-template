@@ -1,21 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, tokens } from '../../theme/config';
 import type { IntentionPillar, IntentionStatsRow } from '../../types';
-import { fetchCurrentIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted, fetchIntentionStats, getTodayCompletionStatus, markIntentionCompleted } from '../../lib/api';
+import { fetchDailyIntentions, resetIntentionsIfNewDay, upsertIntentions, pingIntentionsCommitted, fetchIntentionStats, getTodayCompletionStatus, markIntentionCompleted } from '../../lib/api';
 import { toast } from '../../lib/notifications/toast';
 
 const PILLARS: { key: IntentionPillar; label: string; emoji: string }[] = [
   { key: 'Power', label: 'Power', emoji: '💪' },
   { key: 'Passion', label: 'Passion', emoji: '❤️' },
   { key: 'Purpose', label: 'Purpose', emoji: '🧠' },
-  { key: 'Production', label: 'Production', emoji: '⚙️' },
+  { key: 'Production', label: 'Production', emoji: '🎯' },
 ];
 
 const PLACEHOLDERS: Record<IntentionPillar, string> = {
   Power: 'What will you do for your body?',
   Passion: 'What will you do for your soul?',
   Purpose: 'How will you grow or build today?',
-  Production: 'What will you focus on today?',
+  Production: 'What is the most impactful thing you will do today?',
 };
 
 const getTodayLocalDate = (): string => {
@@ -51,7 +51,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
       try {
         await resetIntentionsIfNewDay();
         const [current, stats, completion] = await Promise.all([
-          fetchCurrentIntentions(),
+          fetchDailyIntentions(),
           fetchIntentionStats(),
           getTodayCompletionStatus()
         ]);
@@ -96,12 +96,46 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
 
   const allFilled = PILLARS.every(p => (drafts[p.key] || '').trim().length > 0);
 
-  // Helper function to get compact streak display
+  // Helper function to get compact streak display with both hot and cold streaks
   const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
     const stat = streakStats.find(s => s.pillar === pillar);
+    if (!stat) return ''; // Loading state
+    
+    // Show hot streak for > 1 day
+    if (stat.current_streak > 1) {
+      return '🔥';
+    }
+    
+    // Show cold streak if streak is 0 and we have a last_completed_date
+    if (stat.current_streak === 0 && stat.last_completed_date) {
+      return '❄️';
+    }
+    
+    // Default: no emoji (first day or just completed yesterday)
+    return '';
+  };
+
+  // Helper function to get tooltip text for streaks
+  const getStreakTooltip = (pillar: IntentionPillar): string => {
+    const stat = streakStats.find(s => s.pillar === pillar);
     if (!stat) return '';
-    // Show nothing for 0 or 1; show single flame when >1
-    return stat.current_streak > 1 ? '🔥' : '';
+    
+    if (stat.current_streak > 1) {
+      return `${stat.current_streak}-day hot streak!`;
+    }
+    
+    if (stat.current_streak === 0 && stat.last_completed_date) {
+      const lastDate = new Date(stat.last_completed_date);
+      const now = new Date();
+      const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      return `Cold for ${daysSince} ${daysSince === 1 ? 'day' : 'days'}`;
+    }
+    
+    if (stat.current_streak === 1) {
+      return 'Completed yesterday!';
+    }
+    
+    return '';
   };
 
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
@@ -158,34 +192,66 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
         {loading ? (
           <div className="py-4 text-center text-neutral-100">Loading intentions…</div>
         ) : (
-          <div className="mt-2 grid gap-3">
+          <div className="grid gap-3">
             {PILLARS.map(p => (
-              <div key={p.key} className="flex items-center gap-3">
-                <div className={cn(tokens.typography.weights.semibold, 'text-neutral-100', 'text-sm', 'w-24', 'whitespace-nowrap')}>
-                  {p.emoji} {p.label}
+              <div 
+                key={p.key} 
+                className={cn(
+                  'rounded-xl border p-4',
+                  'flex items-center gap-4',
+                  'transition-all duration-200 ease-out',
+                  'cursor-pointer',
+                  lockedIn 
+                    ? 'border-neutral-800 bg-neutral-900/30 hover:bg-neutral-800/40 hover:border-neutral-700 hover:shadow-md'
+                    : 'border-neutral-800 bg-neutral-900/50 hover:border-neutral-600 hover:bg-neutral-800/60 hover:shadow-lg hover:scale-[1.01]'
+                )}
+              >
+                {/* Content: Question + Answer */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'text-xs uppercase tracking-wide font-semibold text-neutral-500',
+                      'leading-relaxed'
+                    )}>
+                      {PLACEHOLDERS[p.key]}
+                    </span>
+                    {!lockedIn && (
+                      <div className="w-6 text-center flex-shrink-0" title={getStreakTooltip(p.key)}>
+                        {getCompactStreakDisplay(p.key)}
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="text"
+                    className={cn(
+                      'w-full text-base font-normal text-neutral-50',
+                      'bg-transparent border-none outline-none px-0',
+                      'placeholder:text-neutral-600',
+                      !lockedIn && 'cursor-text',
+                      lockedIn && 'cursor-default'
+                    )}
+                    placeholder=""
+                    value={drafts[p.key]}
+                    onChange={(e) => onChangeDraft(p.key, e.target.value)}
+                    readOnly={lockedIn}
+                  />
                 </div>
-                <div className={cn(tokens.typography.weights.medium, 'text-neutral-300', 'text-sm', 'w-12', 'text-center')}>
-                  {getCompactStreakDisplay(p.key)}
-                </div>
-                <input
-                  type="text"
-                  className={cn(tokens.input.base, tokens.input.focus, 'text-neutral-100 placeholder:text-neutral-300', 'flex-1')}
-                  placeholder={PLACEHOLDERS[p.key]}
-                  value={drafts[p.key]}
-                  onChange={(e) => onChangeDraft(p.key, e.target.value)}
-                  readOnly={lockedIn}
-                />
+
+                {/* Checkbox - Vertically Centered */}
                 {lockedIn && (
                   <button
                     onClick={() => handleCompletionToggle(p.key)}
                     className={cn(
-                      'w-6 h-6 rounded border-2 flex items-center justify-center transition-colors',
+                      'w-8 h-8 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0',
                       completionStatus[p.key]
-                        ? 'bg-green-600 border-green-600 text-white'
-                        : 'border-neutral-500 hover:border-green-500 hover:bg-green-500/20'
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : 'border-neutral-600 hover:border-emerald-400 hover:bg-emerald-500/10 hover:scale-110'
                     )}
                   >
-                    {completionStatus[p.key] && '✓'}
+                    {completionStatus[p.key] && (
+                      <span className="text-sm font-bold">✓</span>
+                    )}
                   </button>
                 )}
               </div>
@@ -193,15 +259,17 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-end">
-          <button
-            className={cn(tokens.button.base, tokens.button.primary, 'disabled:opacity-50 disabled:cursor-not-allowed')}
-            disabled={lockedIn || !allFilled}
-            onClick={onLockIn}
-          >
-            {lockedIn ? 'Committed' : 'Commit'}
-          </button>
-        </div>
+        {!lockedIn && (
+          <div className="mt-4 flex items-center justify-end">
+            <button
+              className={cn(tokens.button.base, tokens.button.primary, 'disabled:opacity-50 disabled:cursor-not-allowed')}
+              disabled={!allFilled}
+              onClick={onLockIn}
+            >
+              Commit
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

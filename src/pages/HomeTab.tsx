@@ -296,7 +296,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
             className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors"
           >
             <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-              Committed Priorities
+              Current Priorities
             </h2>
             <svg
               className={cn(
