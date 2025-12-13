@@ -590,13 +590,25 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
     }
   };
 
+  // Load data only once on mount, not on visibility changes
+  const hasLoadedRef = useRef(false);
   useEffect(() => { 
-    if (isVisible) {
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       load();
       // Background sync habit-linked KRs
       syncHabitLinkedKRs();
     }
-  }, [isVisible]);
+  }, []); // Empty deps = load once on mount
+  
+  // Listen for refresh events to reload when needed
+  useEffect(() => {
+    const handleRefresh = () => {
+      load();
+    };
+    window.addEventListener('dashboard:okrs-refresh', handleRefresh);
+    return () => window.removeEventListener('dashboard:okrs-refresh', handleRefresh);
+  }, []);
 
   const syncHabitLinkedKRs = async () => {
     try {

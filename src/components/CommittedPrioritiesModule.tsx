@@ -150,12 +150,10 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
     return stats;
   }, [overview]);
 
-  // Don't render when not visible, but don't reload on visibility change
-  if (!isVisible) return null;
-
+  // Keep component mounted but hidden (don't unmount/remount on collapse/expand)
   if (loading) {
     return (
-      <div className={cn(tokens.card.base, 'p-6')}>
+      <div className={cn(tokens.card.base, 'p-6', !isVisible && 'hidden')}>
         <div className="text-sm text-neutral-400">Loading current priorities...</div>
       </div>
     );
@@ -163,7 +161,7 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
 
   if (error) {
     return (
-      <div className={cn(tokens.card.base, 'p-6')}>
+      <div className={cn(tokens.card.base, 'p-6', !isVisible && 'hidden')}>
         <div className="text-sm text-red-400">⚠️ {error}</div>
       </div>
     );
@@ -171,7 +169,7 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
 
   if (displayData.length === 0) {
     return (
-      <div className={cn(tokens.card.base, 'p-6')}>
+      <div className={cn(tokens.card.base, 'p-6', !isVisible && 'hidden')}>
         <div className="text-sm text-neutral-400">No current priorities. Visit the Priorities tab to commit some!</div>
       </div>
     );
@@ -188,7 +186,7 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-4', !isVisible && 'hidden')}>
       {allPriorities.map((priority) => (
         <div key={priority.priority_id} className={cn(tokens.card.base, 'flex flex-col')}>
           {/* Priority title first - the hero content */}
