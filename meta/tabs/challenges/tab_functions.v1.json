@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-01-27",
+  "functions": {
+    "generateChallenge": {
+      "description": "Generate a new challenge based on selected type",
+      "parameters": {
+        "type": "journal | product | business",
+        "webhook_url": "https://geronimo.askdavidstone.com/webhook/challenges"
+      },
+      "returns": "Generated challenge text",
+      "error_handling": "Toast notifications for success/failure, fails cleanly on webhook errors"
+    },
+    "submitResponse": {
+      "description": "Submit user response to challenge for AI feedback",
+      "parameters": {
+        "challenge_type": "journal | product | business",
+        "user_response": "string",
+        "webhook_url": "string (environment variable)"
+      },
+      "returns": "AI feedback text (judgment, summary, or streamlining)",
+      "error_handling": "Toast notifications for success/failure"
+    },
+    "copyToClipboard": {
+      "description": "Copy challenge or feedback text to clipboard",
+      "parameters": {
+        "text": "string (challenge or feedback)"
+      },
+      "returns": "void",
+      "error_handling": "Toast notification on failure"
+    },
+    "setChallengeType": {
+      "description": "Update the selected challenge type",
+      "parameters": {
+        "type": "journal | product | business"
+      },
+      "returns": "void"
+    }
+  },
+  "webhook_endpoints": {
+    "generate_challenge": {
+      "description": "Generate challenge prompt",
+      "method": "POST",
+      "url": "https://geronimo.askdavidstone.com/webhook/challenges",
+      "headers": {
+        "Authorization": "Bearer {VITE_N8N_WEBHOOK_TOKEN}",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "type": "journal | product | business",
+        "timestamp": "ISO string"
+      },
+      "response_format": {
+        "challenge": "string (the generated challenge text)"
+      }
+    },
+    "submit_response": {
+      "description": "Submit user response and receive AI feedback",
+      "method": "POST", 
+      "url": "TBD - to be configured",
+      "headers": {
+        "Authorization": "Bearer {token}",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "challenge_type": "journal | product | business",
+        "user_response": "string",
+        "timestamp": "ISO string"
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "tab_id": "calendar",
+  "acceptance": [
+    "Year list view with one row per day grouped by month",
+    "Fast month jumping via right-side month index",
+    "Weekend highlighting with emerald/green theme",
+    "Desktop: right detail pane (1/3 width) for event CRUD",
+    "Mobile: bottom sheet for event details",
+    "Event categories with color coding (travel, medical, social, work, personal)",
+    "Toggle to show/hide past months",
+    "Sticky month headers while scrolling",
+    "Multiple events per day with visual indicators",
+    "Full CRUD operations via Supabase"
+  ],
+  "features": [
+    "Calendar View: Year-long list of all days grouped by month",
+    "Event Management: Create, edit, delete events for any date",
+    "Category System: Color-coded event categories",
+    "Month Navigation: Fast scrolling to specific months via index",
+    "Weekend Highlighting: Visual distinction for Saturdays and Sundays",
+    "Responsive Layout: Desktop right pane, mobile bottom sheet",
+    "Past Filter: Option to hide fully past months",
+    "Multi-Event Display: Show multiple events per day",
+    "Data Persistence: Direct Supabase integration"
+  ],
+  "state_management": [
+    "year: Current year being displayed",
+    "events: Array of all calendar events for the year",
+    "isLoading: Loading state for initial data fetch",
+    "selectedDate: Currently selected date (YYYY-MM-DD)",
+    "showPastMonths: Toggle for showing/hiding past months",
+    "editingEvent: Event currently being edited",
+    "isCreating: Flag for create mode in detail pane"
+  ],
+  "data_flow": [
+    "Load: Fetch all events for year → Map to dates → Render day rows",
+    "Select: Click day → Open detail pane/sheet → Show events for date",
+    "Create: Add event → Submit → Supabase insert → Update local state",
+    "Edit: Select event → Update fields → Submit → Supabase update → Refresh",
+    "Delete: Confirm → Supabase delete → Remove from local state"
+  ],
+  "integrations": [
+    "apiClient: Supabase API methods for calendar events",
+    "CalendarTab: Main component with year view",
+    "DayDetailPane: Reusable component for desktop/mobile detail view",
+    "toast: Toast notifications for success/error feedback"
+  ],
+  "accessibility": [
+    "Keyboard navigation for day selection",
+    "Focus management in detail pane forms",
+    "Screen reader friendly date labels",
+    "ARIA labels for interactive elements"
+  ],
+  "performance": [
+    "Memoized day generation for entire year",
+    "Efficient event-to-date mapping",
+    "Optimistic UI updates for CRUD operations",
+    "Lazy rendering with scroll optimization"
+  ]
+}
+
+

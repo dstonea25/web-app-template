@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-01-27",
+  "styles": {
+    "layout": {
+      "container": "tokens.layout.container",
+      "grid_gap": "gap-6",
+      "responsive": "grid grid-cols-1 md:grid-cols-3"
+    },
+    "typography": {
+      "heading": "tokens.typography.scale.h1 + tokens.typography.weights.bold + tokens.palette.dark.text",
+      "subheading": "tokens.typography.scale.h2 + tokens.typography.weights.semibold + tokens.palette.dark.text",
+      "body": "tokens.typography.scale.body + tokens.palette.dark.text",
+      "secondary": "tokens.typography.scale.body + tokens.palette.dark.textSecondary"
+    },
+    "buttons": {
+      "primary": "tokens.button.base + tokens.button.primary",
+      "ghost": "tokens.button.base + tokens.button.ghost",
+      "loading_state": "opacity-50 cursor-not-allowed"
+    },
+    "cards": {
+      "challenge_type": "p-4 rounded-lg border-2 transition-all duration-200 text-left",
+      "challenge_type_active": "border-emerald-400 bg-emerald-400/10",
+      "challenge_type_inactive": "border-neutral-700 bg-neutral-800/50 hover:border-neutral-600 hover:bg-neutral-800/70",
+      "challenge_display": "p-6 rounded-lg border border-neutral-700 bg-neutral-800/50 min-h-[200px] flex items-center",
+      "instructions": "p-4 rounded-lg border border-neutral-700 bg-neutral-800/30"
+    },
+    "colors": {
+      "primary": "emerald-400",
+      "background": "neutral-800/50",
+      "border": "neutral-700",
+      "text_primary": "tokens.palette.dark.text",
+      "text_secondary": "tokens.palette.dark.textSecondary"
+    },
+    "animations": {
+      "loading_spinner": "animate-spin",
+      "hover_transitions": "transition-all duration-200"
+    }
+  }
+}
