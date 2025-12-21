@@ -104,6 +104,38 @@ export interface HabitEvent {
   complete: boolean;
 }
 
+export interface HabitYearlyStats {
+  id: string;
+  habit_id: string;
+  year: number;
+  longest_hot_streak: number;
+  longest_cold_streak: number;
+  total_completions: number;
+  first_completion_date: string | null;
+  last_completion_date: string | null;
+  weekly_goal: number | null;
+  updated_at: string;
+}
+
+export interface HabitRollingStats {
+  monthly_average: number;  // completions per 30 days
+  weekly_average: number;   // completions per 7 days
+}
+
+export interface HabitWeeklyAchievement {
+  id: string;
+  habit_id: string;
+  year: number;
+  week_number: number;
+  goal_at_week: number | null;
+  actual_completions: number;
+  goal_met: boolean;
+  week_start_date: string;
+  week_end_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Authentication types
 export interface AuthCredentials {
   username: string;
@@ -273,17 +305,97 @@ export interface MilestoneRecord {
 // Calendar Events
 export interface CalendarEvent {
   id: string;
-  date: string; // YYYY-MM-DD
   title: string;
   category: string | null;
   notes: string | null;
+  
+  // Multi-day support
+  start_date: string;      // YYYY-MM-DD (required)
+  end_date: string;        // YYYY-MM-DD (required, defaults to start_date for single-day)
+  start_time: string | null; // HH:MM:SS (null = all-day)
+  end_time: string | null;   // HH:MM:SS (null = all-day)
+  all_day: boolean;
+  
+  // Row appearance / priority
+  affects_row_appearance: boolean;
+  priority: number;  // 1-10, higher wins
+  
+  // PTO flag
+  is_pto: boolean;  // Whether this event is Paid Time Off
+  
+  // Pattern linkage
+  source_pattern_id: string | null;
+  
+  // Metadata
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CalendarEventInput {
-  date: string; // YYYY-MM-DD
   title: string;
   category: string | null;
   notes: string | null;
+  
+  // Multi-day support
+  start_date: string;      // YYYY-MM-DD (required)
+  end_date: string;        // YYYY-MM-DD (defaults to start_date)
+  start_time: string | null; // HH:MM:SS
+  end_time: string | null;   // HH:MM:SS
+  all_day: boolean;
+  
+  // Row appearance / priority
+  affects_row_appearance: boolean;
+  priority: number;
+  
+  // PTO flag
+  is_pto: boolean;
+  
+  // Pattern linkage
+  source_pattern_id: string | null;
+}
+
+// Calendar Patterns
+export interface CalendarPattern {
+  id: string;
+  name: string;
+  pattern_type: 'recurring' | 'goal' | 'one_off_template' | string;
+  category: string | null;
+  notes: string | null;
+  
+  start_date: string | null;  // YYYY-MM-DD
+  end_date: string | null;    // YYYY-MM-DD
+  
+  // Flexible rule storage
+  rule_json: {
+    // Examples:
+    // Recurring: { frequency: 'weekly', days: ['monday', 'wednesday'], time: '18:00' }
+    // Goal: { type: 'count', target: 5, deadline: '2024-03-31', prompt: 'Go on dates' }
+    // One-off: { template: 'Pay rent', day_of_month: 1 }
+    [key: string]: any;
+  };
+  
+  // Defaults for generated events
+  default_affects_row_appearance: boolean;
+  default_priority: number;
+  is_active: boolean;
+  
+  // Metadata
+  created_by: string | null;
+  user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarPatternInput {
+  name: string;
+  pattern_type: string;
+  category: string | null;
+  notes: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  rule_json: { [key: string]: any };
+  default_affects_row_appearance: boolean;
+  default_priority: number;
+  is_active: boolean;
 }

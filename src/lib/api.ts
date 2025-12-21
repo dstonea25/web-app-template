@@ -659,6 +659,134 @@ export class ApiClient {
     return { success: true };
   }
 
+  // ===== Habit Stats =====
+  async fetchHabitYearlyStats(year: number): Promise<import('../types').HabitYearlyStats[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) return [];
+    
+    // Fetch from existing habit_streaks table (contains current year data)
+    const { data, error } = await supabase
+      .from('habit_streaks')
+      .select('id, habit_id, longest_streak, longest_cold_streak, current_streak, last_completed_date, weekly_goal, updated_at')
+      .order('updated_at', { ascending: false });
+    
+    if (error) {
+      console.error('Failed to fetch habit streaks:', error);
+      throw error;
+    }
+    
+    // Transform to match HabitYearlyStats interface
+    return (data || []).map(row => ({
+      id: row.id,
+      habit_id: row.habit_id,
+      year: year, // Current year
+      longest_hot_streak: row.longest_streak || 0,
+      longest_cold_streak: row.longest_cold_streak || 0,
+      total_completions: 0, // Not tracked in habit_streaks, could calculate if needed
+      first_completion_date: null,
+      last_completion_date: row.last_completed_date,
+      weekly_goal: row.weekly_goal,
+      updated_at: row.updated_at
+    })) as import('../types').HabitYearlyStats[];
+  }
+
+  async updateHabitWeeklyGoal(habitId: string, weeklyGoal: number | null): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('habit_streaks')
+      .update({ weekly_goal: weeklyGoal, updated_at: new Date().toISOString() })
+      .eq('habit_id', habitId);
+    
+    if (error) throw error;
+  }
+
+  async fetchHabitWeeklyAchievements(year: number): Promise<import('../types').HabitWeeklyAchievement[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) return [];
+    
+    const { data, error } = await supabase
+      .from('habit_weekly_achievements')
+      .select('*')
+      .eq('year', year)
+      .order('week_number', { ascending: true });
+    
+    if (error) {
+      console.error('Failed to fetch weekly achievements:', error);
+      throw error;
+    }
+    
+    return (data || []) as import('../types').HabitWeeklyAchievement[];
+  }
+
+  async calculateRollingHabitStats(habitId: string, windowDays: number = 90): Promise<{ monthly_average: number; weekly_average: number }> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) return { monthly_average: 0, weekly_average: 0 };
+
+    const { data, error } = await supabase
+      .rpc('calculate_rolling_habit_stats', {
+        p_habit_id: habitId,
+        p_window_days: windowDays
+      });
+
+    if (error) {
+      console.error('Failed to calculate rolling stats for habit:', habitId, error);
+      throw error;
+    }
+
+    console.log('Raw RPC response for habit', habitId, ':', data);
+
+    // Handle both array and single object responses
+    const result = Array.isArray(data) ? data[0] : data;
+    
+    return {
+      monthly_average: Number(result?.monthly_average || 0),
+      weekly_average: Number(result?.weekly_average || 0)
+    };
+  }
+
+  async fetchHabitRollingStats(
+    habitId: string,
+    windowDays: 30 | 60 | 90 = 30
+  ): Promise<import('../types').HabitRollingStats> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) {
+      return { monthly_average: 0, weekly_average: 0 };
+    }
+    
+    const { data, error } = await supabase
+      .rpc('calculate_rolling_habit_stats', {
+        p_habit_id: habitId,
+        p_window_days: windowDays
+      });
+    
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return { monthly_average: 0, weekly_average: 0 };
+    }
+    
+    return {
+      monthly_average: Number(data[0].monthly_average) || 0,
+      weekly_average: Number(data[0].weekly_average) || 0
+    };
+  }
+
+  async fetchAllHabitsRollingStats(
+    habitIds: string[],
+    windowDays: 30 | 60 | 90 = 30
+  ): Promise<Map<string, import('../types').HabitRollingStats>> {
+    const results = await Promise.all(
+      habitIds.map(async id => ({
+        id,
+        stats: await this.fetchHabitRollingStats(id, windowDays)
+      }))
+    );
+    
+    return new Map(results.map(r => [r.id, r.stats]));
+  }
+
   // ===== Calendar Events =====
   async fetchCalendarEventsForYear(year: number): Promise<import('../types').CalendarEvent[]> {
     const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
@@ -667,12 +795,14 @@ export class ApiClient {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
     
+    // Fetch events that overlap with this year
+    // An event overlaps if: start_date <= year_end AND end_date >= year_start
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true });
+      .lte('start_date', endDate)
+      .gte('end_date', startDate)
+      .order('start_date', { ascending: true });
     
     if (error) throw error;
     return (data || []) as import('../types').CalendarEvent[];
@@ -682,11 +812,14 @@ export class ApiClient {
     const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
     if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
     
+    // Fetch events that overlap with this specific date
+    // An event overlaps if: start_date <= date AND end_date >= date
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .eq('date', date)
-      .order('created_at', { ascending: true });
+      .lte('start_date', date)
+      .gte('end_date', date)
+      .order('priority', { ascending: false });  // Higher priority first
     
     if (error) throw error;
     return (data || []) as import('../types').CalendarEvent[];
@@ -699,10 +832,18 @@ export class ApiClient {
     const { data, error } = await supabase
       .from('calendar_events')
       .insert({
-        date: input.date,
         title: input.title,
         category: input.category ?? null,
         notes: input.notes ?? null,
+        start_date: input.start_date,
+        end_date: input.end_date || input.start_date, // Default to start_date
+        start_time: input.start_time ?? null,
+        end_time: input.end_time ?? null,
+        all_day: input.all_day ?? true,
+        affects_row_appearance: input.affects_row_appearance ?? false,
+        priority: input.priority ?? 5,
+        is_pto: input.is_pto ?? false,
+        source_pattern_id: input.source_pattern_id ?? null,
       })
       .select('id')
       .single();
@@ -715,9 +856,23 @@ export class ApiClient {
     const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
     if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
     
+    const updateData: any = {};
+    if (patch.title !== undefined) updateData.title = patch.title;
+    if (patch.category !== undefined) updateData.category = patch.category;
+    if (patch.notes !== undefined) updateData.notes = patch.notes;
+    if (patch.start_date !== undefined) updateData.start_date = patch.start_date;
+    if (patch.end_date !== undefined) updateData.end_date = patch.end_date;
+    if (patch.start_time !== undefined) updateData.start_time = patch.start_time;
+    if (patch.end_time !== undefined) updateData.end_time = patch.end_time;
+    if (patch.all_day !== undefined) updateData.all_day = patch.all_day;
+    if (patch.affects_row_appearance !== undefined) updateData.affects_row_appearance = patch.affects_row_appearance;
+    if (patch.priority !== undefined) updateData.priority = patch.priority;
+    if (patch.is_pto !== undefined) updateData.is_pto = patch.is_pto;
+    if (patch.source_pattern_id !== undefined) updateData.source_pattern_id = patch.source_pattern_id;
+    
     const { error } = await supabase
       .from('calendar_events')
-      .update(patch)
+      .update(updateData)
       .eq('id', id);
     
     if (error) throw error;
@@ -735,15 +890,168 @@ export class ApiClient {
     if (error) throw error;
   }
 
-  // Future webhook endpoints (disabled in MVP)
-  // private async makeRequest<T>(
-  //   endpoint: string,
-  //   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-  //   body?: any
-  // ): Promise<ApiResponse<T>> {
-  //   // This would be the real implementation for future webhooks
-  //   throw new Error(`Webhook ${endpoint} not implemented in MVP`);
-  // }
+  // ===== Calendar Patterns =====
+  async fetchCalendarPatterns(): Promise<import('../types').CalendarPattern[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('calendar_patterns')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []) as import('../types').CalendarPattern[];
+  }
+
+  async fetchActiveCalendarPatterns(): Promise<import('../types').CalendarPattern[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('calendar_patterns')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []) as import('../types').CalendarPattern[];
+  }
+
+  async createCalendarPattern(input: import('../types').CalendarPatternInput): Promise<string> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('calendar_patterns')
+      .insert({
+        name: input.name,
+        pattern_type: input.pattern_type,
+        category: input.category ?? null,
+        notes: input.notes ?? null,
+        start_date: input.start_date ?? null,
+        end_date: input.end_date ?? null,
+        rule_json: input.rule_json || {},
+        default_affects_row_appearance: input.default_affects_row_appearance ?? false,
+        default_priority: input.default_priority ?? 5,
+        is_active: input.is_active ?? true,
+      })
+      .select('id')
+      .single();
+    
+    if (error) throw error;
+    return String((data as any).id);
+  }
+
+  async updateCalendarPattern(id: string, patch: Partial<import('../types').CalendarPatternInput>): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('calendar_patterns')
+      .update(patch)
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async deleteCalendarPattern(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('calendar_patterns')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  // ===== Calendar Natural Language Parsing =====
+  async parseNaturalLanguageEvent(text: string, context?: { currentDate?: string }): Promise<import('../types').CalendarEventInput> {
+    // TODO: Replace with your actual n8n webhook URL
+    const WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/calendar-nl-parse';
+    const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
+    
+    if (!N8N_WEBHOOK_TOKEN) {
+      console.warn('N8N webhook token not set. NL parsing may fail without authentication.');
+    }
+    
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`
+        },
+        body: JSON.stringify({
+          text,
+          context: {
+            currentDate: context?.currentDate || new Date().toISOString().split('T')[0],
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Check N8N webhook token.');
+        }
+        throw new Error(`Webhook returned ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to parse event');
+      }
+      
+      return result.parsed;
+    } catch (error) {
+      console.error('NL parsing failed:', error);
+      throw error;
+    }
+  }
+
+  // ===== Pattern Event Generation =====
+  async generatePatternEvents(patternId: string, period?: { start_date: string; end_date: string }): Promise<{ count: number; events: any[] }> {
+    // TODO: Replace with your actual n8n webhook URL
+    const WEBHOOK_URL = 'https://geronimo.askdavidstone.com/webhook/calendar-generate-pattern-events';
+    const N8N_WEBHOOK_TOKEN = import.meta.env.VITE_N8N_WEBHOOK_TOKEN || '';
+    
+    if (!N8N_WEBHOOK_TOKEN) {
+      console.warn('N8N webhook token not set. Pattern generation may fail without authentication.');
+    }
+    
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${N8N_WEBHOOK_TOKEN}`
+        },
+        body: JSON.stringify({
+          pattern_id: patternId,
+          generate_for_period: period || {
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 60 days
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Check N8N webhook token.');
+        }
+        throw new Error(`Webhook returned ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return { count: result.total_events_created || 0, events: result.events_created || [] };
+    } catch (error) {
+      console.error('Pattern generation failed:', error);
+      throw error;
+    }
+  }
 }
 
 // Webhook configuration

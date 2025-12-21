@@ -49,6 +49,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
   });
   const [hoveredCell, setHoveredCell] = React.useState<{ habitId: string; dateIso: string } | null>(null);
   const [habitStreaks, setHabitStreaks] = React.useState<Record<string, HabitStreak>>({});
+  const [rollingStats, setRollingStats] = React.useState<Record<string, { monthly: number }>>({});
 
   // Generate month options for selector
   const monthOptions = React.useMemo(() => {
@@ -151,6 +152,47 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
   React.useEffect(() => {
     fetchHabitStreaks();
   }, [fetchHabitStreaks]);
+
+  // Track if stats have been loaded
+  const hasLoadedStats = React.useRef(false);
+
+  // Fetch 90-day rolling stats for monthly average (only once)
+  React.useEffect(() => {
+    if (habits.length === 0 || hasLoadedStats.current) return;
+
+    let isCancelled = false;
+
+    const loadStats = async () => {
+      try {
+        const { apiClient } = await import('../lib/api');
+        
+        const statsPromises = habits.map(async (habit) => {
+          const stats = await apiClient.calculateRollingHabitStats(habit.id, 90);
+          return { habitId: habit.id, stats };
+        });
+
+        const statsResults = await Promise.all(statsPromises);
+        if (!isCancelled) {
+          const statsMap: Record<string, { monthly: number }> = {};
+          statsResults.forEach(({ habitId, stats }) => {
+            statsMap[habitId] = {
+              monthly: stats.monthly_average
+            };
+          });
+          setRollingStats(statsMap);
+          hasLoadedStats.current = true;
+        }
+      } catch (err) {
+        console.error('Failed to load habit monthly stats:', err);
+      }
+    };
+
+    loadStats();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [habits]);
 
   // Get streak emoji (1/2/3 progression based on length)
   const getStreakEmoji = (streak: number): string => {
@@ -304,6 +346,15 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                     <span className="text-xs text-neutral-400 italic">
                       {habit.rule}
                     </span>
+                  )}
+                  {/* Monthly average */}
+                  {rollingStats[habit.id] && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-neutral-500">Monthly Avg</span>
+                      <span className="font-medium tabular-nums text-neutral-300">
+                        {rollingStats[habit.id].monthly.toFixed(1)}
+                      </span>
+                    </div>
                   )}
                 </div>
                 

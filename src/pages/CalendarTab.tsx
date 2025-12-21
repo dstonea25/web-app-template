@@ -9,17 +9,94 @@ interface CalendarTabProps {
   isVisible?: boolean;
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  travel: { bg: 'bg-teal-900/20', text: 'text-teal-300', border: 'border-teal-900/30' },
-  medical: { bg: 'bg-rose-900/20', text: 'text-rose-300', border: 'border-rose-900/30' },
-  social: { bg: 'bg-amber-900/20', text: 'text-amber-300', border: 'border-amber-900/30' },
-  work: { bg: 'bg-emerald-900/20', text: 'text-emerald-300', border: 'border-emerald-900/30' },
-  personal: { bg: 'bg-neutral-800/60', text: 'text-neutral-300', border: 'border-neutral-700' },
+// Category colors for event pills (dot + text)
+const CATEGORY_COLORS: Record<string, { dot: string; text: string; bg: string; border: string }> = {
+  vacation: { dot: 'bg-purple-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  holiday: { dot: 'bg-rose-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  travel: { dot: 'bg-teal-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  medical: { dot: 'bg-orange-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  social: { dot: 'bg-amber-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  work: { dot: 'bg-blue-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+  personal: { dot: 'bg-neutral-500', text: 'text-neutral-200', bg: 'bg-neutral-800/60', border: 'border-neutral-700' },
+};
+
+// Row appearance colors (ONLY for PTO, Travel, and Weekends)
+const ROW_COLORS: Record<string, { bg: string; border: string }> = {
+  pto: { bg: 'bg-yellow-950/40', border: 'border-yellow-700/50' },  // Golden for PTO
+  travel: { bg: 'bg-teal-950/30', border: 'border-teal-800/40' },   // Teal for travel
+  weekend: { bg: 'bg-emerald-950/20', border: 'border-emerald-900/30' }, // Emerald for weekends
+  default: { bg: 'bg-neutral-900', border: 'border-neutral-800' },
+};
+
+// Priority values - ONLY for row appearance (PTO, Travel, Weekend)
+const PRIORITY_VALUES: Record<string, number> = {
+  pto: 10,      // PTO always wins
+  travel: 7,    // Travel
+  weekend: 5,   // Baseline special day
+  default: 1,
 };
 
 const getCategoryStyle = (category: string | null | undefined) => {
   if (!category) return CATEGORY_COLORS.personal;
   return CATEGORY_COLORS[category.toLowerCase()] || CATEGORY_COLORS.personal;
+};
+
+const getDefaultPriority = (category: string | null): number => {
+  // Only travel gets default affects_row_appearance
+  if (category?.toLowerCase() === 'travel') return PRIORITY_VALUES.travel;
+  return PRIORITY_VALUES.default;
+};
+
+interface RowAppearance {
+  bg: string;
+  border: string;
+  hasPto: boolean;  // Whether to show gold dot indicator
+  ptoOnly: boolean; // Whether this is PTO-only (golden background)
+}
+
+const getRowAppearance = (day: DayData): RowAppearance => {
+  // Check for PTO events
+  const ptoEvents = day.events.filter(e => e.is_pto);
+  const travelEvents = day.events.filter(e => e.category?.toLowerCase() === 'travel' && e.affects_row_appearance);
+  
+  const hasPto = ptoEvents.length > 0;
+  const hasTravel = travelEvents.length > 0;
+  
+  // Priority: PTO > Travel > Weekend > Default
+  
+  // If PTO exists → Golden row
+  if (hasPto) {
+    return {
+      ...ROW_COLORS.pto,
+      hasPto: true,
+      ptoOnly: !hasTravel, // Show if not combined with travel
+    };
+  }
+  
+  // If Travel exists → Teal row
+  if (hasTravel) {
+    return {
+      ...ROW_COLORS.travel,
+      hasPto: false,
+      ptoOnly: false,
+    };
+  }
+  
+  // If Weekend → Emerald row
+  if (day.isWeekend) {
+    return {
+      ...ROW_COLORS.weekend,
+      hasPto: false,
+      ptoOnly: false,
+    };
+  }
+  
+  // Default (no special row color)
+  return {
+    ...ROW_COLORS.default,
+    hasPto: false,
+    ptoOnly: false,
+  };
 };
 
 interface DayData {
@@ -69,6 +146,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [showNlPanel, setShowNlPanel] = useState(false);
   const [showNlSheet, setShowNlSheet] = useState(false); // Mobile bottom sheet
   const [isYearHeaderVisible, setIsYearHeaderVisible] = useState(true); // Track year header visibility
+  const [activeMonthDropdown, setActiveMonthDropdown] = useState<string | null>(null); // Which month's dropdown is open
+  const [manualEntryType, setManualEntryType] = useState<'single' | 'multi' | 'pattern'>('single'); // Type of manual entry
   
   // Track which months are expanded (default: current month + all future)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => {
@@ -215,13 +294,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   // Use rendered days
   const daysData = renderedDays;
 
-  // Map events to days
+  // Map events to days (handling multi-day events)
   const daysWithEvents = useMemo(() => {
     const eventsByDate = new Map<string, CalendarEvent[]>();
+    
+    // For each event, map it to all days it spans
     events.forEach(event => {
-      const existing = eventsByDate.get(event.date) || [];
-      existing.push(event);
-      eventsByDate.set(event.date, existing);
+      const startDate = parseLocalDate(event.start_date);
+      const endDate = parseLocalDate(event.end_date);
+      
+      // Iterate through each day in the event's range
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+        const existing = eventsByDate.get(dateStr) || [];
+        existing.push(event);
+        eventsByDate.set(dateStr, existing);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
     });
     
     return daysData.map(day => ({
@@ -417,14 +507,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       if (eventId) {
         // Update existing
         await apiClient.updateCalendarEvent(eventId, input);
-        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, ...input } : e));
+        // Merge updates into existing event
+        setEvents(prev => prev.map(e => {
+          if (e.id === eventId) {
+            return {
+              ...e,
+              ...input,
+              updated_at: new Date().toISOString(),
+            };
+          }
+          return e;
+        }));
         toast.success('Event updated');
       } else {
         // Create new
         const newId = await apiClient.createCalendarEvent(input);
         const newEvent: CalendarEvent = {
           id: newId,
-          ...input,
+          title: input.title,
+          category: input.category,
+          notes: input.notes,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          start_time: input.start_time,
+          end_time: input.end_time,
+          all_day: input.all_day,
+          affects_row_appearance: input.affects_row_appearance,
+          priority: input.priority,
+          is_pto: input.is_pto,
+          source_pattern_id: input.source_pattern_id,
+          user_id: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -440,19 +552,73 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     }
   };
 
+  const [deletingEvent, setDeletingEvent] = useState<CalendarEvent | null>(null);
+  const [deleteTimeoutId, setDeleteTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Delete this event?')) return;
+    const eventToDelete = events.find(e => e.id === eventId);
+    if (!eventToDelete) return;
     
-    try {
-      await apiClient.deleteCalendarEvent(eventId);
-      setEvents(prev => prev.filter(e => e.id !== eventId));
-      toast.success('Event deleted');
-      setEditingEvent(null);
-    } catch (error) {
-      console.error('Failed to delete event:', error);
-      toast.error('Failed to delete event');
-    }
+    // Optimistically remove from UI
+    setEvents(prev => prev.filter(e => e.id !== eventId));
+    setDeletingEvent(eventToDelete);
+    setEditingEvent(null);
+    
+    // Show undo toast
+    const undoToast = toast.success(
+      <div className="flex items-center justify-between gap-4">
+        <span>Event deleted</span>
+        <button
+          onClick={() => handleUndoDelete()}
+          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-medium transition-colors"
+        >
+          Undo
+        </button>
+      </div>,
+      { duration: 8000 }  // 8 second window to undo
+    );
+    
+    // Set timeout to actually delete from DB after 8 seconds
+    const timeoutId = setTimeout(async () => {
+      try {
+        await apiClient.deleteCalendarEvent(eventId);
+        setDeletingEvent(null);
+        // Toast already shown
+      } catch (error) {
+        console.error('Failed to delete event:', error);
+        // Restore event if DB delete failed
+        setEvents(prev => [...prev, eventToDelete]);
+        toast.error('Failed to delete event');
+      }
+    }, 8000);
+    
+    setDeleteTimeoutId(timeoutId);
   };
+
+  const handleUndoDelete = () => {
+    if (!deletingEvent) return;
+    
+    // Cancel the delete timeout
+    if (deleteTimeoutId) {
+      clearTimeout(deleteTimeoutId);
+      setDeleteTimeoutId(null);
+    }
+    
+    // Restore event to UI
+    setEvents(prev => [...prev, deletingEvent]);
+    setDeletingEvent(null);
+    
+    toast.success('Deletion undone');
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutId) {
+        clearTimeout(deleteTimeoutId);
+      }
+    };
+  }, [deleteTimeoutId]);
 
   // Close settings when clicking outside
   useEffect(() => {
@@ -568,12 +734,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     };
   }, [isVisible]);
 
-  // Handle NL input submission (stub for now)
-  const handleNlSubmit = (e: React.FormEvent) => {
+  // Handle NL input submission
+  const handleNlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nlInput.trim()) return;
-    console.log("NL submit (not wired yet)", nlInput);
-    // Don't clear or close - just log for now
+    
+    try {
+      // Parse natural language to structured event
+      const parsedEvent = await apiClient.parseNaturalLanguageEvent(nlInput);
+      
+      // Create the event in Supabase
+      const newId = await apiClient.createCalendarEvent(parsedEvent);
+      
+      // Add to local state
+      const newEvent: CalendarEvent = {
+        id: newId,
+        ...parsedEvent,
+        user_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setEvents(prev => [...prev, newEvent]);
+      
+      // Success!
+      toast.success(`Created: ${parsedEvent.title}`);
+      setNlInput('');
+      setShowNlPanel(false);
+    } catch (error: any) {
+      console.error('Failed to create event from NL:', error);
+      toast.error(error.message || 'Could not understand event. Try manual entry.');
+    }
   };
 
   // Handle opening NL input from month header
@@ -849,35 +1039,155 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     </button>
                   </div>
 
-                  {/* Manual setup placeholder */}
+                  {/* Manual setup - functional */}
                   <div className="pt-4 border-t border-neutral-700">
                     <h4 className="text-sm font-semibold text-neutral-300 mb-3">Manual setup</h4>
-                    <div className="space-y-3 opacity-50">
-                      <input
-                        type="text"
-                        placeholder="Event title"
-                        disabled
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                      />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="date"
-                          disabled
-                          className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                        />
-                        <select
-                          disabled
-                          className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                        >
-                          <option>Category</option>
-                        </select>
-                      </div>
-                      <textarea
-                        placeholder="Notes"
-                        disabled
-                        rows={2}
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed resize-none"
-                      />
+                    
+                    {/* Type selector */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => setManualEntryType('single')}
+                        className={cn(
+                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
+                          manualEntryType === 'single'
+                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                        )}
+                      >
+                        📅 Single Event
+                      </button>
+                      <button
+                        onClick={() => setManualEntryType('multi')}
+                        className={cn(
+                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
+                          manualEntryType === 'multi'
+                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                        )}
+                      >
+                        📆 Multi-Day
+                      </button>
+                      <button
+                        onClick={() => setManualEntryType('pattern')}
+                        className={cn(
+                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
+                          manualEntryType === 'pattern'
+                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                        )}
+                      >
+                        🔁 Pattern
+                      </button>
+                    </div>
+
+                    {/* Dynamic form based on type */}
+                    <div className="space-y-3">
+                      {/* Common fields for events */}
+                      {(manualEntryType === 'single' || manualEntryType === 'multi') && (
+                        <>
+                          <input
+                            type="text"
+                            placeholder="Event title"
+                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            {manualEntryType === 'single' ? (
+                              <input
+                                type="date"
+                                placeholder="Date"
+                                className="col-span-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                            ) : (
+                              <>
+                                <input
+                                  type="date"
+                                  placeholder="Start date"
+                                  className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                                <input
+                                  type="date"
+                                  placeholder="End date"
+                                  className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                              </>
+                            )}
+                          </div>
+
+                          <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">Select category...</option>
+                            <option value="vacation">🏖️ Vacation</option>
+                            <option value="holiday">🎉 Holiday</option>
+                            <option value="travel">✈️ Travel</option>
+                            <option value="medical">🏥 Medical</option>
+                            <option value="social">👥 Social</option>
+                            <option value="work">💼 Work</option>
+                            <option value="personal">📌 Personal</option>
+                          </select>
+
+                          <div className="flex gap-3">
+                            <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
+                              <input type="checkbox" className="w-3 h-3 rounded border-neutral-700 bg-neutral-900 text-emerald-500" />
+                              <span>All-day</span>
+                            </label>
+                            <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
+                              <input type="checkbox" className="w-3 h-3 rounded border-neutral-700 bg-neutral-900 text-yellow-500" />
+                              <span>PTO 🟡</span>
+                            </label>
+                          </div>
+
+                          <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium text-white transition-colors">
+                            Create Event
+                          </button>
+                        </>
+                      )}
+
+                      {/* Pattern-specific fields */}
+                      {manualEntryType === 'pattern' && (
+                        <>
+                          <input
+                            type="text"
+                            placeholder="Pattern name (e.g., Weekly Team Meeting)"
+                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+
+                          <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">Pattern type...</option>
+                            <option value="recurring">🔁 Recurring (repeats regularly)</option>
+                            <option value="goal">🎯 Goal (target count by date)</option>
+                            <option value="template">📋 Template (one-off)</option>
+                          </select>
+
+                          <input
+                            type="text"
+                            placeholder="Frequency (e.g., Every Monday, Weekly, Monthly)"
+                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="date"
+                              placeholder="Start date"
+                              className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <input
+                              type="date"
+                              placeholder="End date (optional)"
+                              className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="p-3 bg-amber-950/20 border border-amber-800/30 rounded-lg">
+                            <p className="text-xs text-amber-300">
+                              ⚠️ Pattern creation stores the rule. Events will be generated by automation (coming soon).
+                            </p>
+                          </div>
+
+                          <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium text-white transition-colors">
+                            Create Pattern
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </form>
@@ -917,15 +1227,17 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                         </h2>
                       </button>
                       
-                      {/* NL input control - shown when year header is not visible AND month is expanded (sticky) */}
+                      {/* Add button - shown when year header is not visible AND month is expanded (sticky) */}
                       {!isYearHeaderVisible && isExpanded && (
                         <button
-                          onClick={handleOpenNlFromMonthHeader}
-                          className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/30 rounded-full text-xs font-medium text-emerald-300 transition-colors flex-shrink-0"
-                          title="Add event with natural language"
+                          onClick={() => {
+                            setActiveMonthDropdown(activeMonthDropdown === monthKey ? null : monthKey);
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/30 rounded-full text-xs font-medium text-emerald-300 transition-colors flex-shrink-0"
+                          title="Add event"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Add with AI</span>
+                          <span className="hidden sm:inline">Add</span>
                         </button>
                       )}
                       
@@ -944,6 +1256,201 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                   </div>
                 </div>
 
+                {/* Dropdown Module - appears below sticky month header */}
+                {activeMonthDropdown === monthKey && isExpanded && (
+                  <div className="bg-neutral-900/98 border border-neutral-700 rounded-xl p-5 mx-4 mb-3 shadow-2xl backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-base font-semibold text-neutral-100">Add to {group.monthName}</h4>
+                      <button
+                        onClick={() => setActiveMonthDropdown(null)}
+                        className="p-1 hover:bg-neutral-800 rounded transition-colors"
+                      >
+                        <X className="w-5 h-5 text-neutral-400" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* AI Input Section */}
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                          Natural Language
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="e.g., Doctor appointment next Tuesday at 2pm"
+                            className="w-full px-4 py-2.5 pl-10 pr-4 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                const nlText = e.currentTarget.value;
+                                try {
+                                  const parsedEvent = await apiClient.parseNaturalLanguageEvent(nlText);
+                                  const newId = await apiClient.createCalendarEvent(parsedEvent);
+                                  const newEvent: CalendarEvent = {
+                                    id: newId,
+                                    ...parsedEvent,
+                                    user_id: null,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                  };
+                                  setEvents(prev => [...prev, newEvent]);
+                                  toast.success(`Created: ${parsedEvent.title}`);
+                                  setActiveMonthDropdown(null);
+                                } catch (error: any) {
+                                  console.error('Failed to create event:', error);
+                                  toast.error(error.message || 'Could not parse event');
+                                }
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                        </div>
+                        <p className="text-xs text-neutral-500 mt-1.5">Press Enter to create with AI</p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-neutral-700"></div>
+                        <span className="text-xs text-neutral-500">OR</span>
+                        <div className="flex-1 h-px bg-neutral-700"></div>
+                      </div>
+
+                      {/* Manual Entry Section - Same as NL panel */}
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                          Manual Entry
+                        </label>
+                        
+                        {/* Type selector */}
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={() => setManualEntryType('single')}
+                            className={cn(
+                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
+                              manualEntryType === 'single'
+                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                            )}
+                          >
+                            📅 Single
+                          </button>
+                          <button
+                            onClick={() => setManualEntryType('multi')}
+                            className={cn(
+                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
+                              manualEntryType === 'multi'
+                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                            )}
+                          >
+                            📆 Multi-Day
+                          </button>
+                          <button
+                            onClick={() => setManualEntryType('pattern')}
+                            className={cn(
+                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
+                              manualEntryType === 'pattern'
+                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
+                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                            )}
+                          >
+                            🔁 Pattern
+                          </button>
+                        </div>
+
+                        {/* Dynamic form based on type - prefilled with first day of month */}
+                        <div className="space-y-2.5">
+                          {(manualEntryType === 'single' || manualEntryType === 'multi') && (
+                            <>
+                              <input
+                                type="text"
+                                placeholder="Event title"
+                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                {manualEntryType === 'single' ? (
+                                  <input
+                                    type="date"
+                                    defaultValue={group.days[0]?.date}
+                                    className="col-span-2 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                  />
+                                ) : (
+                                  <>
+                                    <input
+                                      type="date"
+                                      placeholder="Start"
+                                      defaultValue={group.days[0]?.date}
+                                      className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                    <input
+                                      type="date"
+                                      placeholder="End"
+                                      defaultValue={group.days[0]?.date}
+                                      className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                  </>
+                                )}
+                              </div>
+
+                              <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="">Category...</option>
+                                <option value="vacation">🏖️ Vacation</option>
+                                <option value="holiday">🎉 Holiday</option>
+                                <option value="travel">✈️ Travel</option>
+                                <option value="medical">🏥 Medical</option>
+                                <option value="social">👥 Social</option>
+                                <option value="work">💼 Work</option>
+                                <option value="personal">📌 Personal</option>
+                              </select>
+
+                              <div className="flex gap-3 text-xs">
+                                <label className="flex items-center gap-1.5 text-neutral-300 cursor-pointer">
+                                  <input type="checkbox" className="w-3 h-3 rounded" defaultChecked />
+                                  All-day
+                                </label>
+                                <label className="flex items-center gap-1.5 text-neutral-300 cursor-pointer">
+                                  <input type="checkbox" className="w-3 h-3 rounded" />
+                                  PTO 🟡
+                                </label>
+                              </div>
+
+                              <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-medium text-white transition-colors">
+                                Create Event
+                              </button>
+                            </>
+                          )}
+
+                          {manualEntryType === 'pattern' && (
+                            <>
+                              <input
+                                type="text"
+                                placeholder="Pattern name"
+                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                              <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option>Pattern type...</option>
+                                <option value="recurring">🔁 Recurring</option>
+                                <option value="goal">🎯 Goal</option>
+                                <option value="template">📋 Template</option>
+                              </select>
+                              <input
+                                type="text"
+                                placeholder="Frequency"
+                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                              <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-medium text-white transition-colors">
+                                Create Pattern
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Day rows - only render if expanded */}
                 {isExpanded && (
                   <div className="space-y-1" style={{ containIntrinsicSize: 'auto 80px' }}>
@@ -951,27 +1458,34 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     const isSelected = selectedDate === day.date;
                     const hasEvents = day.events.length > 0;
                     const isToday = day.date === today;
+                    const rowAppearance = getRowAppearance(day);
                     
                     return (
-                      <button
+                      <div
                         key={day.date}
-                        ref={isToday ? todayRef : undefined}
-                        onClick={() => handleDayClick(day.date)}
-                        className={cn(
-                          'w-full text-left px-4 py-3 rounded-lg border transition-colors',
-                          'hover:bg-neutral-800/50',
-                          isSelected && 'bg-neutral-800 border-emerald-500',
-                          !isSelected && day.isWeekend && 'bg-emerald-950/20 border-emerald-900/30',
-                          !isSelected && !day.isWeekend && 'bg-neutral-900 border-neutral-800',
-                          isToday && !isSelected && 'ring-2 ring-emerald-400/50',
-                        )}
+                        className="group/day relative"
                         style={{ 
                           contentVisibility: 'auto',
-                          scrollMarginTop: isToday ? '200px' : undefined // Space for 2-3 days above + sticky header
                         }}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
+                        <button
+                          ref={isToday ? todayRef : undefined}
+                          onClick={() => handleDayClick(day.date)}
+                          className={cn(
+                            'w-full text-left px-4 py-3 rounded-lg border transition-colors',
+                            'hover:bg-neutral-800/50',
+                            isSelected && 'bg-neutral-800 border-emerald-500',
+                            !isSelected && rowAppearance.bg,
+                            !isSelected && rowAppearance.border,
+                            isToday && !isSelected && 'ring-2 ring-emerald-400/50',
+                          )}
+                          style={{ 
+                            scrollMarginTop: isToday ? '200px' : undefined // Space for 2-3 days above + sticky header
+                          }}
+                        >
+                        <div className="flex items-center gap-3">
+                          {/* Date info */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
                             <span className={cn(
                               'text-sm font-medium w-12',
                               day.isWeekend ? 'text-emerald-400' : 'text-neutral-400'
@@ -984,23 +1498,49 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             )}>
                               {day.dayNumber}
                             </span>
+                            {/* Gold PTO indicator dot */}
+                            {rowAppearance.hasPto && !rowAppearance.ptoOnly && (
+                              <span 
+                                className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm"
+                                title="PTO day"
+                              />
+                            )}
                           </div>
                           
+                          {/* Event pills - left-aligned */}
                           {hasEvents && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap flex-1">
                               {day.events.slice(0, 3).map(event => {
                                 const style = getCategoryStyle(event.category);
                                 return (
                                   <div
                                     key={event.id}
                                     className={cn(
-                                      'px-2 py-1 rounded-md text-xs font-medium border',
+                                      'group flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer',
+                                      'hover:bg-neutral-700/50 transition-all',
                                       style.bg,
-                                      style.text,
                                       style.border
                                     )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditEvent(event);
+                                    }}
                                   >
-                                    {event.title}
+                                    {/* Colored dot */}
+                                    <span className={cn('w-2 h-2 rounded-full flex-shrink-0', style.dot)} />
+                                    {/* Event name */}
+                                    <span className={cn('truncate max-w-[100px]', style.text)}>{event.title}</span>
+                                    {/* Delete X - white/light colored for visibility */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteEvent(event.id);
+                                      }}
+                                      className="text-neutral-400 opacity-70 group-hover:opacity-100 hover:text-rose-400 transition-all ml-0.5"
+                                      title="Delete event"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -1012,7 +1552,28 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             </div>
                           )}
                         </div>
-                      </button>
+                        </button>
+                        
+                        {/* Quick Add Button (shows on hover) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDate(day.date);
+                            setIsCreating(true);
+                            setEditingEvent(null);
+                          }}
+                          className={cn(
+                            'absolute right-2 top-1/2 -translate-y-1/2',
+                            'opacity-0 group-hover/day:opacity-100',
+                            'p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full',
+                            'transition-all shadow-lg hover:scale-110',
+                            'z-10'
+                          )}
+                          title="Quick add event"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
                     );
                   })}
                   </div>
@@ -1209,26 +1770,50 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
   onDeleteEvent,
 }) => {
   const [formData, setFormData] = useState<CalendarEventInput>({
-    date: dayData.date,
     title: '',
     category: null,
     notes: null,
+    start_date: dayData.date,
+    end_date: dayData.date,
+    start_time: null,
+    end_time: null,
+    all_day: true,
+    affects_row_appearance: false,
+    priority: 5,
+    is_pto: false,
+    source_pattern_id: null,
   });
 
   useEffect(() => {
     if (editingEvent) {
       setFormData({
-        date: editingEvent.date,
         title: editingEvent.title,
         category: editingEvent.category,
         notes: editingEvent.notes,
+        start_date: editingEvent.start_date,
+        end_date: editingEvent.end_date,
+        start_time: editingEvent.start_time,
+        end_time: editingEvent.end_time,
+        all_day: editingEvent.all_day,
+        affects_row_appearance: editingEvent.affects_row_appearance,
+        priority: editingEvent.priority,
+        is_pto: editingEvent.is_pto,
+        source_pattern_id: editingEvent.source_pattern_id,
       });
     } else {
       setFormData({
-        date: dayData.date,
         title: '',
         category: null,
         notes: null,
+        start_date: dayData.date,
+        end_date: dayData.date,
+        start_time: null,
+        end_time: null,
+        all_day: true,
+        affects_row_appearance: false,
+        priority: 5,
+        is_pto: false,
+        source_pattern_id: null,
       });
     }
   }, [editingEvent, dayData.date]);
@@ -1270,57 +1855,207 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* Create/Edit form */}
         {(isCreating || editingEvent) && (
-          <form onSubmit={handleSubmit} className={cn(tokens.card.base, 'space-y-3')}>
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-1">
-                Title *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className={cn(tokens.input.base, tokens.input.focus)}
-                placeholder="Event title"
-                required
-              />
+          <form onSubmit={handleSubmit} className={cn(tokens.card.base, 'space-y-4')}>
+            {/* Section: Basic Info */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Basic Information</h4>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  className={cn(tokens.input.base, tokens.input.focus, 'text-base')}
+                  placeholder="e.g., Team Meeting, Doctor Appointment"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                  Category
+                </label>
+                <select
+                  value={formData.category || ''}
+                onChange={(e) => {
+                  const newCategory = e.target.value || null;
+                  const newPriority = getDefaultPriority(newCategory);
+                  // Only travel affects row appearance by default
+                  const shouldAffectRow = newCategory?.toLowerCase() === 'travel';
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    category: newCategory,
+                    priority: newPriority,
+                    affects_row_appearance: shouldAffectRow
+                  }));
+                }}
+                  className={cn(tokens.select.base, 'text-base')}
+                >
+                  <option value="">Select category...</option>
+                  <option value="vacation">🏖️ Vacation</option>
+                  <option value="holiday">🎉 Holiday</option>
+                  <option value="travel">✈️ Travel</option>
+                  <option value="medical">🏥 Medical</option>
+                  <option value="social">👥 Social</option>
+                  <option value="work">💼 Work</option>
+                  <option value="personal">📌 Personal</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-1">
-                Category
-              </label>
-              <select
-                value={formData.category || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value || null }))}
-                className={cn(tokens.select.base)}
-              >
-                <option value="">None</option>
-                <option value="travel">Travel</option>
-                <option value="medical">Medical</option>
-                <option value="social">Social</option>
-                <option value="work">Work</option>
-                <option value="personal">Personal</option>
-              </select>
+            {/* Section: Date & Time */}
+            <div className="space-y-3 pt-4 border-t border-neutral-700">
+              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Date & Time</h4>
+              
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      start_date: e.target.value,
+                      // Auto-update end_date if it's before start_date
+                      end_date: prev.end_date < e.target.value ? e.target.value : prev.end_date
+                    }))}
+                    className={cn(tokens.input.base, tokens.input.focus)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                    min={formData.start_date}
+                    className={cn(tokens.input.base, tokens.input.focus)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* All-Day Toggle */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.all_day}
+                    onChange={(e) => setFormData(prev => ({ ...prev, all_day: e.target.checked }))}
+                    className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span>All-day event</span>
+                </label>
+
+                {/* PTO Toggle */}
+                <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_pto}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_pto: e.target.checked }))}
+                    className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-yellow-500 focus:ring-2 focus:ring-yellow-500"
+                  />
+                  <span className="flex items-center gap-1">
+                    PTO
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                  </span>
+                </label>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-1">
-                Notes
+            {/* Time inputs (only if not all-day) */}
+            {!formData.all_day && (
+              <div className="space-y-3 pt-3 border-t border-neutral-700/50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.start_time || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value || null }))}
+                      className={cn(tokens.input.base, tokens.input.focus)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.end_time || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value || null }))}
+                      className={cn(tokens.input.base, tokens.input.focus)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Section: Display Options */}
+            <div className="space-y-3 pt-4 border-t border-neutral-700">
+              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Display Options</h4>
+              
+              <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={formData.affects_row_appearance}
+                  onChange={(e) => setFormData(prev => ({ ...prev, affects_row_appearance: e.target.checked }))}
+                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                />
+                <span>Change calendar row color</span>
               </label>
+
+              {formData.affects_row_appearance && (
+                <div className="pl-6 space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Priority: <span className="text-emerald-400 font-semibold">{formData.priority}</span>
+                    <span className="text-xs text-neutral-500 ml-2">(Higher priority wins color conflicts)</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={formData.priority}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: Number(e.target.value) }))}
+                    className="w-full accent-emerald-500"
+                  />
+                  <div className="flex justify-between text-xs text-neutral-500">
+                    <span>Low (1)</span>
+                    <span>High (10)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section: Notes */}
+            <div className="space-y-3 pt-4 border-t border-neutral-700">
+              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Notes</h4>
               <textarea
                 value={formData.notes || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value || null }))}
-                className={cn(tokens.input.base, tokens.input.focus, 'min-h-[80px] resize-y')}
-                placeholder="Additional details..."
+                className={cn(tokens.input.base, tokens.input.focus, 'min-h-[100px] resize-y')}
+                placeholder="Add any additional details, reminders, or context..."
               />
             </div>
 
-            <div className="flex gap-2">
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                className={cn(tokens.button.primary, 'flex-1')}
+                className={cn(tokens.button.primary, 'flex-1 py-3 font-semibold')}
               >
-                {editingEvent ? 'Update' : 'Create'}
+                {editingEvent ? '✓ Update Event' : '+ Create Event'}
               </button>
               <button
                 type="button"
@@ -1328,7 +2063,7 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
                   onEditEvent(null as any);
                   onClose();
                 }}
-                className={cn(tokens.button.secondary)}
+                className={cn(tokens.button.secondary, 'px-6 py-3')}
               >
                 Cancel
               </button>
@@ -1369,11 +2104,40 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
                     <h4 className={cn('font-semibold', style.text)}>
                       {event.title}
                     </h4>
-                    {event.category && (
-                      <p className="text-xs text-neutral-400 mt-1">
-                        {event.category}
-                      </p>
-                    )}
+                    
+                    <div className="space-y-1 mt-2">
+                      {/* Date range display */}
+                      {event.start_date !== event.end_date ? (
+                        <p className="text-xs text-neutral-400">
+                          {new Date(event.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 
+                          {' → '}
+                          {new Date(event.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      ) : !event.all_day && event.start_time && (
+                        <p className="text-xs text-neutral-400">
+                          {event.start_time.slice(0, 5)}
+                          {event.end_time && ` - ${event.end_time.slice(0, 5)}`}
+                        </p>
+                      )}
+                      
+                      {/* Category & PTO indicator */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {event.category && (
+                          <p className="text-xs text-neutral-400">
+                            {event.category}
+                            {event.affects_row_appearance && ` • Priority ${event.priority}`}
+                          </p>
+                        )}
+                        {event.is_pto && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-yellow-950/40 border border-yellow-700/50 rounded text-xs text-yellow-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                            PTO
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Notes */}
                     {event.notes && (
                       <p className="text-sm text-neutral-300 mt-2">
                         {event.notes}

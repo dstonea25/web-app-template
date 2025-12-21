@@ -5,6 +5,7 @@ import type { Habit } from '../types';
 import { apiClient } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { MonthlyHabitOverview } from '../components/MonthlyHabitOverview';
+import { HabitWeeklyAchievementGrid } from '../components/HabitWeeklyAchievementGrid';
 
 interface HabitTrackerTabProps {
   isVisible?: boolean;
@@ -46,6 +47,12 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [loadedHabits, setLoadedHabits] = React.useState<Set<string>>(new Set());
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
+  
+  // Collapse state for each section
+  const [isMonthlyCollapsed, setIsMonthlyCollapsed] = React.useState(false);
+  const [isWeeklyCollapsed, setIsWeeklyCollapsed] = React.useState(false);
+  const [isYearlyCollapsed, setIsYearlyCollapsed] = React.useState(false);
+  
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipRef = React.useRef<HTMLDivElement | null>(null);
   const rafRef = React.useRef<number | null>(null);
@@ -564,27 +571,96 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       {/* Monthly Overview */}
       {!isInitialLoading && habits.length > 0 && !errorMessage && (
         <section className="mb-6">
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-            Monthly Overview
-          </h2>
-          <div className="mt-4">
-            <MonthlyHabitOverview
-              habits={habits}
-              calendarData={calendarData}
-              onToggleDay={toggleDay}
-              isVisible={isVisible}
-            />
-          </div>
+          <button
+            onClick={() => setIsMonthlyCollapsed(!isMonthlyCollapsed)}
+            className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors mb-4"
+          >
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+              Monthly Overview
+            </h2>
+            <svg
+              className={cn(
+                "w-5 h-5 transition-transform duration-200",
+                isMonthlyCollapsed ? "rotate-0" : "rotate-180"
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {!isMonthlyCollapsed && (
+            <div className="mt-4">
+              <MonthlyHabitOverview
+                habits={habits}
+                calendarData={calendarData}
+                onToggleDay={toggleDay}
+                isVisible={isVisible && !isMonthlyCollapsed}
+              />
+            </div>
+          )}
         </section>
       )}
 
-      {/* Yearly Calendar */}
+      {/* Weekly Overview */}
+      {!isInitialLoading && habits.length > 0 && !errorMessage && (
+        <section className="mb-6">
+          <button
+            onClick={() => setIsWeeklyCollapsed(!isWeeklyCollapsed)}
+            className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors mb-4"
+          >
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+              Weekly Overview
+            </h2>
+            <svg
+              className={cn(
+                "w-5 h-5 transition-transform duration-200",
+                isWeeklyCollapsed ? "rotate-0" : "rotate-180"
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {!isWeeklyCollapsed && (
+            <div className="mt-4">
+              <HabitWeeklyAchievementGrid
+                habits={habits}
+                year={year}
+                isVisible={isVisible && !isWeeklyCollapsed}
+              />
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Yearly Overview */}
       <section className="mb-6">
-        <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-          Yearly Overview
-        </h2>
-        <div className="mt-4">
-          <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
+        <button
+          onClick={() => setIsYearlyCollapsed(!isYearlyCollapsed)}
+          className="flex items-center gap-2 w-full text-left text-neutral-100 hover:text-emerald-400 transition-colors mb-4"
+        >
+          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+            Yearly Overview
+          </h2>
+          <svg
+            className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              isYearlyCollapsed ? "rotate-0" : "rotate-180"
+            )}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {!isYearlyCollapsed && (
+          <div className="mt-4">
+            <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
         <header className="mb-4">
           <div className="flex items-center justify-between mb-2">
             {(isSaving || isInitialLoading || isHabitLoading) && (
@@ -610,8 +686,9 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
             )}
           </>
         )}
+            </div>
           </div>
-        </div>
+        )}
       </section>
     </div>
   );
