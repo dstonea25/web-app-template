@@ -237,3 +237,4 @@ You now have:
 **This gives you an instant visual snapshot of your entire year's habit consistency!** 
 
 See trends, identify weak periods, celebrate wins, and use data to improve future weeks. 📊✨
+

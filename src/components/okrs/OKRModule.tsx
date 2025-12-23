@@ -582,6 +582,25 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
       setError(null);
       const data = await fetchOkrsWithProgress();
       setOkrs(data);
+      
+      // Sync habit-linked KRs after data is loaded
+      // Find all habit-linked KRs from the loaded data
+      const habitLinkedKRs = data.flatMap(o => 
+        (o.key_results || []).filter(kr => kr.data_source === 'habit' && kr.auto_sync)
+      );
+      
+      // If there are habit-linked KRs, sync them all then reload once
+      if (habitLinkedKRs.length > 0) {
+        // Sync all habit-linked KRs (in background, don't block UI)
+        Promise.all(habitLinkedKRs.map(kr => syncHabitToKR(kr.id)))
+          .then(() => {
+            // Reload all OKRs once after all syncs complete to maintain sort order
+            fetchOkrsWithProgress().then(refreshedData => {
+              setOkrs(refreshedData);
+            });
+          })
+          .catch(e => console.error('Failed to sync habit KRs:', e));
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load OKRs');
       setOkrs([]);
@@ -596,8 +615,6 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       load();
-      // Background sync habit-linked KRs
-      syncHabitLinkedKRs();
     }
   }, []); // Empty deps = load once on mount
   
@@ -609,22 +626,6 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
     window.addEventListener('dashboard:okrs-refresh', handleRefresh);
     return () => window.removeEventListener('dashboard:okrs-refresh', handleRefresh);
   }, []);
-
-  const syncHabitLinkedKRs = async () => {
-    try {
-      // Find all habit-linked KRs
-      const habitLinkedKRs = okrs.flatMap(o => 
-        (o.key_results || []).filter(kr => kr.data_source === 'habit' && kr.auto_sync)
-      );
-      
-      // Sync each one (in background, don't await)
-      for (const kr of habitLinkedKRs) {
-        syncHabitToKR(kr.id).catch(e => console.error('Failed to sync habit KR:', e));
-      }
-    } catch (e) {
-      console.error('Failed to sync habit-linked KRs:', e);
-    }
-  };
 
   const byPillar: Record<OkrPillar, Okr | null> = useMemo(() => {
     const map: Record<OkrPillar, Okr | null> = { Power: null, Passion: null, Purpose: null, Production: null };

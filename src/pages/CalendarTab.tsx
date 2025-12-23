@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useTransition, useDeferredValue } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useTransition, useDeferredValue, useCallback } from 'react';
 import { tokens, cn } from '../theme/config';
-import { Calendar, X, Plus, Edit2, Trash2, Settings, ChevronRight, ChevronDown, Sparkles } from 'lucide-react';
+import { Calendar, X, Plus, Edit2, Trash2, Settings, ChevronRight, ChevronDown, Sparkles, BarChart3 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
 import type { CalendarEvent, CalendarEventInput } from '../types';
@@ -39,6 +39,21 @@ const PRIORITY_VALUES: Record<string, number> = {
 const getCategoryStyle = (category: string | null | undefined) => {
   if (!category) return CATEGORY_COLORS.personal;
   return CATEGORY_COLORS[category.toLowerCase()] || CATEGORY_COLORS.personal;
+};
+
+// Map category to actual hex color for borders
+const getCategoryBorderColor = (category: string | null | undefined): string => {
+  const categoryMap: Record<string, string> = {
+    vacation: '#a855f7',  // purple-500
+    holiday: '#f43f5e',   // rose-500
+    travel: '#14b8a6',    // teal-500
+    medical: '#f97316',   // orange-500
+    social: '#f59e0b',    // amber-500
+    work: '#3b82f6',      // blue-500
+    personal: '#737373',  // neutral-500
+  };
+  if (!category) return categoryMap.personal;
+  return categoryMap[category.toLowerCase()] || categoryMap.personal;
 };
 
 const getDefaultPriority = (category: string | null): number => {
@@ -118,6 +133,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null); // For event detail modal
   const [showPastMonths, setShowPastMonths] = useState(() => {
     try {
       const saved = localStorage.getItem('calendar-show-past-months');
@@ -138,16 +154,81 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [renderedDays, setRenderedDays] = useState<DayData[]>([]); // Progressive rendering
   const [isLoadingPast, setIsLoadingPast] = useState(false);
   
-  // Natural Language input state
+  // Quick add input state
   const [nlInput, setNlInput] = useState('');
   const [showNlPanel, setShowNlPanel] = useState(false);
   const [showNlSheet, setShowNlSheet] = useState(false); // Mobile bottom sheet
   const [isYearHeaderVisible, setIsYearHeaderVisible] = useState(true); // Track year header visibility
   const [activeMonthDropdown, setActiveMonthDropdown] = useState<string | null>(null); // Which month's dropdown is open
-  const [manualEntryType, setManualEntryType] = useState<'single' | 'multi' | 'pattern'>('single'); // Type of manual entry
+  
+  // Animated placeholder
+  const [placeholderText, setPlaceholderText] = useState('');
+  const examples = [
+    'Dentist Thursday 2pm',
+    'Bahamas Jan 11-12',
+    'PTO next week'
+  ];
+  
+  // Typewriter animation for placeholder (runs once)
+  useEffect(() => {
+    if (nlInput) return; // Don't animate if user is typing
+    
+    let exampleIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    let timeoutId: NodeJS.Timeout;
+    
+    const animate = () => {
+      const currentExample = examples[exampleIndex];
+      
+      if (!isDeleting) {
+        // Typing
+        if (charIndex < currentExample.length) {
+          setPlaceholderText(currentExample.slice(0, charIndex + 1));
+          charIndex++;
+          timeoutId = setTimeout(animate, 50); // Typing speed
+        } else {
+          // Pause at end
+          timeoutId = setTimeout(() => {
+            isDeleting = true;
+            animate();
+          }, 2000); // Pause before deleting
+        }
+      } else {
+        // Deleting
+        if (charIndex > 0) {
+          setPlaceholderText(currentExample.slice(0, charIndex - 1));
+          charIndex--;
+          timeoutId = setTimeout(animate, 30); // Delete speed (faster)
+        } else {
+          // Move to next example
+          exampleIndex++;
+          if (exampleIndex < examples.length) {
+            isDeleting = false;
+            timeoutId = setTimeout(animate, 500); // Pause before next example
+          } else {
+            // Done - show last example
+            setPlaceholderText(examples[examples.length - 1]);
+          }
+        }
+      }
+    };
+    
+    timeoutId = setTimeout(animate, 1000); // Initial delay
+    
+    return () => clearTimeout(timeoutId);
+  }, [nlInput]);
+  
+  // Multi-day drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartDate, setDragStartDate] = useState<string | null>(null);
+  const [dragEndDate, setDragEndDate] = useState<string | null>(null);
+  const [confirmedRangeStart, setConfirmedRangeStart] = useState<string | null>(null);
+  const [confirmedRangeEnd, setConfirmedRangeEnd] = useState<string | null>(null);
   
   // Track which months are expanded (default: current month + all future)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => {
@@ -482,25 +563,244 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
 
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
+    setShowStats(false); // Close stats when selecting a day
     setIsCreating(false);
     setEditingEvent(null);
   };
 
-  const handleCloseDetail = () => {
+  const handleCloseDetail = useCallback(() => {
     setSelectedDate(null);
     setIsCreating(false);
     setEditingEvent(null);
-  };
+    setDragEndDate(null); // Clear drag selection
+    setConfirmedRangeStart(null); // Clear visual highlighting
+    setConfirmedRangeEnd(null);
+  }, []);
 
-  const handleCreateEvent = () => {
+  const handleTogglePTO = useCallback(async (startDate: string, endDate: string, currentlyHasPTO: boolean) => {
+    if (currentlyHasPTO) {
+      // Remove PTO - find and delete PTO events in this range
+      const ptoEvents = events.filter(e => e.is_pto && e.start_date >= startDate && e.end_date <= endDate);
+      if (ptoEvents.length > 0) {
+        try {
+          // Optimistically remove from UI
+          setEvents(prev => prev.filter(e => !ptoEvents.some(pto => pto.id === e.id)));
+          // Delete from DB
+          await Promise.all(ptoEvents.map(e => apiClient.deleteCalendarEvent(e.id)));
+          toast.success('Removed PTO');
+        } catch (error) {
+          console.error('Failed to remove PTO:', error);
+          // Restore on error
+          setEvents(prev => [...prev, ...ptoEvents]);
+          toast.error('Failed to remove PTO');
+        }
+      }
+    } else {
+      // Add PTO - create a PTO event for the date range
+      try {
+        const ptoInput: CalendarEventInput = {
+          title: 'Out of Office',
+          category: null,
+          notes: null,
+          start_date: startDate,
+          end_date: endDate,
+          start_time: null,
+          end_time: null,
+          all_day: true,
+          affects_row_appearance: false,
+          priority: 10,
+          is_pto: true,
+          source_pattern_id: null,
+        };
+        const newId = await apiClient.createCalendarEvent(ptoInput);
+        const newEvent: CalendarEvent = {
+          id: newId,
+          ...ptoInput,
+          user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setEvents(prev => [...prev, newEvent]);
+        const dayCount = Math.ceil((parseLocalDate(endDate).getTime() - parseLocalDate(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        toast.success(dayCount > 1 ? `Marked ${dayCount} days as PTO` : 'Marked as PTO');
+      } catch (error) {
+        console.error('Failed to toggle PTO:', error);
+        toast.error('Failed to update PTO');
+      }
+    }
+  }, [events, parseLocalDate]);
+
+  const handleSetLocation = useCallback(async (startDate: string, endDate: string, location: string) => {
+    try {
+      // Step 1: Find ALL location events that overlap with the selected range
+      const overlappingLocationEvents = events.filter(e => 
+        e.category === 'location' && 
+        e.start_date <= endDate && 
+        e.end_date >= startDate
+      );
+
+      // Step 2: Remove location from the selected date range
+      // We need to clear any existing locations in this range first
+      if (overlappingLocationEvents.length > 0) {
+        for (const event of overlappingLocationEvents) {
+          // Calculate which days to remove from this event
+          const eventStart = new Date(event.start_date + 'T00:00:00');
+          const eventEnd = new Date(event.end_date + 'T00:00:00');
+          const rangeStart = new Date(startDate + 'T00:00:00');
+          const rangeEnd = new Date(endDate + 'T00:00:00');
+
+          // Event is completely within selection - delete it
+          if (event.start_date >= startDate && event.end_date <= endDate) {
+            await apiClient.deleteCalendarEvent(event.id);
+            setEvents(prev => prev.filter(e => e.id !== event.id));
+            continue;
+          }
+
+          // Event starts before and ends after - split into two
+          if (event.start_date < startDate && event.end_date > endDate) {
+            // Keep the "before" part
+            const beforeEnd = new Date(rangeStart);
+            beforeEnd.setDate(beforeEnd.getDate() - 1);
+            const beforeEndDate = beforeEnd.toISOString().split('T')[0];
+
+            await apiClient.updateCalendarEvent(event.id, {
+              end_date: beforeEndDate
+            });
+
+            // Create the "after" part
+            const afterStart = new Date(rangeEnd);
+            afterStart.setDate(afterStart.getDate() + 1);
+            const afterStartDate = afterStart.toISOString().split('T')[0];
+
+            const afterInput: CalendarEventInput = {
+              title: event.title,
+              category: 'location',
+              notes: null,
+              start_date: afterStartDate,
+              end_date: event.end_date,
+              start_time: null,
+              end_time: null,
+              all_day: true,
+              affects_row_appearance: false,
+              priority: 9,
+              is_pto: false,
+              source_pattern_id: null,
+            };
+
+            const afterId = await apiClient.createCalendarEvent(afterInput);
+            const afterEvent: CalendarEvent = {
+              id: afterId,
+              ...afterInput,
+              user_id: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            setEvents(prev => [
+              ...prev.map(e => 
+                e.id === event.id 
+                  ? { ...e, end_date: beforeEndDate }
+                  : e
+              ),
+              afterEvent
+            ]);
+            continue;
+          }
+
+          // Event starts before selection - trim the end
+          if (event.start_date < startDate && event.end_date <= endDate) {
+            const newEnd = new Date(rangeStart);
+            newEnd.setDate(newEnd.getDate() - 1);
+            const newEndDate = newEnd.toISOString().split('T')[0];
+
+            await apiClient.updateCalendarEvent(event.id, {
+              end_date: newEndDate
+            });
+
+            setEvents(prev => prev.map(e => 
+              e.id === event.id 
+                ? { ...e, end_date: newEndDate }
+                : e
+            ));
+            continue;
+          }
+
+          // Event ends after selection - trim the start
+          if (event.start_date >= startDate && event.end_date > endDate) {
+            const newStart = new Date(rangeEnd);
+            newStart.setDate(newStart.getDate() + 1);
+            const newStartDate = newStart.toISOString().split('T')[0];
+
+            await apiClient.updateCalendarEvent(event.id, {
+              start_date: newStartDate
+            });
+
+            setEvents(prev => prev.map(e => 
+              e.id === event.id 
+                ? { ...e, start_date: newStartDate }
+                : e
+            ));
+            continue;
+          }
+        }
+      }
+
+      // Step 3: If location is provided, create new location event for the range
+      if (location && location.trim()) {
+        const locationInput: CalendarEventInput = {
+          title: location.trim(),
+          category: 'location',
+          notes: null,
+          start_date: startDate,
+          end_date: endDate,
+          start_time: null,
+          end_time: null,
+          all_day: true,
+          affects_row_appearance: false,
+          priority: 9,
+          is_pto: false,
+          source_pattern_id: null,
+        };
+
+        const newId = await apiClient.createCalendarEvent(locationInput);
+        const newEvent: CalendarEvent = {
+          id: newId,
+          ...locationInput,
+          user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        setEvents(prev => [...prev, newEvent]);
+        const dayCount = Math.ceil((parseLocalDate(endDate).getTime() - parseLocalDate(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        toast.success(dayCount > 1 ? `Location set for ${dayCount} days` : 'Location set');
+      } else if (overlappingLocationEvents.length > 0) {
+        toast.success('Location removed');
+      }
+
+    } catch (error) {
+      console.error('Failed to update location:', error);
+      toast.error('Failed to update location');
+    }
+  }, [events, parseLocalDate]);
+
+  const handleCreateEvent = useCallback(() => {
     setIsCreating(true);
     setEditingEvent(null);
-  };
+  }, []);
 
-  const handleEditEvent = (event: CalendarEvent) => {
+  const handleEditEvent = useCallback((event: CalendarEvent) => {
     setEditingEvent(event);
     setIsCreating(false);
-  };
+  }, []);
+
+  const handleViewEvent = useCallback((event: CalendarEvent) => {
+    setSelectedEvent(event);
+  }, []);
+
+  const handleCloseEventModal = useCallback(() => {
+    setSelectedEvent(null);
+  }, []);
 
   const handleSaveEvent = async (input: CalendarEventInput, eventId?: string) => {
     try {
@@ -546,6 +846,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       
       setIsCreating(false);
       setEditingEvent(null);
+      setDragEndDate(null); // Clear drag selection after save
+      setConfirmedRangeStart(null); // Clear visual highlighting
+      setConfirmedRangeEnd(null);
     } catch (error) {
       console.error('Failed to save event:', error);
       toast.error('Failed to save event');
@@ -554,6 +857,118 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
 
   const [deletingEvent, setDeletingEvent] = useState<CalendarEvent | null>(null);
   const [deleteTimeoutId, setDeleteTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
+  // Remove PTO/Location from a specific day (handles multi-day ranges)
+  const handleRemoveDayMetadata = async (dayDate: string, metadataType: 'pto' | 'location') => {
+    const targetEvent = events.find(e => 
+      (metadataType === 'pto' ? e.is_pto : e.category === 'location') &&
+      e.start_date <= dayDate && 
+      e.end_date >= dayDate
+    );
+    
+    if (!targetEvent) return;
+    
+    // Single day event - just delete it
+    if (targetEvent.start_date === targetEvent.end_date) {
+      handleDeleteEvent(targetEvent.id);
+      return;
+    }
+    
+    // Multi-day event - need to adjust range or split
+    try {
+      const isFirstDay = dayDate === targetEvent.start_date;
+      const isLastDay = dayDate === targetEvent.end_date;
+      
+      if (isFirstDay) {
+        // Remove first day - move start date forward
+        const nextDay = new Date(dayDate + 'T00:00:00');
+        nextDay.setDate(nextDay.getDate() + 1);
+        const newStartDate = nextDay.toISOString().split('T')[0];
+        
+        await apiClient.updateCalendarEvent(targetEvent.id, {
+          start_date: newStartDate
+        });
+        
+        setEvents(prev => prev.map(e => 
+          e.id === targetEvent.id 
+            ? { ...e, start_date: newStartDate }
+            : e
+        ));
+        toast.success(`Removed ${metadataType === 'pto' ? 'PTO' : 'location'} from ${dayDate}`);
+        
+      } else if (isLastDay) {
+        // Remove last day - move end date backward
+        const prevDay = new Date(dayDate + 'T00:00:00');
+        prevDay.setDate(prevDay.getDate() - 1);
+        const newEndDate = prevDay.toISOString().split('T')[0];
+        
+        await apiClient.updateCalendarEvent(targetEvent.id, {
+          end_date: newEndDate
+        });
+        
+        setEvents(prev => prev.map(e => 
+          e.id === targetEvent.id 
+            ? { ...e, end_date: newEndDate }
+            : e
+        ));
+        toast.success(`Removed ${metadataType === 'pto' ? 'PTO' : 'location'} from ${dayDate}`);
+        
+      } else {
+        // Remove middle day - need to split into two events
+        const beforeDay = new Date(dayDate + 'T00:00:00');
+        beforeDay.setDate(beforeDay.getDate() - 1);
+        const beforeEndDate = beforeDay.toISOString().split('T')[0];
+        
+        const afterDay = new Date(dayDate + 'T00:00:00');
+        afterDay.setDate(afterDay.getDate() + 1);
+        const afterStartDate = afterDay.toISOString().split('T')[0];
+        
+        // Update existing event to end before the removed day
+        await apiClient.updateCalendarEvent(targetEvent.id, {
+          end_date: beforeEndDate
+        });
+        
+        // Create new event for days after the removed day
+        const secondHalfInput: CalendarEventInput = {
+          title: targetEvent.title,
+          category: targetEvent.category,
+          notes: targetEvent.notes,
+          start_date: afterStartDate,
+          end_date: targetEvent.end_date,
+          start_time: targetEvent.start_time,
+          end_time: targetEvent.end_time,
+          all_day: targetEvent.all_day,
+          affects_row_appearance: targetEvent.affects_row_appearance,
+          priority: targetEvent.priority,
+          is_pto: targetEvent.is_pto,
+          source_pattern_id: targetEvent.source_pattern_id,
+        };
+        
+        const newId = await apiClient.createCalendarEvent(secondHalfInput);
+        const newEvent: CalendarEvent = {
+          id: newId,
+          ...secondHalfInput,
+          user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        setEvents(prev => [
+          ...prev.map(e => 
+            e.id === targetEvent.id 
+              ? { ...e, end_date: beforeEndDate }
+              : e
+          ),
+          newEvent
+        ]);
+        
+        toast.success(`Removed ${metadataType === 'pto' ? 'PTO' : 'location'} from ${dayDate}`);
+      }
+    } catch (error) {
+      console.error(`Failed to remove ${metadataType}:`, error);
+      toast.error(`Failed to remove ${metadataType}`);
+    }
+  };
 
   const handleDeleteEvent = async (eventId: string) => {
     const eventToDelete = events.find(e => e.id === eventId);
@@ -619,6 +1034,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       }
     };
   }, [deleteTimeoutId]);
+
+  // Global mouseup handler for drag selection
+  useEffect(() => {
+    if (isDragging) {
+      const handleGlobalMouseUp = () => {
+        handleDragEnd();
+      };
+      
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isDragging, dragStartDate, dragEndDate]);
 
   // Close settings when clicking outside
   useEffect(() => {
@@ -740,7 +1167,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     if (!nlInput.trim()) return;
     
     try {
-      // Parse natural language to structured event
+      // Parse input to event
       const parsedEvent = await apiClient.parseNaturalLanguageEvent(nlInput);
       
       // Create the event in Supabase
@@ -868,6 +1295,93 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     }
   };
 
+  // Multi-day drag selection handlers
+  const handleDragStart = (date: string, e: React.MouseEvent) => {
+    // Only allow drag on the day box itself, not on events
+    if ((e.target as HTMLElement).closest('.group\\/event')) {
+      return;
+    }
+    setIsDragging(true);
+    setDragStartDate(date);
+    setDragEndDate(date);
+    setConfirmedRangeStart(null); // Clear previous selection
+    setConfirmedRangeEnd(null);
+  };
+
+  const handleDragOver = (date: string) => {
+    if (isDragging && dragStartDate) {
+      setDragEndDate(date);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (isDragging && dragStartDate && dragEndDate) {
+      // Determine the actual start and end dates (user might drag backwards)
+      const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
+      const end = dragStartDate < dragEndDate ? dragEndDate : dragStartDate;
+      
+      // Only create multi-day event if more than one day selected
+      if (start !== end) {
+        setSelectedDate(start);
+        setDragEndDate(end); // Set the calculated end date
+        setConfirmedRangeStart(start); // Keep visual highlighting
+        setConfirmedRangeEnd(end);
+        setIsCreating(true);
+        setEditingEvent(null);
+        setIsDragging(false);
+        setDragStartDate(null);
+        return; // Keep dragEndDate for the form
+      } else {
+        // Single day click - normal behavior
+        handleDayClick(dragStartDate);
+      }
+    }
+    
+    setIsDragging(false);
+    setDragStartDate(null);
+    setDragEndDate(null);
+  };
+
+  // Get the selected date range for visual feedback
+  const getSelectedRange = (): string[] => {
+    // While dragging, show the dragging range
+    if (isDragging && dragStartDate && dragEndDate) {
+      const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
+      const end = dragStartDate < dragEndDate ? dragEndDate : dragStartDate;
+      
+      const range: string[] = [];
+      const currentDate = parseLocalDate(start);
+      const endDateObj = parseLocalDate(end);
+      
+      while (currentDate <= endDateObj) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+        range.push(dateStr);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      return range;
+    }
+    
+    // After drag ends, show the confirmed range
+    if (confirmedRangeStart && confirmedRangeEnd) {
+      const range: string[] = [];
+      const currentDate = parseLocalDate(confirmedRangeStart);
+      const endDateObj = parseLocalDate(confirmedRangeEnd);
+      
+      while (currentDate <= endDateObj) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+        range.push(dateStr);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      return range;
+    }
+    
+    return [];
+  };
+
+  const selectedRange = getSelectedRange();
+
   // Today's date for highlighting
   const today = new Date().toISOString().split('T')[0];
 
@@ -929,7 +1443,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                 )}
               </div>
               
-              {/* Natural Language Input - Hidden on mobile */}
+              {/* Quick Add Input - Hidden on mobile */}
               <div className="hidden md:flex flex-1 max-w-2xl mx-4">
                 <form onSubmit={handleNlSubmit} className="w-full relative">
                   <div className="relative">
@@ -939,15 +1453,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                       value={nlInput}
                       onChange={(e) => setNlInput(e.target.value)}
                       onFocus={() => setShowNlPanel(true)}
-                      placeholder="Add an event with natural language..."
-                      className="w-full px-4 py-2 pl-10 pr-4 bg-neutral-900 border border-neutral-700 rounded-full text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      placeholder={placeholderText}
+                      className="w-full px-4 py-2 pl-10 pr-10 bg-neutral-900 border border-neutral-700 rounded-full text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                     <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                    {nlInput.trim() && (
+                      <button
+                        type="submit"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
+                        title="Create event"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </form>
               </div>
 
-              {/* Mobile: NL Input button - Shows on mobile */}
+              {/* Mobile: Quick Add button - Shows on mobile */}
               <button
                 onClick={() => setShowNlSheet(true)}
                 className={cn(
@@ -955,9 +1478,20 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                   tokens.button.ghost,
                   'p-2 text-emerald-400'
                 )}
-                title="Add event with natural language"
+                title="Add event"
               >
                 <Sparkles className="w-5 h-5" />
+              </button>
+              
+              {/* Right controls group */}
+              <div className="flex items-center">
+                {/* Stats button */}
+                <button
+                  onClick={() => setShowStats(!showStats)}
+                  className={cn(tokens.button.ghost, 'p-2', showStats && 'bg-neutral-800')}
+                  title="View stats"
+                >
+                  <BarChart3 className="w-5 h-5" />
               </button>
               
               {/* Settings button */}
@@ -1009,193 +1543,31 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
 
-            {/* Desktop: Expanded NL Panel */}
+            {/* Desktop: Expanded NL Panel - Just examples */}
             {showNlPanel && (
               <div 
                 ref={nlPanelRef}
-                className="hidden md:block mt-4 bg-neutral-900/95 border border-neutral-700 rounded-xl p-6 shadow-2xl backdrop-blur-sm"
+                className="hidden md:block mt-4 bg-neutral-900/95 border border-neutral-700 rounded-xl p-4 shadow-2xl backdrop-blur-sm"
               >
-                <form onSubmit={handleNlSubmit} className="space-y-4">
-                  {/* NL Input (mirrored) */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={nlInput}
-                      onChange={(e) => setNlInput(e.target.value)}
-                      placeholder="Describe your event in natural language..."
-                      className="w-full px-4 py-3 pl-10 pr-12 bg-neutral-800 border border-neutral-700 rounded-xl text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                      autoFocus
-                    />
-                    <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
-                    <button
-                      type="submit"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-emerald-400 hover:text-emerald-300 transition-colors"
-                      title="Submit"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Manual setup - functional */}
-                  <div className="pt-4 border-t border-neutral-700">
-                    <h4 className="text-sm font-semibold text-neutral-300 mb-3">Manual setup</h4>
-                    
-                    {/* Type selector */}
-                    <div className="flex gap-2 mb-4">
-                      <button
-                        onClick={() => setManualEntryType('single')}
-                        className={cn(
-                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
-                          manualEntryType === 'single'
-                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                        )}
-                      >
-                        📅 Single Event
-                      </button>
-                      <button
-                        onClick={() => setManualEntryType('multi')}
-                        className={cn(
-                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
-                          manualEntryType === 'multi'
-                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                        )}
-                      >
-                        📆 Multi-Day
-                      </button>
-                      <button
-                        onClick={() => setManualEntryType('pattern')}
-                        className={cn(
-                          'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
-                          manualEntryType === 'pattern'
-                            ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                            : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                        )}
-                      >
-                        🔁 Pattern
-                      </button>
-                    </div>
-
-                    {/* Dynamic form based on type */}
-                    <div className="space-y-3">
-                      {/* Common fields for events */}
-                      {(manualEntryType === 'single' || manualEntryType === 'multi') && (
-                        <>
-                          <input
-                            type="text"
-                            placeholder="Event title"
-                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            {manualEntryType === 'single' ? (
-                              <input
-                                type="date"
-                                placeholder="Date"
-                                className="col-span-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              />
-                            ) : (
-                              <>
-                                <input
-                                  type="date"
-                                  placeholder="Start date"
-                                  className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
-                                <input
-                                  type="date"
-                                  placeholder="End date"
-                                  className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
-                              </>
-                            )}
+                <div className="text-xs text-neutral-400 space-y-1">
+                  <p className="flex items-center gap-1.5 text-neutral-300 font-medium">
+                    💡 Examples:
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 ml-2">
+                    <li>"PTO Dec 22 to Jan 2" → Creates golden PTO days</li>
+                    <li>"Bahamas travel next week" → Creates travel event</li>
+                    <li>"Doctor appointment tomorrow 3pm" → Creates timed event</li>
+                  </ul>
                           </div>
-
-                          <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="">Select category...</option>
-                            <option value="vacation">🏖️ Vacation</option>
-                            <option value="holiday">🎉 Holiday</option>
-                            <option value="travel">✈️ Travel</option>
-                            <option value="medical">🏥 Medical</option>
-                            <option value="social">👥 Social</option>
-                            <option value="work">💼 Work</option>
-                            <option value="personal">📌 Personal</option>
-                          </select>
-
-                          <div className="flex gap-3">
-                            <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
-                              <input type="checkbox" className="w-3 h-3 rounded border-neutral-700 bg-neutral-900 text-emerald-500" />
-                              <span>All-day</span>
-                            </label>
-                            <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
-                              <input type="checkbox" className="w-3 h-3 rounded border-neutral-700 bg-neutral-900 text-yellow-500" />
-                              <span>PTO 🟡</span>
-                            </label>
-                          </div>
-
-                          <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium text-white transition-colors">
-                            Create Event
-                          </button>
-                        </>
-                      )}
-
-                      {/* Pattern-specific fields */}
-                      {manualEntryType === 'pattern' && (
-                        <>
-                          <input
-                            type="text"
-                            placeholder="Pattern name (e.g., Weekly Team Meeting)"
-                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-
-                          <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="">Pattern type...</option>
-                            <option value="recurring">🔁 Recurring (repeats regularly)</option>
-                            <option value="goal">🎯 Goal (target count by date)</option>
-                            <option value="template">📋 Template (one-off)</option>
-                          </select>
-
-                          <input
-                            type="text"
-                            placeholder="Frequency (e.g., Every Monday, Weekly, Monthly)"
-                            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <input
-                              type="date"
-                              placeholder="Start date"
-                              className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                            <input
-                              type="date"
-                              placeholder="End date (optional)"
-                              className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="p-3 bg-amber-950/20 border border-amber-800/30 rounded-lg">
-                            <p className="text-xs text-amber-300">
-                              ⚠️ Pattern creation stores the rule. Events will be generated by automation (coming soon).
-                            </p>
-                          </div>
-
-                          <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium text-white transition-colors">
-                            Create Pattern
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </form>
               </div>
             )}
           </div>
 
-          {/* Day rows grouped by month */}
+          {/* Day rows/grid grouped by month */}
           <div className="pb-24">
             {monthGroups.map((group, idx) => {
               const monthKey = `${group.year}-${String(group.monthIndex).padStart(2, '0')}`;
@@ -1256,7 +1628,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                   </div>
                 </div>
 
-                {/* Dropdown Module - appears below sticky month header */}
+                {/* Dropdown Module - appears below sticky month header - Simple NL only */}
                 {activeMonthDropdown === monthKey && isExpanded && (
                   <div className="bg-neutral-900/98 border border-neutral-700 rounded-xl p-5 mx-4 mb-3 shadow-2xl backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-4">
@@ -1269,16 +1641,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                       </button>
                     </div>
 
-                    <div className="space-y-4">
-                      {/* AI Input Section */}
                       <div>
-                        <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                          Natural Language
-                        </label>
                         <div className="relative">
                           <input
                             type="text"
-                            placeholder="e.g., Doctor appointment next Tuesday at 2pm"
+                          placeholder="Type anything: 'Dentist 2pm' or 'PTO this week' or 'Trip to NYC'"
                             className="w-full px-4 py-2.5 pl-10 pr-4 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             onKeyDown={async (e) => {
                               if (e.key === 'Enter' && e.currentTarget.value.trim()) {
@@ -1306,157 +1673,19 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                           />
                           <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
                         </div>
-                        <p className="text-xs text-neutral-500 mt-1.5">Press Enter to create with AI</p>
+                      <p className="text-xs text-neutral-500 mt-2">Press Enter to create</p>
                       </div>
-
-                      {/* Divider */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-px bg-neutral-700"></div>
-                        <span className="text-xs text-neutral-500">OR</span>
-                        <div className="flex-1 h-px bg-neutral-700"></div>
                       </div>
-
-                      {/* Manual Entry Section - Same as NL panel */}
-                      <div>
-                        <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                          Manual Entry
-                        </label>
-                        
-                        {/* Type selector */}
-                        <div className="flex gap-2 mb-3">
-                          <button
-                            onClick={() => setManualEntryType('single')}
-                            className={cn(
-                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                              manualEntryType === 'single'
-                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                            )}
-                          >
-                            📅 Single
-                          </button>
-                          <button
-                            onClick={() => setManualEntryType('multi')}
-                            className={cn(
-                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                              manualEntryType === 'multi'
-                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                            )}
-                          >
-                            📆 Multi-Day
-                          </button>
-                          <button
-                            onClick={() => setManualEntryType('pattern')}
-                            className={cn(
-                              'flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                              manualEntryType === 'pattern'
-                                ? 'bg-emerald-900/30 border-2 border-emerald-600 text-emerald-300'
-                                : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                            )}
-                          >
-                            🔁 Pattern
-                          </button>
-                        </div>
-
-                        {/* Dynamic form based on type - prefilled with first day of month */}
-                        <div className="space-y-2.5">
-                          {(manualEntryType === 'single' || manualEntryType === 'multi') && (
-                            <>
-                              <input
-                                type="text"
-                                placeholder="Event title"
-                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              />
-                              
-                              <div className="grid grid-cols-2 gap-2">
-                                {manualEntryType === 'single' ? (
-                                  <input
-                                    type="date"
-                                    defaultValue={group.days[0]?.date}
-                                    className="col-span-2 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                  />
-                                ) : (
-                                  <>
-                                    <input
-                                      type="date"
-                                      placeholder="Start"
-                                      defaultValue={group.days[0]?.date}
-                                      className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    />
-                                    <input
-                                      type="date"
-                                      placeholder="End"
-                                      defaultValue={group.days[0]?.date}
-                                      className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    />
-                                  </>
-                                )}
-                              </div>
-
-                              <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                                <option value="">Category...</option>
-                                <option value="vacation">🏖️ Vacation</option>
-                                <option value="holiday">🎉 Holiday</option>
-                                <option value="travel">✈️ Travel</option>
-                                <option value="medical">🏥 Medical</option>
-                                <option value="social">👥 Social</option>
-                                <option value="work">💼 Work</option>
-                                <option value="personal">📌 Personal</option>
-                              </select>
-
-                              <div className="flex gap-3 text-xs">
-                                <label className="flex items-center gap-1.5 text-neutral-300 cursor-pointer">
-                                  <input type="checkbox" className="w-3 h-3 rounded" defaultChecked />
-                                  All-day
-                                </label>
-                                <label className="flex items-center gap-1.5 text-neutral-300 cursor-pointer">
-                                  <input type="checkbox" className="w-3 h-3 rounded" />
-                                  PTO 🟡
-                                </label>
-                              </div>
-
-                              <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-medium text-white transition-colors">
-                                Create Event
-                              </button>
-                            </>
-                          )}
-
-                          {manualEntryType === 'pattern' && (
-                            <>
-                              <input
-                                type="text"
-                                placeholder="Pattern name"
-                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              />
-                              <select className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                                <option>Pattern type...</option>
-                                <option value="recurring">🔁 Recurring</option>
-                                <option value="goal">🎯 Goal</option>
-                                <option value="template">📋 Template</option>
-                              </select>
-                              <input
-                                type="text"
-                                placeholder="Frequency"
-                                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              />
-                              <button className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-medium text-white transition-colors">
-                                Create Pattern
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 )}
 
-                {/* Day rows - only render if expanded */}
+                {/* Day rows/grid - only render if expanded */}
                 {isExpanded && (
-                  <div className="space-y-1" style={{ containIntrinsicSize: 'auto 80px' }}>
+                  <>
+                    {/* Mobile: Row layout (default, < md) */}
+                    <div className="md:hidden space-y-1" style={{ containIntrinsicSize: 'auto 80px' }}>
                     {group.days.map(day => {
                     const isSelected = selectedDate === day.date;
-                    const hasEvents = day.events.length > 0;
+                      const hasEvents = day.events.filter(e => !e.is_pto && e.category !== 'location').length > 0; // Exclude PTO and location from event count
                     const isToday = day.date === today;
                     const rowAppearance = getRowAppearance(day);
                     
@@ -1498,19 +1727,39 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             )}>
                               {day.dayNumber}
                             </span>
-                            {/* Gold PTO indicator dot */}
+                            {/* Gold PTO indicator dot - Click to remove */}
                             {rowAppearance.hasPto && !rowAppearance.ptoOnly && (
-                              <span 
-                                className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm"
-                                title="PTO day"
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveDayMetadata(day.date, 'pto');
+                                }}
+                                className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
+                                title="Out of Office (PTO) - Click to remove"
                               />
+                            )}
+                            {/* Location indicator - Click to remove */}
+                            {day.events.some(e => e.category === 'location') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveDayMetadata(day.date, 'location');
+                                }}
+                                className="text-xs hover:scale-110 transition-transform cursor-pointer"
+                                title={`📍 ${day.events.find(e => e.category === 'location')?.title} - Click to remove`}
+                              >
+                                📍
+                              </button>
                             )}
                           </div>
                           
-                          {/* Event pills - left-aligned */}
+                            {/* Event pills - left-aligned (exclude PTO) */}
                           {hasEvents && (
                             <div className="flex items-center gap-2 flex-wrap flex-1">
-                              {day.events.slice(0, 3).map(event => {
+                                {day.events
+                                  .filter(event => !event.is_pto) // PTO doesn't show as pill
+                                  .slice(0, 3)
+                                  .map(event => {
                                 const style = getCategoryStyle(event.category);
                                 return (
                                   <div
@@ -1523,7 +1772,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleEditEvent(event);
+                                      e.preventDefault();
+                                      handleViewEvent(event);
                                     }}
                                   >
                                     {/* Colored dot */}
@@ -1544,9 +1794,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                   </div>
                                 );
                               })}
-                              {day.events.length > 3 && (
+                                {day.events.filter(e => !e.is_pto && e.category !== 'location').length > 3 && (
                                 <span className="text-xs text-neutral-400">
-                                  +{day.events.length - 3} more
+                                    +{day.events.filter(e => !e.is_pto && e.category !== 'location').length - 3} more
                                 </span>
                               )}
                             </div>
@@ -1577,6 +1827,172 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     );
                   })}
                   </div>
+
+                    {/* Desktop: Grid layout (>= md) */}
+                    <div className="hidden md:grid grid-cols-8 gap-2" style={{ gridAutoRows: '1fr', containIntrinsicSize: 'auto 150px' }}>
+                      {group.days.map((day, dayIndex) => {
+                      const isSelected = selectedDate === day.date;
+                      const hasEvents = day.events.filter(e => !e.is_pto && e.category !== 'location').length > 0; // Exclude PTO and location from event count
+                      const isToday = day.date === today;
+                      const rowAppearance = getRowAppearance(day);
+                      const isInDragRange = selectedRange.includes(day.date);
+                      
+                      return (
+                        <div
+                          key={day.date}
+                          className="group/day relative flex"
+                          style={{ 
+                            contentVisibility: 'auto',
+                          }}
+                        >
+                          <button
+                            ref={isToday ? todayRef : undefined}
+                            onMouseDown={(e) => handleDragStart(day.date, e)}
+                            onMouseEnter={() => handleDragOver(day.date)}
+                            onClick={() => !isDragging && handleDayClick(day.date)}
+                            className={cn(
+                              'w-full h-full min-h-[120px] text-left p-3 rounded-lg border transition-colors',
+                              'flex flex-col',
+                              'hover:bg-neutral-800/50',
+                              isInDragRange && 'bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/50',
+                              !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500 ring-2 ring-emerald-500/30',
+                              !isInDragRange && !isSelected && rowAppearance.bg,
+                              !isInDragRange && !isSelected && rowAppearance.border,
+                              isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                              isDragging && 'select-none',
+                            )}
+                            style={{ 
+                              scrollMarginTop: isToday ? '200px' : undefined
+                            }}
+                          >
+                            {/* Header: Day of week + number */}
+                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-neutral-700/50">
+                              <div className="flex items-center gap-2">
+                                <span className={cn(
+                                  'text-xs font-medium uppercase',
+                                  day.isWeekend ? 'text-emerald-400' : 'text-neutral-500'
+                                )}>
+                                  {day.dayOfWeek}
+                                </span>
+                                {/* Gold PTO indicator dot - Click to remove */}
+                                {rowAppearance.hasPto && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveDayMetadata(day.date, 'pto');
+                                    }}
+                                    className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
+                                    title="Out of Office (PTO) - Click to remove"
+                                  />
+                                )}
+                                {/* Location indicator - Click to remove */}
+                                {day.events.some(e => e.category === 'location') && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveDayMetadata(day.date, 'location');
+                                    }}
+                                    className="text-xs hover:scale-110 transition-transform cursor-pointer"
+                                    title={`📍 ${day.events.find(e => e.category === 'location')?.title} - Click to remove`}
+                                  >
+                                    📍
+                                  </button>
+                                )}
+                              </div>
+                              <span className={cn(
+                                'text-2xl font-bold',
+                                day.isWeekend ? 'text-emerald-300' : 'text-neutral-100'
+                              )}>
+                                {day.dayNumber}
+                              </span>
+                            </div>
+                            
+                            {/* Location display */}
+                            {day.events.some(e => e.category === 'location') && (
+                              <div className="group/location relative mb-2 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300 truncate hover:bg-blue-950/40 transition-colors">
+                                <span>📍 {day.events.find(e => e.category === 'location')?.title}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveDayMetadata(day.date, 'location');
+                                  }}
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-blue-400 hover:text-blue-200 hover:bg-blue-900/50 rounded opacity-0 group-hover/location:opacity-100 transition-opacity"
+                                  title="Remove location"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            
+                            {/* Events list - vertical stack (exclude PTO and location - they're day-level metadata) */}
+                            <div className="flex-1 space-y-1.5">
+                              {day.events
+                                .filter(event => !event.is_pto && event.category !== 'location') // PTO and location don't show as event pills
+                                .map(event => {
+                                const style = getCategoryStyle(event.category);
+                                const borderColor = getCategoryBorderColor(event.category);
+                                
+                                return (
+                                  <div
+                                    key={event.id}
+                                    className={cn(
+                                      'group/event flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer',
+                                      'hover:bg-neutral-700/50 transition-all',
+                                      'border-l-2',
+                                      style.bg
+                                    )}
+                                    style={{ borderLeftColor: borderColor }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      handleViewEvent(event);
+                                    }}
+                                  >
+                                    {/* Event content */}
+                                    <div className={cn('flex-1 min-w-0 text-[11px] font-medium break-words leading-tight', style.text)}>
+                                      {event.title}
+                                    </div>
+                                    {/* Delete X - on hover */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteEvent(event.id);
+                                      }}
+                                      className="opacity-0 group-hover/event:opacity-100 text-neutral-400 hover:text-rose-400 transition-all flex-shrink-0"
+                                      title="Delete event"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </button>
+                          
+                          {/* Quick Add Button (shows on hover) */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDate(day.date);
+                              setIsCreating(true);
+                              setEditingEvent(null);
+                            }}
+                            className={cn(
+                              'absolute bottom-2 left-1/2 -translate-x-1/2',
+                              'opacity-0 group-hover/day:opacity-100',
+                              'p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full',
+                              'transition-all shadow-lg hover:scale-110',
+                              'z-10'
+                            )}
+                            title="Quick add event"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    </div>
+                  </>
                 )}
               </div>
               );
@@ -1621,18 +2037,80 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
               onEditEvent={handleEditEvent}
               onSaveEvent={handleSaveEvent}
               onDeleteEvent={handleDeleteEvent}
+              dragEndDate={dragEndDate}
+              onTogglePTO={handleTogglePTO}
+              onSetLocation={handleSetLocation}
             />
+          </div>
+        )}
+
+        {/* Desktop: Stats panel */}
+        {showStats && !selectedDate && (
+          <div className="hidden lg:block w-1/3 flex-shrink-0 sticky top-6 self-start max-h-[calc(100vh-8rem)] overflow-auto">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl">
+              {/* Header */}
+              <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+                    {selectedYear} Stats
+                  </h3>
+                  <button
+                    onClick={() => setShowStats(false)}
+                    className={cn(tokens.button.ghost, 'p-2')}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 space-y-6">
+                {/* PTO Count */}
+                <div className="bg-yellow-950/20 border border-yellow-700/30 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full bg-yellow-400" />
+                    <h4 className="text-sm font-semibold text-yellow-300">Out of Office (PTO)</h4>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-yellow-100">
+                      {(() => {
+                        // Count PTO days for selected year
+                        const yearStart = `${selectedYear}-01-01`;
+                        const yearEnd = `${selectedYear}-12-31`;
+                        const ptoDays = events.filter(e => 
+                          e.is_pto && 
+                          e.start_date >= yearStart && 
+                          e.end_date <= yearEnd
+                        );
+                        
+                        // Calculate total days
+                        let totalDays = 0;
+                        ptoDays.forEach(event => {
+                          const start = new Date(event.start_date + 'T00:00:00');
+                          const end = new Date(event.end_date + 'T00:00:00');
+                          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                          totalDays += days;
+                        });
+                        
+                        return totalDays;
+                      })()}
+                    </span>
+                    <span className="text-sm text-neutral-400">days</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Mobile: Bottom sheet for day details */}
       {selectedDate && selectedDayData && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end" onClick={handleCloseDetail}>
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end" onMouseDown={(e) => e.target === e.currentTarget && handleCloseDetail()}>
           <div className="absolute inset-0 bg-black/50" />
           <div
             className="relative w-full max-h-[80vh] bg-neutral-900 rounded-t-2xl border-t border-neutral-800 overflow-auto"
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <DayDetailPane
               dayData={selectedDayData}
@@ -1643,6 +2121,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
               onEditEvent={handleEditEvent}
               onSaveEvent={handleSaveEvent}
               onDeleteEvent={handleDeleteEvent}
+              dragEndDate={dragEndDate}
+              onTogglePTO={handleTogglePTO}
+              onSetLocation={handleSetLocation}
             />
           </div>
         </div>
@@ -1670,8 +2151,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
             </div>
 
             {/* Content */}
-            <div className="p-4 space-y-4">
-              <form onSubmit={handleNlSubmit} className="space-y-4">
+            <div className="p-4">
+              <form onSubmit={handleNlSubmit} className="space-y-3">
                 {/* NL Input */}
                 <div className="relative">
                   <input
@@ -1679,7 +2160,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     type="text"
                     value={nlInput}
                     onChange={(e) => setNlInput(e.target.value)}
-                    placeholder="Describe your event in natural language..."
+                    placeholder={placeholderText}
                     className="w-full px-4 py-3 pl-10 pr-12 bg-neutral-800 border border-neutral-700 rounded-xl text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   />
                   <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
@@ -1692,38 +2173,118 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                   </button>
                 </div>
 
-                {/* Manual setup placeholder */}
-                <div className="pt-4 border-t border-neutral-700">
-                  <h4 className="text-sm font-semibold text-neutral-300 mb-3">Manual setup</h4>
-                  <div className="space-y-3 opacity-50">
-                    <input
-                      type="text"
-                      placeholder="Event title"
-                      disabled
-                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="date"
-                        disabled
-                        className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                      />
-                      <select
-                        disabled
-                        className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed"
-                      >
-                        <option>Category</option>
-                      </select>
-                    </div>
-                    <textarea
-                      placeholder="Notes"
-                      disabled
-                      rows={3}
-                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-400 cursor-not-allowed resize-none"
-                    />
-                  </div>
+                {/* Tips */}
+                <div className="text-xs text-neutral-400 space-y-1">
+                  <p>💡 Examples:</p>
+                  <ul className="list-disc list-inside space-y-0.5 ml-2">
+                    <li>"PTO Dec 22 to Jan 2"</li>
+                    <li>"Bahamas travel next week"</li>
+                    <li>"Doctor appointment tomorrow 3pm"</li>
+                  </ul>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event Detail Modal - Small modal for viewing single event */}
+      {selectedEvent && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-150" 
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseEventModal();
+            }
+          }}
+        >
+          <div 
+            className="absolute inset-0 bg-black/60" 
+            onMouseDown={handleCloseEventModal}
+          />
+          <div
+            className="relative w-full max-w-md bg-neutral-900 rounded-xl border border-neutral-800 shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+              <h3 className="text-lg font-semibold text-neutral-100">Event Details</h3>
+              <button
+                onClick={handleCloseEventModal}
+                className={cn(tokens.button.ghost, 'p-2')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+                    </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {/* Event info */}
+              <div>
+                <h4 className="text-xl font-bold text-neutral-100 mb-2">{selectedEvent.title}</h4>
+                
+                {/* Date range */}
+                <div className="flex items-center gap-2 text-sm text-neutral-400 mb-1">
+                  <Calendar className="w-4 h-4" />
+                  {selectedEvent.start_date === selectedEvent.end_date ? (
+                    <span>{new Date(selectedEvent.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  ) : (
+                    <span>
+                      {new Date(selectedEvent.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 
+                      {' → '}
+                      {new Date(selectedEvent.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  )}
+                  </div>
+
+                {/* Time */}
+                {!selectedEvent.all_day && selectedEvent.start_time && (
+                  <div className="text-sm text-neutral-400 mb-1">
+                    {selectedEvent.start_time.slice(0, 5)}
+                    {selectedEvent.end_time && ` - ${selectedEvent.end_time.slice(0, 5)}`}
+                </div>
+                )}
+
+                {/* Category */}
+                {selectedEvent.category && (
+                  <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs text-neutral-300 mt-2">
+                    {selectedEvent.category}
+            </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              {selectedEvent.notes && (
+                <div className="pt-3 border-t border-neutral-700">
+                  <h5 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Notes</h5>
+                  <p className="text-sm text-neutral-300 whitespace-pre-wrap">{selectedEvent.notes}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-3 border-t border-neutral-700">
+                <button
+                  onClick={() => {
+                    handleEditEvent(selectedEvent);
+                    setSelectedDate(selectedEvent.start_date);
+                    handleCloseEventModal();
+                  }}
+                  className={cn(tokens.button.primary, 'flex-1')}
+                >
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    handleDeleteEvent(selectedEvent.id);
+                    handleCloseEventModal();
+                  }}
+                  className={cn(tokens.button.secondary, 'px-4')}
+                  title="Delete event"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1757,6 +2318,9 @@ interface DayDetailPaneProps {
   onEditEvent: (event: CalendarEvent) => void;
   onSaveEvent: (input: CalendarEventInput, eventId?: string) => void;
   onDeleteEvent: (eventId: string) => void;
+  dragEndDate?: string | null;
+  onTogglePTO: (startDate: string, endDate: string, currentlyHasPTO: boolean) => void;
+  onSetLocation: (startDate: string, endDate: string, location: string) => void;
 }
 
 const DayDetailPane: React.FC<DayDetailPaneProps> = ({
@@ -1768,7 +2332,35 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
   onEditEvent,
   onSaveEvent,
   onDeleteEvent,
+  dragEndDate,
+  onTogglePTO,
+  onSetLocation,
 }) => {
+  const endDate = dragEndDate || dayData.date;
+  const isRange = endDate !== dayData.date;
+  
+  // Calculate day count
+  const parseDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+  const dayCount = isRange 
+    ? Math.ceil((parseDate(endDate).getTime() - parseDate(dayData.date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : 1;
+  
+  // Check if any day in range has PTO
+  const hasPTO = dayData.events.some(e => e.is_pto);
+  
+  // Check if day/range has location and get it
+  // For multi-day ranges, show existing location if present (user can overwrite)
+  const locationEvent = dayData.events.find(e => e.category === 'location');
+  const [locationInput, setLocationInput] = useState(locationEvent?.title || '');
+  
+  // Update location input when day changes
+  useEffect(() => {
+    setLocationInput(locationEvent?.title || '');
+  }, [locationEvent?.title, dayData.date, endDate]);
+  
   const [formData, setFormData] = useState<CalendarEventInput>({
     title: '',
     category: null,
@@ -1801,12 +2393,15 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
         source_pattern_id: editingEvent.source_pattern_id,
       });
     } else {
+      // Use drag end date if provided, otherwise default to same day
+      const endDate = dragEndDate || dayData.date;
+      
       setFormData({
         title: '',
         category: null,
         notes: null,
         start_date: dayData.date,
-        end_date: dayData.date,
+        end_date: endDate,
         start_time: null,
         end_time: null,
         all_day: true,
@@ -1816,7 +2411,7 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
         source_pattern_id: null,
       });
     }
-  }, [editingEvent, dayData.date]);
+  }, [editingEvent, dayData.date, dragEndDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1824,7 +2419,16 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
     onSaveEvent(formData, editingEvent?.id);
   };
 
-  const dateDisplay = new Date(dayData.date + 'T00:00:00').toLocaleDateString('en-US', {
+  // Generate date display for header
+  const dateDisplay = isRange
+    ? (() => {
+        const start = new Date(dayData.date + 'T00:00:00');
+        const end = new Date(endDate + 'T00:00:00');
+        const startMonth = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const endFormatted = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `${startMonth} - ${endFormatted}`;
+      })()
+    : new Date(dayData.date + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -1834,14 +2438,17 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-4 flex items-center justify-between">
+      <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-4">
+        <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
             {dateDisplay}
           </h3>
+            {!isRange && (
           <p className="text-sm text-neutral-400 mt-1">
-            {dayData.events.length} {dayData.events.length === 1 ? 'event' : 'events'}
+                {dayData.events.filter(e => !e.is_pto && e.category !== 'location').length} {dayData.events.filter(e => !e.is_pto && e.category !== 'location').length === 1 ? 'event' : 'events'}
           </p>
+            )}
         </div>
         <button
           onClick={onClose}
@@ -1849,72 +2456,182 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
         >
           <X className="w-5 h-5" />
         </button>
+        </div>
+        
+        {/* PTO & Location Controls */}
+        <div className="space-y-2">
+          {/* PTO Toggle - Click dot to toggle */}
+          <button
+            onClick={() => onTogglePTO(dayData.date, endDate, hasPTO)}
+            className="w-full flex items-center gap-2 px-3 py-2 bg-neutral-800/50 rounded-lg hover:bg-neutral-800 transition-colors group"
+          >
+            <span 
+              className={cn(
+                'w-5 h-5 rounded-full flex items-center justify-center transition-all',
+                hasPTO 
+                  ? 'bg-yellow-400 shadow-sm' 
+                  : 'bg-neutral-700 group-hover:bg-neutral-600'
+              )}
+            >
+              {hasPTO && (
+                <svg className="w-3 h-3 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </span>
+            <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-300">
+              Out of Office
+            </span>
+          </button>
+          
+          {/* Location Input with clear button */}
+          <div className="relative">
+            <input
+              type="text"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              onBlur={() => {
+                if (locationInput.trim() !== (locationEvent?.title || '')) {
+                  onSetLocation(dayData.date, endDate, locationInput.trim());
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder={isRange ? `📍 Location for ${dayCount} days` : "📍 Location (optional)"}
+              className={cn(
+                "w-full px-3 py-2 bg-neutral-800/50 rounded-lg text-sm text-neutral-300 placeholder:text-neutral-500 border border-transparent hover:border-neutral-700 focus:border-blue-500 focus:bg-neutral-800 focus:outline-none transition-colors",
+                locationInput && "pr-8"
+              )}
+            />
+            {locationInput && (
+              <button
+                onClick={() => {
+                  setLocationInput('');
+                  onSetLocation(dayData.date, endDate, '');
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700 rounded transition-colors"
+                title="Clear location"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Events list (exclude PTO and location - they're in the header) */}
+        {!isCreating && !editingEvent && (
+          <div className="space-y-3">
+            {dayData.events.filter(e => !e.is_pto && e.category !== 'location').map(event => {
+              const style = getCategoryStyle(event.category);
+              const isEditing = editingEvent?.id === event.id;
+              const borderColor = getCategoryBorderColor(event.category);
+
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    'group relative p-3 rounded-lg border-l-2 transition-all',
+                    style.bg,
+                    style.border,
+                    'hover:shadow-lg'
+                  )}
+                  style={{ borderLeftColor: borderColor }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-neutral-100 mb-1 break-words leading-tight">
+                        {event.title}
+                      </h4>
+                      {event.category && (
+                        <span className={cn('inline-block px-2 py-0.5 rounded text-xs font-medium', style.text, style.bg)}>
+                          {event.category}
+                        </span>
+                      )}
+                      {!event.all_day && event.start_time && (
+                        <p className="text-xs text-neutral-400 mt-1">
+                          {event.start_time}
+                          {event.end_time && ` - ${event.end_time}`}
+                        </p>
+                      )}
+                      {event.notes && (
+                        <p className="text-xs text-neutral-400 mt-1 break-words leading-relaxed">
+                          {event.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => onEditEvent(event)}
+                        className="p-1.5 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800 rounded transition-colors"
+                        title="Edit event"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteEvent(event.id)}
+                        className="p-1.5 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded transition-colors"
+                        title="Delete event"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Quick add input - shows when not creating */}
+        {!isCreating && !editingEvent && (
+          <div>
+            <input
+              type="text"
+              placeholder="Add event..."
+              onFocus={() => onCreateEvent()}
+              className={cn(
+                tokens.input.base,
+                tokens.input.focus,
+                'w-full text-sm'
+              )}
+            />
+          </div>
+        )}
+
         {/* Create/Edit form */}
         {(isCreating || editingEvent) && (
           <form onSubmit={handleSubmit} className={cn(tokens.card.base, 'space-y-4')}>
             {/* Section: Basic Info */}
             <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Basic Information</h4>
               <div>
                 <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                  Title *
+                  What's happening? *
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                   className={cn(tokens.input.base, tokens.input.focus, 'text-base')}
-                  placeholder="e.g., Team Meeting, Doctor Appointment"
+                  placeholder="e.g., Dentist, Bahamas, Team Meeting"
                   required
                   autoFocus
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                  Category
-                </label>
-                <select
-                  value={formData.category || ''}
-                onChange={(e) => {
-                  const newCategory = e.target.value || null;
-                  const newPriority = getDefaultPriority(newCategory);
-                  // Only travel affects row appearance by default
-                  const shouldAffectRow = newCategory?.toLowerCase() === 'travel';
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    category: newCategory,
-                    priority: newPriority,
-                    affects_row_appearance: shouldAffectRow
-                  }));
-                }}
-                  className={cn(tokens.select.base, 'text-base')}
-                >
-                  <option value="">Select category...</option>
-                  <option value="vacation">🏖️ Vacation</option>
-                  <option value="holiday">🎉 Holiday</option>
-                  <option value="travel">✈️ Travel</option>
-                  <option value="medical">🏥 Medical</option>
-                  <option value="social">👥 Social</option>
-                  <option value="work">💼 Work</option>
-                  <option value="personal">📌 Personal</option>
-                </select>
-              </div>
             </div>
 
-            {/* Section: Date & Time */}
+            {/* Section: Dates */}
             <div className="space-y-3 pt-4 border-t border-neutral-700">
-              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Date & Time</h4>
-              
               {/* Date Range */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                    Start Date *
+                    Start
                   </label>
                   <input
                     type="date"
@@ -1922,138 +2639,168 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
                     onChange={(e) => setFormData(prev => ({ 
                       ...prev, 
                       start_date: e.target.value,
-                      // Auto-update end_date if it's before start_date
                       end_date: prev.end_date < e.target.value ? e.target.value : prev.end_date
                     }))}
-                    className={cn(tokens.input.base, tokens.input.focus)}
+                    className={cn(tokens.input.base, tokens.input.focus, '[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-200 [&::-webkit-calendar-picker-indicator]:cursor-pointer')}
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                    End Date *
+                    End
                   </label>
                   <input
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
                     min={formData.start_date}
-                    className={cn(tokens.input.base, tokens.input.focus)}
+                    className={cn(tokens.input.base, tokens.input.focus, '[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-200 [&::-webkit-calendar-picker-indicator]:cursor-pointer')}
                     required
                   />
                 </div>
               </div>
-
-              {/* All-Day Toggle */}
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.all_day}
-                    onChange={(e) => setFormData(prev => ({ ...prev, all_day: e.target.checked }))}
-                    className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <span>All-day event</span>
-                </label>
-
-                {/* PTO Toggle */}
-                <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_pto}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_pto: e.target.checked }))}
-                    className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-yellow-500 focus:ring-2 focus:ring-yellow-500"
-                  />
-                  <span className="flex items-center gap-1">
-                    PTO
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  </span>
-                </label>
-              </div>
             </div>
 
-            {/* Time inputs (only if not all-day) */}
-            {!formData.all_day && (
-              <div className="space-y-3 pt-3 border-t border-neutral-700/50">
+            {/* Optional Details */}
+            <div className="pt-4 space-y-4 border-t border-neutral-700">
+                {/* Time */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                      Start Time
+                      Start Time <span className="text-neutral-500 font-normal">(optional)</span>
                     </label>
-                    <input
-                      type="time"
+                    <select
                       value={formData.start_time || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value || null }))}
-                      className={cn(tokens.input.base, tokens.input.focus)}
-                    />
+                      onChange={(e) => {
+                        const hasTime = e.target.value || formData.end_time;
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          start_time: e.target.value || null,
+                          all_day: !hasTime
+                        }));
+                      }}
+                      className={cn(tokens.select.base, 'text-sm')}
+                    >
+                      <option value="">--</option>
+                      <option value="06:00">6:00 AM</option>
+                      <option value="07:00">7:00 AM</option>
+                      <option value="08:00">8:00 AM</option>
+                      <option value="09:00">9:00 AM</option>
+                      <option value="10:00">10:00 AM</option>
+                      <option value="11:00">11:00 AM</option>
+                      <option value="12:00">12:00 PM</option>
+                      <option value="13:00">1:00 PM</option>
+                      <option value="14:00">2:00 PM</option>
+                      <option value="15:00">3:00 PM</option>
+                      <option value="16:00">4:00 PM</option>
+                      <option value="17:00">5:00 PM</option>
+                      <option value="18:00">6:00 PM</option>
+                      <option value="19:00">7:00 PM</option>
+                      <option value="20:00">8:00 PM</option>
+                      <option value="21:00">9:00 PM</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                      End Time
+                      End Time <span className="text-neutral-500 font-normal">(optional)</span>
                     </label>
-                    <input
-                      type="time"
+                    <select
                       value={formData.end_time || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value || null }))}
-                      className={cn(tokens.input.base, tokens.input.focus)}
-                    />
+                      onChange={(e) => {
+                        const hasTime = formData.start_time || e.target.value;
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          end_time: e.target.value || null,
+                          all_day: !hasTime
+                        }));
+                      }}
+                      className={cn(tokens.select.base, 'text-sm')}
+                    >
+                      <option value="">--</option>
+                      <option value="06:00">6:00 AM</option>
+                      <option value="07:00">7:00 AM</option>
+                      <option value="08:00">8:00 AM</option>
+                      <option value="09:00">9:00 AM</option>
+                      <option value="10:00">10:00 AM</option>
+                      <option value="11:00">11:00 AM</option>
+                      <option value="12:00">12:00 PM</option>
+                      <option value="13:00">1:00 PM</option>
+                      <option value="14:00">2:00 PM</option>
+                      <option value="15:00">3:00 PM</option>
+                      <option value="16:00">4:00 PM</option>
+                      <option value="17:00">5:00 PM</option>
+                      <option value="18:00">6:00 PM</option>
+                      <option value="19:00">7:00 PM</option>
+                      <option value="20:00">8:00 PM</option>
+                      <option value="21:00">9:00 PM</option>
+                    </select>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Section: Display Options */}
-            <div className="space-y-3 pt-4 border-t border-neutral-700">
-              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Display Options</h4>
-              
-              <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer hover:text-neutral-100 transition-colors">
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Category (optional)
+                  </label>
+                  <select
+                    value={formData.category || ''}
+                    onChange={(e) => {
+                      const newCategory = e.target.value || null;
+                      const newPriority = getDefaultPriority(newCategory);
+                      const shouldAffectRow = newCategory?.toLowerCase() === 'travel';
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        category: newCategory,
+                        priority: newPriority,
+                        affects_row_appearance: shouldAffectRow
+                      }));
+                    }}
+                    className={cn(tokens.select.base, 'text-sm')}
+                  >
+                    <option value="">None</option>
+                    <option value="vacation">🏖️ Vacation</option>
+                    <option value="holiday">🎉 Holiday</option>
+                    <option value="travel">✈️ Travel</option>
+                    <option value="medical">🏥 Medical</option>
+                    <option value="social">👥 Social</option>
+                    <option value="work">💼 Work</option>
+                    <option value="personal">📌 Personal</option>
+                  </select>
+              </div>
+
+                {/* Row appearance */}
+                {formData.category === 'travel' && (
+                  <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.affects_row_appearance}
                   onChange={(e) => setFormData(prev => ({ ...prev, affects_row_appearance: e.target.checked }))}
-                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-500"
                 />
-                <span>Change calendar row color</span>
+                    <span>Highlight days with teal background</span>
               </label>
+                )}
 
-              {formData.affects_row_appearance && (
-                <div className="pl-6 space-y-2">
-                  <label className="block text-sm font-medium text-neutral-300">
-                    Priority: <span className="text-emerald-400 font-semibold">{formData.priority}</span>
-                    <span className="text-xs text-neutral-500 ml-2">(Higher priority wins color conflicts)</span>
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Notes <span className="text-neutral-500 font-normal">(optional)</span>
                   </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={formData.priority}
-                    onChange={(e) => setFormData(prev => ({ ...prev, priority: Number(e.target.value) }))}
-                    className="w-full accent-emerald-500"
-                  />
-                  <div className="flex justify-between text-xs text-neutral-500">
-                    <span>Low (1)</span>
-                    <span>High (10)</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Section: Notes */}
-            <div className="space-y-3 pt-4 border-t border-neutral-700">
-              <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Notes</h4>
               <textarea
                 value={formData.notes || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value || null }))}
-                className={cn(tokens.input.base, tokens.input.focus, 'min-h-[100px] resize-y')}
-                placeholder="Add any additional details, reminders, or context..."
+                    className={cn(tokens.input.base, tokens.input.focus, 'min-h-[80px] resize-y text-sm')}
+                    placeholder="Add any details..."
               />
             </div>
+            </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - only show when title is entered */}
+            {formData.title.trim() && (
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                className={cn(tokens.button.primary, 'flex-1 py-3 font-semibold')}
+                  className={cn(tokens.button.primary, 'flex-1 py-3 font-semibold rounded-xl')}
               >
                 {editingEvent ? '✓ Update Event' : '+ Create Event'}
               </button>
@@ -2063,115 +2810,14 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
                   onEditEvent(null as any);
                   onClose();
                 }}
-                className={cn(tokens.button.secondary, 'px-6 py-3')}
+                  className={cn(tokens.button.secondary, 'px-6 py-3 rounded-xl')}
               >
                 Cancel
               </button>
             </div>
+            )}
           </form>
         )}
-
-        {/* Add event button (when not creating/editing) */}
-        {!isCreating && !editingEvent && (
-          <button
-            onClick={onCreateEvent}
-            className={cn(tokens.button.primary, 'w-full')}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Event
-          </button>
-        )}
-
-        {/* Events list */}
-        <div className="space-y-3">
-          {dayData.events.map(event => {
-            const style = getCategoryStyle(event.category);
-            const isEditing = editingEvent?.id === event.id;
-            
-            if (isEditing) return null; // Hide when editing
-            
-            return (
-              <div
-                key={event.id}
-                className={cn(
-                  'p-4 rounded-lg border',
-                  style.bg,
-                  style.border
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <h4 className={cn('font-semibold', style.text)}>
-                      {event.title}
-                    </h4>
-                    
-                    <div className="space-y-1 mt-2">
-                      {/* Date range display */}
-                      {event.start_date !== event.end_date ? (
-                        <p className="text-xs text-neutral-400">
-                          {new Date(event.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 
-                          {' → '}
-                          {new Date(event.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      ) : !event.all_day && event.start_time && (
-                        <p className="text-xs text-neutral-400">
-                          {event.start_time.slice(0, 5)}
-                          {event.end_time && ` - ${event.end_time.slice(0, 5)}`}
-                        </p>
-                      )}
-                      
-                      {/* Category & PTO indicator */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {event.category && (
-                          <p className="text-xs text-neutral-400">
-                            {event.category}
-                            {event.affects_row_appearance && ` • Priority ${event.priority}`}
-                          </p>
-                        )}
-                        {event.is_pto && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-yellow-950/40 border border-yellow-700/50 rounded text-xs text-yellow-300">
-                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                            PTO
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Notes */}
-                    {event.notes && (
-                      <p className="text-sm text-neutral-300 mt-2">
-                        {event.notes}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => onEditEvent(event)}
-                      className={cn(tokens.button.ghost, 'p-2')}
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteEvent(event.id)}
-                      className={cn(tokens.button.ghost, 'p-2 text-rose-400 hover:text-rose-300')}
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {dayData.events.length === 0 && !isCreating && (
-            <div className="text-center py-8 text-neutral-400">
-              <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>No events on this day</p>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

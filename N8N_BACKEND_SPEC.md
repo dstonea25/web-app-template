@@ -443,17 +443,21 @@ If generation fails:
 ✅ Frontend UI (NL inputs, manual forms, event display)
 ✅ Row coloring, PTO tracking, multi-day events
 
+**What's Done:**
+✅ Database schema (multi-day, PTO, patterns, unique constraints)
+✅ Frontend API methods (with authentication)
+✅ NL inputs wired up (top header + sticky month dropdown)
+✅ Pattern generation cron workflow (runs daily at 2 AM)
+✅ Event display (colored dots, pills, row coloring)
+
 **What Needs n8n/LLM:**
-⏸️ NL text → structured event JSON (webhook)
-⏸️ Pattern → event generation (cron + webhook)
-⏸️ Duplicate detection logic
+⏸️ NL text → structured event JSON (webhook) - **Only thing left!**
 
 **Next Steps:**
-1. Build `/webhook/calendar-nl-parse` endpoint in n8n
+1. Build `/webhook/calendar-nl-parse` endpoint in n8n (see `CALENDAR_WEBHOOK_SETUP.md`)
 2. Connect to OpenAI/Claude for parsing
-3. Wire up frontend NL inputs to call webhook
-4. Test with real examples
-5. Add pattern generation cron (Phase 2)
+3. Test with "Meeting tomorrow at 3pm" in calendar UI
 
-The frontend is **100% ready** - just needs the backend webhooks! 🚀
+The frontend is **100% ready** and the pattern generator is **running daily**! 🚀  
+Just build the NL parser webhook and you're done!
 
