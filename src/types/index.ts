@@ -138,7 +138,7 @@ export interface HabitWeeklyAchievement {
 
 // Authentication types
 export interface AuthCredentials {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -146,7 +146,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: AuthCredentials) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void> | void;
 }
 
 // Personal OKRs

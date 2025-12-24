@@ -38,7 +38,6 @@ function ProgressBar({ value, flash, color }: { value: number; flash?: boolean; 
 }
 
 function OKRSettingsModal({ okr, pillar, onClose, onUpdateDirection, onUpdateBaseline, onUpdateDataSource }: { okr: Okr | null; pillar: OkrPillar; onClose: () => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; }) {
-  const accent = PILLAR_COLORS[pillar]?.base || '#5EEAD4';
   const [habits, setHabits] = useState<Array<{ id: string; name: string }>>([]);
   
   useEffect(() => {
@@ -302,7 +301,7 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
   );
 }
 
-function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; }) {
+function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateBaseline }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; }) {
   const [localValue, setLocalValue] = useState<number | boolean | ''>(() => {
     if (kr.kind === 'boolean') return Boolean(kr.current_value);
     if (kr.kind === 'percent') return Number(kr.current_value || 0);
@@ -372,7 +371,6 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
     return Math.max(0, Math.round((currentNum / targetNumLive) * 100));
   };
   const progress = calcProgress();
-  const targetNum = Number(kr.target_value || 0);
 
   return (
     <div className={cn(

@@ -9,9 +9,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check initial authentication state
-    setIsAuthenticated(authService.getAuthState());
-    setIsLoading(false);
+    // Initialize auth service and check session
+    const initAuth = async () => {
+      await authService.initialize();
+      setIsAuthenticated(authService.getAuthState());
+      setIsLoading(false);
+    };
+
+    initAuth();
 
     // Subscribe to authentication state changes
     const unsubscribe = authService.subscribe(() => {
@@ -31,8 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    authService.logout();
+  const logout = async () => {
+    await authService.logout();
   };
 
   const value: AuthContextType = {

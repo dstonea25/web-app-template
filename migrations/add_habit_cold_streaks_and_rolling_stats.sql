@@ -283,3 +283,4 @@ FROM habit_streaks hs
 JOIN habits h ON h.id = hs.habit_id
 ORDER BY h.name;
 
+

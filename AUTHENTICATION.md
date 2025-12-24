@@ -1,61 +1,94 @@
 # Authentication Setup
 
-This dashboard includes basic password protection using environment variables for credentials.
+This dashboard uses **Supabase Authentication** for secure user login.
+
+## How It Works
+
+Authentication is handled by Supabase Auth:
+- User credentials are stored securely in Supabase
+- Login creates a JWT session token
+- Row Level Security (RLS) protects all database tables
+- Only authenticated users can access data
 
 ## Environment Variables
 
-The authentication system uses the following environment variables:
+The following Supabase environment variables are required:
 
-- `VITE_AUTH_USERNAME` - Username for login
-- `VITE_AUTH_PASSWORD` - Password for login
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anon/public key
 
-## Setting Custom Credentials
-
-### Option 1: Environment Variables
-
-Set the environment variables before running the application:
+### .env File Example
 
 ```bash
-export VITE_AUTH_USERNAME="your_username"
-export VITE_AUTH_PASSWORD="your_secure_password"
-./start-production.sh
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### Option 2: .env File
+## Managing Users
 
-Create a `.env` file in the project root:
+### Creating a New User
 
-```bash
-VITE_AUTH_USERNAME=your_username
-VITE_AUTH_PASSWORD=your_secure_password
+Users are created in the Supabase Dashboard:
+
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+2. Navigate to **Authentication** → **Users**
+3. Click **Add User** → **Create new user**
+4. Enter email and password
+5. The user can now log in to the dashboard
+
+### Resetting a Password
+
+1. Go to Supabase Dashboard → **Authentication** → **Users**
+2. Find the user and click the three-dot menu
+3. Select **Send password recovery**
+
+Or use the Supabase client:
+```javascript
+await supabase.auth.resetPasswordForEmail('user@example.com')
 ```
 
-### Option 3: Docker Environment
+## Security Features
 
-Pass environment variables to Docker:
+- ✅ **Supabase Auth** - Industry-standard authentication
+- ✅ **Row Level Security (RLS)** - Database-level protection
+- ✅ **JWT tokens** - Secure session management
+- ✅ **Session persistence** - Stays logged in across browser sessions
+- ✅ **Auto token refresh** - Sessions don't expire unexpectedly
 
-```bash
-VITE_AUTH_USERNAME=your_username VITE_AUTH_PASSWORD=your_secure_password docker-compose up --build -d
+## Row Level Security
+
+All tables have RLS enabled with policies that only allow authenticated users:
+
+```sql
+-- Example policy on all tables
+CREATE POLICY "authenticated_all" ON public.your_table
+  FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 ```
 
-## Security Notes
-
-- **Change default credentials** in production
-- **Use strong passwords** (12+ characters, mixed case, numbers, symbols)
-- **Environment variables** are embedded in the build, so use secure deployment practices
-- **Consider HTTPS** for production deployments
-- **Session persistence** uses localStorage (clears on browser data clear)
-
-## Features
-
-- ✅ **Themed login form** matching app design
-- ✅ **Environment variable configuration**
-- ✅ **Session persistence** (remembers login)
-- ✅ **Logout functionality** (desktop & mobile)
-- ✅ **Loading states** and error handling
-- ✅ **Password visibility toggle**
-- ✅ **Responsive design**
+This means:
+- Anonymous users (not logged in) cannot access any data
+- Authenticated users have full access to all data
+- Backend services using the Service Role key bypass RLS
 
 ## Development
 
-For development, you can temporarily disable authentication by commenting out the `ProtectedRoute` wrapper in `src/App.tsx`.
+For local development:
+
+1. Ensure your `.env` file has the Supabase credentials
+2. Run `npm run dev`
+3. Log in with your Supabase user credentials
+
+## Troubleshooting
+
+### "Invalid login credentials"
+- Verify the email/password in Supabase Dashboard
+- Check that the user's email is confirmed
+
+### "Database error querying schema"
+- This usually means the user record is incomplete
+- Try creating a fresh user in the Supabase Dashboard
+
+### Data not loading after login
+- Check that RLS policies exist on your tables
+- Verify the user has the `authenticated` role

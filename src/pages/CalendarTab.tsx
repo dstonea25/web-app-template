@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useTransition, useDeferredValue, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useTransition, useCallback } from 'react';
 import { tokens, cn } from '../theme/config';
 import { Calendar, X, Plus, Edit2, Trash2, Settings, ChevronRight, ChevronDown, Sparkles, BarChart3 } from 'lucide-react';
 import { apiClient } from '../lib/api';
@@ -156,7 +156,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [renderedDays, setRenderedDays] = useState<DayData[]>([]); // Progressive rendering
-  const [isLoadingPast, setIsLoadingPast] = useState(false);
   
   // Quick add input state
   const [nlInput, setNlInput] = useState('');
@@ -256,7 +255,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const todayRef = useRef<HTMLButtonElement>(null);
   const topRef = useRef<HTMLDivElement>(null); // Ref for scrolling to top
   const monthIndexTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For auto-hide
-  const hasInitiallyRendered = useRef(false);
   const hasLoadedPast = useRef(false);
   const nlPanelRef = useRef<HTMLDivElement>(null);
   const nlInputRef = useRef<HTMLInputElement>(null);
@@ -644,8 +642,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       if (overlappingLocationEvents.length > 0) {
         for (const event of overlappingLocationEvents) {
           // Calculate which days to remove from this event
-          const eventStart = new Date(event.start_date + 'T00:00:00');
-          const eventEnd = new Date(event.end_date + 'T00:00:00');
           const rangeStart = new Date(startDate + 'T00:00:00');
           const rangeEnd = new Date(endDate + 'T00:00:00');
 
@@ -980,18 +976,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     setEditingEvent(null);
     
     // Show undo toast
-    const undoToast = toast.success(
-      <div className="flex items-center justify-between gap-4">
-        <span>Event deleted</span>
-        <button
-          onClick={() => handleUndoDelete()}
-          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-medium transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      { duration: 8000 }  // 8 second window to undo
-    );
+    toast.success('Event deleted', {
+      ttlMs: 8000,
+      actionLabel: 'Undo',
+      onAction: handleUndoDelete
+    });
     
     // Set timeout to actually delete from DB after 8 seconds
     const timeoutId = setTimeout(async () => {
@@ -1098,7 +1087,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       
       // Find the scrollable parent container
       let container: HTMLElement | null = null;
-      let element = scrollContainerRef.current;
+      let element: HTMLElement | null = scrollContainerRef.current;
       
       while (element) {
         const styles = window.getComputedStyle(element);
@@ -1193,20 +1182,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     }
   };
 
-  // Handle opening NL input from month header
-  const handleOpenNlFromMonthHeader = () => {
-    // On mobile, open bottom sheet
-    if (window.innerWidth < 768) {
-      setShowNlSheet(true);
-    } else {
-      // On desktop, open panel and focus input WITHOUT scrolling
-      setShowNlPanel(true);
-      setTimeout(() => {
-        nlInputRef.current?.focus({ preventScroll: true });
-      }, 100);
-    }
-  };
-
   // Unified scroll detection for both scroll-to-top button and month index
   useEffect(() => {
     if (!isVisible) return;
@@ -1219,7 +1194,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     
     // Find scrollable container by traversing up (same as handleScrollToTop)
     let container: HTMLElement | null = null;
-    let element = scrollContainerRef.current;
+    let element: HTMLElement | null = scrollContainerRef.current;
     
     while (element) {
       const styles = window.getComputedStyle(element);
@@ -1280,7 +1255,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     let scrollContainer: HTMLElement | null = null;
     
     // Start from our component and go up to find the overflow-y-auto div
-    let element = scrollContainerRef.current;
+    let element: HTMLElement | null = scrollContainerRef.current;
     while (element) {
       const styles = window.getComputedStyle(element);
       if (styles.overflowY === 'auto' || styles.overflowY === 'scroll') {
@@ -1830,9 +1805,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
 
                     {/* Desktop: Grid layout (>= md) */}
                     <div className="hidden md:grid grid-cols-8 gap-2" style={{ gridAutoRows: '1fr', containIntrinsicSize: 'auto 150px' }}>
-                      {group.days.map((day, dayIndex) => {
+                      {group.days.map((day) => {
                       const isSelected = selectedDate === day.date;
-                      const hasEvents = day.events.filter(e => !e.is_pto && e.category !== 'location').length > 0; // Exclude PTO and location from event count
                       const isToday = day.date === today;
                       const rowAppearance = getRowAppearance(day);
                       const isInDragRange = selectedRange.includes(day.date);
@@ -2529,7 +2503,6 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
           <div className="space-y-3">
             {dayData.events.filter(e => !e.is_pto && e.category !== 'location').map(event => {
               const style = getCategoryStyle(event.category);
-              const isEditing = editingEvent?.id === event.id;
               const borderColor = getCategoryBorderColor(event.category);
 
               return (

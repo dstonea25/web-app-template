@@ -334,14 +334,12 @@ export const HabitWeeklyAchievementGrid: React.FC<HabitWeeklyAchievementGridProp
                         const achievement = habitAchievements?.get(weekNum);
                         const isCurrentWeek = weekNum === currentWeekNumber;
                         const goalMet = achievement && achievement.goal_at_week !== null && achievement.goal_met;
-                        const hasGoal = achievement && achievement.goal_at_week !== null;
                         
                         const size = 24; // hexagon size
                         const cx = size / 2;
                         const cy = size / 2;
                         
                         const isPastWeek = weekNum < currentWeekNumber;
-                        const isFutureWeek = weekNum > currentWeekNumber;
                         
                         const offStroke = '#6b7280'; // neutral-500 (no goal or not met)
                         const activeStroke = color.base;

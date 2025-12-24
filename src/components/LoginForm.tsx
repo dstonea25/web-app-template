@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { tokens, theme } from '../theme/config';
 
 export function LoginForm() {
   const { login, isLoading } = useAuth();
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
@@ -13,18 +13,18 @@ export function LoginForm() {
     e.preventDefault();
     setError('');
     
-    if (!credentials.username || !credentials.password) {
-      setError('Please enter both username and password');
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password');
       return;
     }
 
     const success = await login(credentials);
     if (!success) {
-      setError('Invalid username or password');
+      setError('Invalid email or password');
     }
   };
 
-  const handleInputChange = (field: 'username' | 'password') => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (field: 'email' | 'password') => (e: React.ChangeEvent<HTMLInputElement>) => {
     setCredentials(prev => ({ ...prev, [field]: e.target.value }));
     if (error) setError(''); // Clear error when user starts typing
   };
@@ -48,24 +48,24 @@ export function LoginForm() {
         {/* Login Form */}
         <div className={`${tokens.card.base} ${theme.layout.shadow.elevated}`}>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
+            {/* Email Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-neutral-200 mb-2">
-                Username
+              <label htmlFor="email" className="block text-sm font-medium text-neutral-200 mb-2">
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="w-4 h-4 text-neutral-400" />
+                  <Mail className="w-4 h-4 text-neutral-400" />
                 </div>
                 <input
-                  id="username"
-                  type="text"
-                  value={credentials.username}
-                  onChange={handleInputChange('username')}
+                  id="email"
+                  type="email"
+                  value={credentials.email}
+                  onChange={handleInputChange('email')}
                   className={`${tokens.input.base} ${tokens.input.focus} pl-10`}
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -114,9 +114,9 @@ export function LoginForm() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !credentials.username || !credentials.password}
+              disabled={isLoading || !credentials.email || !credentials.password}
               className={`${tokens.button.base} ${tokens.button.primary} w-full ${
-                isLoading || !credentials.username || !credentials.password
+                isLoading || !credentials.email || !credentials.password
                   ? 'opacity-50 cursor-not-allowed'
                   : ''
               }`}

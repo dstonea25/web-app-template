@@ -16,7 +16,7 @@ interface KRDraft {
   target_value: number;
   direction: 'up' | 'down';
   baseline_value: number | null;
-  data_source: 'manual' | 'habit';
+  data_source: 'manual' | 'habit' | 'metric';
   linked_habit_id: string | null;
   auto_sync: boolean;
 }

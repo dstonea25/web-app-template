@@ -1,20 +1,23 @@
 import type { AuthCredentials } from '../types';
+import { supabase } from './supabase';
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
-// Environment variables for credentials
-const AUTH_USERNAME = import.meta.env.VITE_AUTH_USERNAME || 'admin';
-const AUTH_PASSWORD = import.meta.env.VITE_AUTH_PASSWORD || 'password123';
-
-// Storage key for authentication state
-const AUTH_STORAGE_KEY = 'dashboard_auth_token';
+// Storage key for backwards compatibility cleanup
+const LEGACY_AUTH_STORAGE_KEY = 'dashboard_auth_token';
 
 export class AuthService {
   private static instance: AuthService;
-  private isAuthenticated = false;
+  private currentUser: User | null = null;
   private listeners: Array<() => void> = [];
+  private initialized = false;
 
   private constructor() {
-    // Check if user is already authenticated on initialization
-    this.isAuthenticated = this.checkStoredAuth();
+    // Clean up legacy auth token if present
+    try {
+      localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+    } catch {
+      // Ignore localStorage errors
+    }
   }
 
   static getInstance(): AuthService {
@@ -24,13 +27,20 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  private checkStoredAuth(): boolean {
-    try {
-      const token = localStorage.getItem(AUTH_STORAGE_KEY);
-      return token === 'authenticated';
-    } catch {
-      return false;
-    }
+  async initialize(): Promise<void> {
+    if (this.initialized || !supabase) return;
+
+    // Get initial session
+    const { data: { session } } = await supabase.auth.getSession();
+    this.currentUser = session?.user ?? null;
+
+    // Listen for auth state changes
+    supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      this.currentUser = session?.user ?? null;
+      this.notifyListeners();
+    });
+
+    this.initialized = true;
   }
 
   private notifyListeners(): void {
@@ -45,27 +55,40 @@ export class AuthService {
   }
 
   async login(credentials: AuthCredentials): Promise<boolean> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (credentials.username === AUTH_USERNAME && credentials.password === AUTH_PASSWORD) {
-      this.isAuthenticated = true;
-      localStorage.setItem(AUTH_STORAGE_KEY, 'authenticated');
-      this.notifyListeners();
-      return true;
+    if (!supabase) {
+      console.error('Supabase not configured');
+      return false;
     }
-    
-    return false;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: credentials.email,
+      password: credentials.password,
+    });
+
+    if (error) {
+      console.error('Login error:', error.message);
+      return false;
+    }
+
+    this.currentUser = data.user;
+    this.notifyListeners();
+    return true;
   }
 
-  logout(): void {
-    this.isAuthenticated = false;
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+  async logout(): Promise<void> {
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    this.currentUser = null;
     this.notifyListeners();
   }
 
   getAuthState(): boolean {
-    return this.isAuthenticated;
+    return this.currentUser !== null;
+  }
+
+  getUser(): User | null {
+    return this.currentUser;
   }
 }
 

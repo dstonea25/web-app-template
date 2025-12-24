@@ -676,7 +676,7 @@ export class ApiClient {
     }
     
     // Transform to match HabitYearlyStats interface
-    return (data || []).map(row => ({
+    return (data || []).map((row: { id: string; habit_id: string; longest_streak: number | null; longest_cold_streak: number | null; current_streak: number | null; last_completed_date: string | null; weekly_goal: number | null; updated_at: string }) => ({
       id: row.id,
       habit_id: row.habit_id,
       year: year, // Current year

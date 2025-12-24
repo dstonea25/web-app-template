@@ -7,8 +7,6 @@ echo "🧪 Testing Docker deployment configuration..."
 if [ ! -f .env ]; then
     echo "❌ .env file not found. Please create one with:"
     echo "   GITHUB_REPO=your-username/your-repo-name"
-    echo "   VITE_AUTH_USERNAME=admin"
-    echo "   VITE_AUTH_PASSWORD=your_password"
     echo "   VITE_SUPABASE_URL=https://xyzcompany.supabase.co"
     echo "   VITE_SUPABASE_ANON_KEY=ey..."
     exit 1
@@ -37,16 +35,6 @@ if [ -z "$GITHUB_REPO" ]; then
     exit 1
 fi
 
-if [ -z "$VITE_AUTH_USERNAME" ]; then
-    echo "❌ VITE_AUTH_USERNAME not set in .env file"
-    exit 1
-fi
-
-if [ -z "$VITE_AUTH_PASSWORD" ]; then
-    echo "❌ VITE_AUTH_PASSWORD not set in .env file"
-    exit 1
-fi
-
 if [ -z "$VITE_SUPABASE_URL" ]; then
     echo "❌ VITE_SUPABASE_URL not set in .env file"
     exit 1
@@ -59,8 +47,6 @@ fi
 
 echo "✅ Configuration looks good!"
 echo "   Repository: $GITHUB_REPO"
-echo "   Username: $VITE_AUTH_USERNAME"
-echo "   Password: [HIDDEN]"
 echo "   Supabase URL: $VITE_SUPABASE_URL"
 echo "   Supabase Anon Key: [HIDDEN]"
 echo "   SSH Key: $(ls -la .ssh/id_ed25519 | awk '{print $1}')"

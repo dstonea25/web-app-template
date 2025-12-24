@@ -23,19 +23,7 @@ if [ -z "$GITHUB_REPO" ]; then
     exit 1
 fi
 
-if [ -z "$VITE_AUTH_USERNAME" ]; then
-    echo "❌ Error: VITE_AUTH_USERNAME environment variable is required"
-    echo "   Set it in your .env file"
-    exit 1
-fi
-
-if [ -z "$VITE_AUTH_PASSWORD" ]; then
-    echo "❌ Error: VITE_AUTH_PASSWORD environment variable is required"
-    echo "   Set it in your .env file"
-    exit 1
-fi
-
-# Supabase envs are required for Habit tab
+# Supabase envs are required
 if [ -z "$VITE_SUPABASE_URL" ]; then
     echo "❌ Error: VITE_SUPABASE_URL environment variable is required for Supabase"
     echo "   Set it in your .env file"
