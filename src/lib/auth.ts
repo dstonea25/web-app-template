@@ -35,7 +35,7 @@ export class AuthService {
     this.currentUser = session?.user ?? null;
 
     // Listen for auth state changes
-    supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       this.currentUser = session?.user ?? null;
       this.notifyListeners();
     });
