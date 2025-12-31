@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Okr, OkrKeyResult, OkrPillar } from '../../types';
 import { tokens, cn } from '../../theme/config';
-import { fetchOkrsWithProgress, fetchOkrById, updateKeyResultValue, updateObjective, updateKrDescription, updateKrTarget, updateKrBaseline, updateKrDirection, updateKrDataSource, syncHabitToKR, normalizeKrProgress } from '../../lib/okrs';
+import { fetchOkrsWithProgress, fetchOkrById, updateKeyResultValue, updateObjective, updateKrDescription, updateKrTarget, updateKrBaseline, updateKrDirection, updateKrDataSource, syncHabitToKR, normalizeKrProgress, puntKeyResult } from '../../lib/okrs';
 import toast from '../../lib/notifications/toast';
-import { Pencil, TrendingUp, TrendingDown, Settings } from 'lucide-react';
+import { Pencil, TrendingUp, TrendingDown, Settings, PauseCircle, PlayCircle } from 'lucide-react';
 
 interface OKRModuleProps {
   isVisible?: boolean;
@@ -210,7 +210,7 @@ function OKRSettingsModal({ okr, pillar, onClose, onUpdateDirection, onUpdateBas
   );
 }
 
-function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline, onUpdateDataSource, onRefresh }: { pillar: OkrPillar; okr: Okr | null; onUpdateKr: (kr: OkrKeyResult, value: number | boolean) => Promise<void>; onUpdateObjective: (okrId: string, value: string) => void; onUpdateDesc: (kr: OkrKeyResult, value: string) => void; onUpdateTarget: (kr: OkrKeyResult, value: number) => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; onRefresh: () => Promise<void>; }) {
+function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline, onUpdateDataSource, onRefresh, onPunt }: { pillar: OkrPillar; okr: Okr | null; onUpdateKr: (kr: OkrKeyResult, value: number | boolean) => Promise<void>; onUpdateObjective: (okrId: string, value: string) => void; onUpdateDesc: (kr: OkrKeyResult, value: string) => void; onUpdateTarget: (kr: OkrKeyResult, value: number) => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; onRefresh: () => Promise<void>; onPunt: (kr: OkrKeyResult, punted: boolean) => void; }) {
   const accent = PILLAR_COLORS[pillar]?.base || '#5EEAD4';
   const [editingObjective, setEditingObjective] = useState(false);
   const [objectiveDraft, setObjectiveDraft] = useState<string>(okr?.objective || '');
@@ -288,7 +288,7 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
       </div>
       <div className="mt-2.5 space-y-3">
         {(okr?.key_results || []).map((kr) => (
-          <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} />
+          <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} onPunt={onPunt} />
         ))}
         {(!okr || !okr.key_results || okr.key_results.length === 0) && (
           <div className="py-3 text-sm text-neutral-400">No key results.</div>
@@ -301,7 +301,8 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
   );
 }
 
-function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateBaseline }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; }) {
+function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateBaseline, onPunt }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; onPunt?: (kr: OkrKeyResult, punted: boolean) => void; }) {
+  const [isPunting, setIsPunting] = useState(false);
   const [localValue, setLocalValue] = useState<number | boolean | ''>(() => {
     if (kr.kind === 'boolean') return Boolean(kr.current_value);
     if (kr.kind === 'percent') return Number(kr.current_value || 0);
@@ -372,14 +373,66 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
   };
   const progress = calcProgress();
 
+  const isPunted = kr.punted === true;
+  const isCompleted = progress >= 100;
+
+  const handlePunt = async () => {
+    if (!onPunt || isCompleted) return;
+    setIsPunting(true);
+    try {
+      onPunt(kr, !isPunted);
+    } finally {
+      setIsPunting(false);
+    }
+  };
+
   return (
     <div className={cn(
-      "p-3 rounded-xl border border-neutral-800 bg-neutral-900/30",
+      "p-3 rounded-xl border bg-neutral-900/30",
       "sm:min-h-[104px] sm:flex sm:flex-col sm:justify-between",
       "transition-all duration-200",
-      "hover:bg-neutral-800/40 hover:border-neutral-700 hover:shadow-md",
-      "overflow-visible"
+      "overflow-visible relative group",
+      isCompleted
+        ? "border-emerald-800/50"
+        : isPunted 
+          ? "border-neutral-800/50 opacity-60" 
+          : "border-neutral-800 hover:bg-neutral-800/40 hover:border-neutral-700 hover:shadow-md"
     )}>
+      {/* Punt button - shows on hover, only for non-completed KRs */}
+      {onPunt && !isCompleted && (
+        <button
+          onClick={handlePunt}
+          disabled={isPunting}
+          className={cn(
+            "absolute -right-2 -top-2 p-1 rounded-full transition-all z-10",
+            "opacity-0 group-hover:opacity-100",
+            isPunted
+              ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+              : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30",
+            isPunting && "animate-pulse"
+          )}
+          title={isPunted ? "Resume this KR" : "Punt this KR (deprioritize)"}
+        >
+          {isPunted ? (
+            <PlayCircle className="w-4 h-4" />
+          ) : (
+            <PauseCircle className="w-4 h-4" />
+          )}
+        </button>
+      )}
+
+      {/* Status badge - Completed or Punted */}
+      {isCompleted && (
+        <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-medium rounded uppercase tracking-wide">
+          ✓ Completed
+        </div>
+      )}
+      {isPunted && !isCompleted && (
+        <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-medium rounded uppercase tracking-wide">
+          Punted
+        </div>
+      )}
+
       {/* Line 1: KR title (click-to-edit) */}
       {editingDesc ? (
         <textarea
@@ -394,7 +447,14 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
         />
       ) : (
         <div className="flex items-center gap-2">
-          <div className="text-neutral-100 font-medium line-clamp-2 leading-[1.3] cursor-text pb-2 flex-1" onClick={() => setEditingDesc(true)} title="Click to edit">
+          <div 
+            className={cn(
+              "font-medium line-clamp-2 leading-[1.3] cursor-text pb-2 flex-1",
+              isPunted ? "text-neutral-400 line-through decoration-neutral-600" : "text-neutral-100"
+            )} 
+            onClick={() => !isPunted && setEditingDesc(true)} 
+            title={isPunted ? "Resume KR to edit" : "Click to edit"}
+          >
             {kr.description}
           </div>
           {kr.data_source === 'habit' && kr.linked_habit_id && (
@@ -852,6 +912,28 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
     }
   };
 
+  const handlePunt = async (kr: OkrKeyResult, punted: boolean) => {
+    // Optimistic update
+    setOkrs(prevOkrs => prevOkrs.map(o => (
+      o.key_results?.some(k => k.id === kr.id)
+        ? { ...o, key_results: (o.key_results || []).map(k => k.id === kr.id ? { ...k, punted, punted_at: punted ? new Date().toISOString() : null } : k) }
+        : o
+    )));
+    
+    try {
+      await puntKeyResult(kr.id, punted);
+      toast.info(punted ? 'KR punted - excluded from challenges' : 'KR resumed', { ttlMs: 2000 });
+    } catch (e: any) {
+      // Revert on error
+      setOkrs(prevOkrs => prevOkrs.map(o => (
+        o.key_results?.some(k => k.id === kr.id)
+          ? { ...o, key_results: (o.key_results || []).map(k => k.id === kr.id ? { ...k, punted: !punted, punted_at: !punted ? new Date().toISOString() : null } : k) }
+          : o
+      )));
+      toast.error(e?.message || 'Failed to update KR');
+    }
+  };
+
   const daysLeftInQuarter = useMemo(() => {
     const now = new Date();
     const startMonth = Math.floor(now.getMonth() / 3) * 3; // 0,3,6,9
@@ -881,7 +963,7 @@ export const OKRModule: React.FC<OKRModuleProps> = ({ isVisible = true, hideHead
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-fr">
           {PILLARS.map((p) => (
-            <PillarCard key={p} pillar={p} okr={byPillar[p]} onUpdateKr={handleUpdateKr} onUpdateObjective={handleUpdateObjective} onUpdateDesc={handleUpdateDesc} onUpdateTarget={handleUpdateTarget} onUpdateDirection={handleUpdateDirection} onUpdateBaseline={handleUpdateBaseline} onUpdateDataSource={handleUpdateDataSource} onRefresh={load} />
+            <PillarCard key={p} pillar={p} okr={byPillar[p]} onUpdateKr={handleUpdateKr} onUpdateObjective={handleUpdateObjective} onUpdateDesc={handleUpdateDesc} onUpdateTarget={handleUpdateTarget} onUpdateDirection={handleUpdateDirection} onUpdateBaseline={handleUpdateBaseline} onUpdateDataSource={handleUpdateDataSource} onRefresh={load} onPunt={handlePunt} />
           ))}
         </div>
       )}

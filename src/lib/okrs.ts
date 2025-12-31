@@ -260,6 +260,27 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
   };
 }
 
+/**
+ * Punt or unpunt a Key Result.
+ * Punted KRs are deprioritized and excluded from weekly challenges,
+ * but their progress is preserved.
+ */
+export async function puntKeyResult(krId: string, punted: boolean): Promise<{ punted: boolean; punted_at: string | null }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  const { data, error } = await supabase.rpc('punt_key_result', {
+    p_kr_id: krId,
+    p_punted: punted
+  });
+  
+  if (error) throw error;
+  
+  return {
+    punted: data?.punted ?? punted,
+    punted_at: data?.punted_at ?? null
+  };
+}
+
 export async function createQuarterOKRs(
   quarter: string,
   start_date: string,

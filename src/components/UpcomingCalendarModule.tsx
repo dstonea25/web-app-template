@@ -1,0 +1,1195 @@
+import React, { useEffect, useState, useMemo, useImperativeHandle, forwardRef } from 'react';
+import type { CalendarEvent, CalendarEventInput, Habit, HabitYearlyStats } from '../types';
+import { tokens, cn } from '../theme/config';
+import { apiClient } from '../lib/api';
+import toast from '../lib/notifications/toast';
+import { X, Plus, MapPin } from 'lucide-react';
+import { ChallengesModule } from './ChallengesModule';
+
+interface UpcomingCalendarModuleProps {
+  isVisible?: boolean;
+}
+
+export interface UpcomingCalendarModuleRef {
+  createEventFromNl: (nlText: string) => Promise<void>;
+}
+
+interface DayData {
+  date: string;
+  dayOfWeek: string;
+  dayNumber: number;
+  monthName: string;
+  isWeekend: boolean;
+  events: CalendarEvent[];
+}
+
+// Styling constants matching CalendarTab
+const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  work: { bg: 'bg-blue-950/30', text: 'text-blue-300' },
+  personal: { bg: 'bg-purple-950/30', text: 'text-purple-300' },
+  health: { bg: 'bg-emerald-950/30', text: 'text-emerald-300' },
+  social: { bg: 'bg-pink-950/30', text: 'text-pink-300' },
+  learning: { bg: 'bg-amber-950/30', text: 'text-amber-300' },
+  travel: { bg: 'bg-cyan-950/30', text: 'text-cyan-300' },
+  location: { bg: 'bg-blue-950/40', text: 'text-blue-200' },
+  habit_reminder: { bg: 'bg-violet-950/30', text: 'text-violet-300' },
+};
+
+const ROW_COLORS = {
+  default: { bg: 'bg-neutral-900/50', border: 'border-neutral-700' },
+  pto: { bg: 'bg-yellow-950/20', border: 'border-yellow-700/30' },
+  travel: { bg: 'bg-cyan-950/20', border: 'border-cyan-700/30' },
+};
+
+interface RowAppearance {
+  bg: string;
+  border: string;
+  hasPto: boolean;
+  ptoOnly: boolean;
+}
+
+const getCategoryStyle = (category?: string) => {
+  return CATEGORY_COLORS[category || ''] || { bg: 'bg-neutral-800/30', text: 'text-neutral-300' };
+};
+
+const getCategoryBorderColor = (category?: string) => {
+  const colorMap: Record<string, string> = {
+    work: '#60A5FA',
+    personal: '#C084FC',
+    health: '#6EE7B7',
+    social: '#F9A8D4',
+    learning: '#FCD34D',
+    travel: '#67E8F9',
+    location: '#60A5FA',
+    habit_reminder: '#A78BFA',
+  };
+  return colorMap[category || ''] || '#737373';
+};
+
+const getRowAppearance = (day: DayData): RowAppearance => {
+  const ptoEvents = day.events.filter(e => e.is_pto);
+  const travelEvents = day.events.filter(e => e.category?.toLowerCase() === 'travel' && e.affects_row_appearance);
+  
+  const hasPto = ptoEvents.length > 0;
+  const hasTravel = travelEvents.length > 0;
+  
+  if (hasPto) {
+    return { ...ROW_COLORS.pto, hasPto: true, ptoOnly: !hasTravel };
+  }
+  if (hasTravel) {
+    return { ...ROW_COLORS.travel, hasPto: false, ptoOnly: false };
+  }
+  return { ...ROW_COLORS.default, hasPto: false, ptoOnly: false };
+};
+
+export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, UpcomingCalendarModuleProps>(({ 
+  isVisible = true
+}, ref) => {
+  const [currentWeek, setCurrentWeek] = useState<DayData[]>([]);
+  const [nextWeek, setNextWeek] = useState<DayData[]>([]);
+  const [weekAfter, setWeekAfter] = useState<DayData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [allEvents, setAllEvents] = useState<CalendarEvent[]>([]);
+  
+  // Form state for creating/editing events
+  const [formData, setFormData] = useState({
+    title: '',
+    category: 'personal',
+    notes: '',
+    start_date: '',
+    end_date: '',
+    start_time: '',
+    end_time: '',
+    all_day: true,
+  });
+  
+  // Multi-day drag selection
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartDate, setDragStartDate] = useState<string | null>(null);
+  const [dragEndDate, setDragEndDate] = useState<string | null>(null);
+  const [confirmedRangeStart, setConfirmedRangeStart] = useState<string | null>(null);
+  const [confirmedRangeEnd, setConfirmedRangeEnd] = useState<string | null>(null);
+  
+  // Habit tracking state
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitEntries, setHabitEntries] = useState<{ habitId: string; date: string; complete: boolean }[]>([]);
+  const [habitStats, setHabitStats] = useState<Record<string, HabitYearlyStats>>({});
+  
+  // Habit emoji mapping - Your 6 habits
+  const habitEmojis: Record<string, string> = {
+    'working out': '💪',
+    'building': '🔨',
+    'reading': '📚',
+    'writing': '✍️',
+    'fasting': '🍽️',
+    'no spend': '💰',
+  };
+  
+  const getHabitEmoji = (habitName: string): string => {
+    const key = habitName.toLowerCase().trim();
+    return habitEmojis[key] || '✓';
+  };
+
+  useEffect(() => {
+    if (!isVisible) {
+      setLoading(false);
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      loadUpcomingEvents();
+      loadHabitsData();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isVisible]);
+
+  const loadUpcomingEvents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      const eventsPromises = [apiClient.fetchCalendarEventsForYear(currentYear)];
+      if (today.getMonth() === 11) {
+        eventsPromises.push(apiClient.fetchCalendarEventsForYear(currentYear + 1));
+      }
+      
+      const results = await Promise.all(eventsPromises);
+      const events = results.flat();
+      setAllEvents(events);
+      
+      // Calculate the Monday of the current week
+      const currentDayOfWeek = today.getDay();
+      const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+      
+      const mondayOfCurrentWeek = new Date(today);
+      mondayOfCurrentWeek.setDate(today.getDate() - daysFromMonday);
+      
+      // Generate current week (Monday - Sunday)
+      const currentWeekData: DayData[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(mondayOfCurrentWeek);
+        date.setDate(mondayOfCurrentWeek.getDate() + i);
+        currentWeekData.push(createDayData(date, events));
+      }
+      
+      // Generate next week (Monday - Sunday)
+      const mondayOfNextWeek = new Date(mondayOfCurrentWeek);
+      mondayOfNextWeek.setDate(mondayOfCurrentWeek.getDate() + 7);
+      
+      const nextWeekData: DayData[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(mondayOfNextWeek);
+        date.setDate(mondayOfNextWeek.getDate() + i);
+        nextWeekData.push(createDayData(date, events));
+      }
+      
+      // Generate week after (Monday - Sunday)
+      const mondayOfWeekAfter = new Date(mondayOfNextWeek);
+      mondayOfWeekAfter.setDate(mondayOfNextWeek.getDate() + 7);
+      
+      const weekAfterData: DayData[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(mondayOfWeekAfter);
+        date.setDate(mondayOfWeekAfter.getDate() + i);
+        weekAfterData.push(createDayData(date, events));
+      }
+      
+      setCurrentWeek(currentWeekData);
+      setNextWeek(nextWeekData);
+      setWeekAfter(weekAfterData);
+    } catch (error) {
+      console.error('Failed to load upcoming calendar events:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to load calendar events';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const loadHabitsData = async () => {
+    try {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      // Load habits, entries, and stats in parallel
+      const [habitsData, entriesData, statsData] = await Promise.all([
+        apiClient.fetchHabitsFromSupabase(),
+        apiClient.fetchHabitEntriesForYear(currentYear),
+        apiClient.fetchHabitYearlyStats(currentYear)
+      ]);
+      
+      setHabits(habitsData);
+      setHabitEntries(entriesData);
+      
+      // Convert stats array to keyed object
+      const statsMap: Record<string, HabitYearlyStats> = {};
+      statsData.forEach(stat => {
+        statsMap[stat.habit_id] = stat;
+      });
+      setHabitStats(statsMap);
+    } catch (err) {
+      console.error('Failed to load habits data:', err);
+    }
+  };
+
+  const createDayData = (date: Date, events: CalendarEvent[]): DayData => {
+    const dateStr = formatDateToYYYYMMDD(date);
+    const dayOfWeek = date.getDay();
+    
+    return {
+      date: dateStr,
+      dayOfWeek: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayNumber: date.getDate(),
+      monthName: date.toLocaleDateString('en-US', { month: 'long' }),
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+      events: getEventsForDate(events, dateStr)
+    };
+  };
+
+  const formatDateToYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  // Helper to check if habit was completed on a specific date
+  const isHabitCompletedOnDate = (habitId: string, dateStr: string): boolean => {
+    return habitEntries.some(entry => 
+      entry.habitId === habitId && 
+      entry.date === dateStr && 
+      entry.complete
+    );
+  };
+  
+  // Calculate current week habit progress
+  const getCurrentWeekProgress = () => {
+    if (currentWeek.length === 0) return [];
+    
+    const startDate = currentWeek[0].date;
+    const endDate = currentWeek[6].date;
+    
+    return habits.map(habit => {
+      const weeklyGoal = habitStats[habit.id]?.weekly_goal || 0;
+      const completions = habitEntries.filter(
+        entry => entry.habitId === habit.id && 
+                 entry.complete && 
+                 entry.date >= startDate && 
+                 entry.date <= endDate
+      ).length;
+      
+      return {
+        habit,
+        completions,
+        goal: weeklyGoal,
+        goalMet: weeklyGoal > 0 && completions >= weeklyGoal
+      };
+    });
+  };
+
+  const getEventsForDate = (events: CalendarEvent[], dateStr: string): CalendarEvent[] => {
+    return events.filter(event => {
+      return dateStr >= event.start_date && dateStr <= event.end_date;
+    }).sort((a, b) => {
+      if (a.all_day && !b.all_day) return -1;
+      if (!a.all_day && b.all_day) return 1;
+      if (a.start_time && b.start_time) {
+        return a.start_time.localeCompare(b.start_time);
+      }
+      return 0;
+    });
+  };
+
+  const handleDayClick = (date: string) => {
+    setSelectedDate(date);
+    setIsCreating(false);
+    setEditingEvent(null);
+    setDragEndDate(null);
+    setConfirmedRangeStart(null);
+    setConfirmedRangeEnd(null);
+    setFormData({
+      title: '',
+      category: 'personal',
+      notes: '',
+      start_date: date,
+      end_date: date,
+      start_time: '',
+      end_time: '',
+      all_day: true,
+    });
+  };
+  
+  const handleCreateEvent = () => {
+    setIsCreating(true);
+    setEditingEvent(null);
+  };
+  
+  const handleEditEvent = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setIsCreating(false);
+    setSelectedEvent(null); // Clear so we show the form
+    setFormData({
+      title: event.title,
+      category: event.category || 'personal',
+      notes: event.notes || '',
+      start_date: event.start_date,
+      end_date: event.end_date,
+      start_time: event.start_time || '',
+      end_time: event.end_time || '',
+      all_day: event.all_day,
+    });
+  };
+  
+  const handleSaveEvent = async () => {
+    if (!formData.title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+    
+    try {
+      const input: CalendarEventInput = {
+        title: formData.title,
+        category: formData.category,
+        notes: formData.notes || null,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        start_time: formData.start_time || null,
+        end_time: formData.end_time || null,
+        all_day: formData.all_day,
+        affects_row_appearance: false,
+        priority: 3,
+        is_pto: false,
+        source_pattern_id: null,
+      };
+      
+      if (editingEvent) {
+        // Update existing event
+        await apiClient.updateCalendarEvent(editingEvent.id, input);
+        const updatedEvents = allEvents.map(e => 
+          e.id === editingEvent.id 
+            ? { ...e, ...input, updated_at: new Date().toISOString() }
+            : e
+        );
+        setAllEvents(updatedEvents);
+        regenerateWeeks(updatedEvents);
+        toast.success('Event updated');
+      } else {
+        // Create new event
+        const newId = await apiClient.createCalendarEvent(input);
+        const newEvent: CalendarEvent = {
+          id: newId,
+          ...input,
+          user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const updatedEvents = [...allEvents, newEvent];
+        setAllEvents(updatedEvents);
+        regenerateWeeks(updatedEvents);
+        toast.success('Event created');
+      }
+      
+      // Close modal
+      setIsCreating(false);
+      setEditingEvent(null);
+      setSelectedDate(null);
+    } catch (error) {
+      console.error('Failed to save event:', error);
+      toast.error('Failed to save event');
+    }
+  };
+
+  // Multi-day drag selection handlers
+  const handleDragStart = (date: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStartDate(date);
+    setDragEndDate(date);
+    setSelectedDate(date);
+  };
+
+  const handleDragOver = (date: string) => {
+    if (isDragging && dragStartDate) {
+      setDragEndDate(date);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (isDragging && dragStartDate && dragEndDate) {
+      // Confirm the range
+      const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
+      const end = dragStartDate < dragEndDate ? dragEndDate : dragStartDate;
+      setConfirmedRangeStart(start);
+      setConfirmedRangeEnd(end);
+      setSelectedDate(start);
+    }
+    setIsDragging(false);
+  };
+
+  const getSelectedRange = () => {
+    if (confirmedRangeStart && confirmedRangeEnd) {
+      return { start: confirmedRangeStart, end: confirmedRangeEnd };
+    }
+    if (isDragging && dragStartDate && dragEndDate) {
+      const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
+      const end = dragStartDate < dragEndDate ? dragEndDate : dragStartDate;
+      return { start, end };
+    }
+    return null;
+  };
+
+  const regenerateWeeks = (events: CalendarEvent[]) => {
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+    
+    const mondayOfCurrentWeek = new Date(today);
+    mondayOfCurrentWeek.setDate(today.getDate() - daysFromMonday);
+    
+    // Generate current week
+    const currentWeekData: DayData[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(mondayOfCurrentWeek);
+      date.setDate(mondayOfCurrentWeek.getDate() + i);
+      currentWeekData.push(createDayData(date, events));
+    }
+    
+    // Generate next week
+    const mondayOfNextWeek = new Date(mondayOfCurrentWeek);
+    mondayOfNextWeek.setDate(mondayOfCurrentWeek.getDate() + 7);
+    
+    const nextWeekData: DayData[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(mondayOfNextWeek);
+      date.setDate(mondayOfNextWeek.getDate() + i);
+      nextWeekData.push(createDayData(date, events));
+    }
+    
+    // Generate week after
+    const mondayOfWeekAfter = new Date(mondayOfNextWeek);
+    mondayOfWeekAfter.setDate(mondayOfNextWeek.getDate() + 7);
+    
+    const weekAfterData: DayData[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(mondayOfWeekAfter);
+      date.setDate(mondayOfWeekAfter.getDate() + i);
+      weekAfterData.push(createDayData(date, events));
+    }
+    
+    setCurrentWeek(currentWeekData);
+    setNextWeek(nextWeekData);
+    setWeekAfter(weekAfterData);
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      await apiClient.deleteCalendarEvent(eventId);
+      
+      // Optimistically update local state without refreshing
+      const updatedEvents = allEvents.filter(e => e.id !== eventId);
+      setAllEvents(updatedEvents);
+      regenerateWeeks(updatedEvents);
+      
+      toast.success('Event deleted');
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      toast.error('Failed to delete event');
+      // On error, do a full refresh
+      await loadUpcomingEvents();
+    }
+  };
+  
+  const handleHabitCircleClick = async (
+    habit: Habit, 
+    date: string, 
+    isCompleted: boolean, 
+    hasPlannedEvent: boolean,
+    isFuture: boolean
+  ) => {
+    if (isFuture) {
+      // Future date - create or delete calendar event
+      if (hasPlannedEvent) {
+        // Find and delete the planned event
+        const plannedEvent = allEvents.find(e => 
+          e.category === 'habit_reminder' &&
+          e.title.toLowerCase().includes(habit.name.toLowerCase()) &&
+          e.start_date <= date && 
+          e.end_date >= date
+        );
+        
+        if (plannedEvent) {
+          await handleDeleteEvent(plannedEvent.id);
+          toast.success(`Removed plan: ${habit.name}`);
+        }
+      } else {
+        // Create new habit reminder event
+        try {
+          const input: CalendarEventInput = {
+            title: habit.name,
+            category: 'habit_reminder',
+            notes: null,
+            start_date: date,
+            end_date: date,
+            start_time: null,
+            end_time: null,
+            all_day: true,
+            affects_row_appearance: false,
+            priority: 3,
+            is_pto: false,
+            source_pattern_id: null,
+          };
+          
+          const newId = await apiClient.createCalendarEvent(input);
+          const newEvent: CalendarEvent = {
+            id: newId,
+            ...input,
+            user_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          const updatedEvents = [...allEvents, newEvent];
+          setAllEvents(updatedEvents);
+          regenerateWeeks(updatedEvents);
+          toast.success(`Planned: ${habit.name}`);
+        } catch (error) {
+          console.error('Failed to create habit reminder:', error);
+          toast.error('Failed to create plan');
+        }
+      }
+    } else {
+      // Past or today - toggle habit completion (not implemented yet in this module)
+      // This would need to integrate with the habit tracker system
+      toast.info('Habit tracking for past dates - coming soon!');
+    }
+  };
+
+  const createEventFromNl = async (nlText: string) => {
+    if (!nlText.trim()) return;
+    
+    try {
+      const parsedEvent = await apiClient.parseNaturalLanguageEvent(nlText);
+      const input: CalendarEventInput = {
+        title: parsedEvent.title,
+        category: parsedEvent.category || 'personal',
+        notes: parsedEvent.notes,
+        start_date: parsedEvent.start_date,
+        end_date: parsedEvent.end_date,
+        start_time: parsedEvent.start_time,
+        end_time: parsedEvent.end_time,
+        all_day: parsedEvent.all_day,
+        affects_row_appearance: false,
+        priority: 3,
+        is_pto: false,
+        source_pattern_id: null,
+      };
+      const newId = await apiClient.createCalendarEvent(input);
+      const newEvent: CalendarEvent = {
+        id: newId,
+        ...input,
+        user_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setAllEvents(prev => [...prev, newEvent]);
+      await loadUpcomingEvents();
+      toast.success(`Created: ${parsedEvent.title}`);
+    } catch (error) {
+      console.error('Failed to parse natural language event:', error);
+      toast.error('Failed to create event');
+    }
+  };
+  
+  // Expose method to parent
+  useImperativeHandle(ref, () => ({
+    createEventFromNl
+  }));
+
+  const selectedDayData = [...currentWeek, ...nextWeek, ...weekAfter].find(d => d.date === selectedDate);
+
+  const renderWeekRow = (weekData: DayData[], label: string) => {
+    const today = formatDateToYYYYMMDD(new Date());
+    const selectedRange = getSelectedRange();
+    
+    // Color mapping for habits
+    const HABIT_COLORS = [
+      { base: '#6EE7B7', glow: '#A7F3D0' }, // emerald
+      { base: '#5EEAD4', glow: '#99F6E4' }, // teal
+      { base: '#FBBF24', glow: '#FDE68A' }, // amber
+      { base: '#A3E635', glow: '#D9F99D' }, // olive
+      { base: '#FDBA74', glow: '#FED7AA' }, // terracotta
+      { base: '#FDA4AF', glow: '#FECDD3' }, // rose
+    ];
+    
+    const getHabitColor = (index: number) => {
+      return HABIT_COLORS[index % HABIT_COLORS.length];
+    };
+    
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-neutral-400">{label}</h3>
+        <div className="grid grid-cols-7 gap-2">
+          {weekData.map((day) => {
+            const isToday = day.date === today;
+            const isPast = day.date < today;
+            const isSelected = selectedDate === day.date;
+            const rowAppearance = getRowAppearance(day);
+            
+            // Check if day is in selected range
+            const isInDragRange = selectedRange && 
+              day.date >= selectedRange.start && 
+              day.date <= selectedRange.end;
+
+            return (
+              <div key={day.date} className="relative group/day">
+                <button
+                  onMouseDown={(e) => handleDragStart(day.date, e)}
+                  onMouseEnter={() => handleDragOver(day.date)}
+                  onClick={() => handleDayClick(day.date)}
+                  className={cn(
+                    'w-full h-full min-h-[120px] text-left p-3 rounded-lg border transition-all',
+                    'hover:bg-neutral-800/50',
+                    'flex flex-col',
+                    isPast && 'opacity-50',
+                    isInDragRange && 'bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/50',
+                    !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500 ring-2 ring-emerald-500/30',
+                    !isInDragRange && !isSelected && rowAppearance.bg,
+                    !isInDragRange && !isSelected && rowAppearance.border,
+                    isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                    isDragging && 'select-none',
+                  )}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-neutral-700/50">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        'text-xs font-medium uppercase',
+                        day.isWeekend ? 'text-emerald-400' : 'text-neutral-500'
+                      )}>
+                        {day.dayOfWeek}
+                      </span>
+                      {rowAppearance.hasPto && (
+                        <div className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm" title="PTO" />
+                      )}
+                    </div>
+                    <span className={cn(
+                      'text-2xl font-bold',
+                      day.isWeekend ? 'text-emerald-300' : 'text-neutral-100'
+                    )}>
+                      {day.dayNumber}
+                    </span>
+                  </div>
+                  
+                  {/* Habit Circles Row - Centered under date */}
+                  <div className="flex gap-1.5 items-center justify-center pt-1 pb-2">
+                    {habits.slice(0, 6).map((habit) => {
+                      const isCompleted = isHabitCompletedOnDate(habit.id, day.date);
+                      const isFuture = day.date > today;
+                      
+                      // Check if there's a planned event for this habit on this day
+                      const hasPlannedEvent = allEvents.some(e => 
+                        e.category === 'habit_reminder' &&
+                        e.title.toLowerCase().includes(habit.name.toLowerCase()) &&
+                        e.start_date <= day.date && 
+                        e.end_date >= day.date
+                      );
+                      
+                      const emoji = getHabitEmoji(habit.name);
+                      
+                      return (
+                        <button
+                          key={habit.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHabitCircleClick(habit, day.date, isCompleted, hasPlannedEvent, isFuture);
+                          }}
+                          className={cn(
+                            'w-3.5 h-3.5 rounded-full transition-all cursor-pointer relative flex items-center justify-center',
+                            'hover:scale-125 group/habit'
+                          )}
+                          style={{
+                            backgroundColor: isFuture && hasPlannedEvent ? '#FFFFFF' : 'transparent',
+                            border: !isCompleted && !hasPlannedEvent ? '1px solid #525252' : (isFuture && hasPlannedEvent ? '1px solid #FFFFFF' : 'none')
+                          }}
+                          title={habit.name}
+                        >
+                          {/* Show emoji when completed, nothing when just planned */}
+                          {isCompleted && (
+                            <span className="text-[10px] leading-none">{emoji}</span>
+                          )}
+                          
+                          {/* Hover tooltip */}
+                          <span className="absolute top-5 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover/habit:opacity-100 transition-opacity delay-300 bg-neutral-800 border border-neutral-700 px-2 py-1 rounded text-[10px] text-neutral-200 pointer-events-none z-10 shadow-lg">
+                            {habit.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Location display - below habits, above events */}
+                  {day.events.some(e => e.category === 'location') && (
+                    <div className="group/location relative px-2 py-1 mb-1 bg-blue-950/30 border border-blue-700/30 rounded text-[10px] text-blue-300 truncate hover:bg-blue-950/40 transition-colors">
+                      <span>📍 {day.events.find(e => e.category === 'location')?.title}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const locationEvent = day.events.find(ev => ev.category === 'location');
+                          if (locationEvent) handleDeleteEvent(locationEvent.id);
+                        }}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-blue-400 hover:text-blue-200 hover:bg-blue-900/50 rounded opacity-0 group-hover/location:opacity-100 transition-opacity"
+                        title="Remove location"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Events - Full width below location */}
+                  <div className="flex-1 space-y-1 overflow-y-auto min-w-0">
+                    {day.events
+                      .filter(event => !event.is_pto && event.category !== 'location')
+                      .map(event => {
+                        const style = getCategoryStyle(event.category);
+                        const borderColor = getCategoryBorderColor(event.category);
+                        
+                        return (
+                          <div
+                            key={event.id}
+                            className={cn(
+                              'group/event flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer',
+                              'hover:bg-neutral-700/50 transition-all border-l-2',
+                              style.bg
+                            )}
+                            style={{ borderLeftColor: borderColor }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                            }}
+                          >
+                            <div className={cn('flex-1 min-w-0 text-[11px] font-medium break-words leading-tight', style.text)}>
+                              {event.title}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event.id);
+                              }}
+                              className="opacity-0 group-hover/event:opacity-100 text-neutral-400 hover:text-rose-400 transition-all flex-shrink-0"
+                              title="Delete event"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </button>
+                
+                {/* Quick Add Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedDate(day.date);
+                    setFormData({
+                      title: '',
+                      category: 'personal',
+                      notes: '',
+                      start_date: day.date,
+                      end_date: day.date,
+                      start_time: '',
+                      end_time: '',
+                      all_day: true,
+                    });
+                    setIsCreating(true);
+                    setEditingEvent(null);
+                  }}
+                  className={cn(
+                    'absolute bottom-2 left-1/2 -translate-x-1/2',
+                    'opacity-0 group-hover/day:opacity-100',
+                    'p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full',
+                    'transition-all shadow-lg hover:scale-110 z-10'
+                  )}
+                  title="Quick add event"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Add mouseup listener for drag end
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) {
+        handleDragEnd();
+      }
+    };
+    
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, [isDragging, dragStartDate, dragEndDate]);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="flex flex-col items-center gap-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500"></div>
+          <div className={tokens.palette.dark.text_muted}>Loading calendar...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="text-center">
+          <div className="text-red-500 text-sm mb-2">{error}</div>
+          <button onClick={loadUpcomingEvents} className="text-xs text-emerald-400 hover:text-emerald-300">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const weekProgress = getCurrentWeekProgress();
+  
+  // Color mapping for habits (same as HabitWeeklyAchievementGrid)
+  const HABIT_COLORS = [
+    { base: '#6EE7B7', glow: '#A7F3D0' }, // emerald
+    { base: '#5EEAD4', glow: '#99F6E4' }, // teal
+    { base: '#FBBF24', glow: '#FDE68A' }, // amber
+    { base: '#A3E635', glow: '#D9F99D' }, // olive
+    { base: '#FDBA74', glow: '#FED7AA' }, // terracotta
+    { base: '#FDA4AF', glow: '#FECDD3' }, // rose
+  ];
+  
+  const getHabitColor = (index: number) => {
+    return HABIT_COLORS[index % HABIT_COLORS.length];
+  };
+
+  return (
+    <div className="space-y-6">
+
+      {/* Calendar Weeks */}
+      {currentWeek.length > 0 && renderWeekRow(currentWeek, 'This Week')}
+      
+      {/* Challenges and Habit Goals Row */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Weekly Challenges Module */}
+        <ChallengesModule habitStats={habitStats} />
+        
+        {/* Habit Progress Stats */}
+        {habits.length > 0 && currentWeek.length > 0 ? (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+              {weekProgress.map((item, idx) => {
+                const color = getHabitColor(idx);
+                const progress = item.goal > 0 ? Math.min((item.completions / item.goal) * 100, 100) : 0;
+                
+                return (
+                  <div key={item.habit.id} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span 
+                        className="text-sm font-medium"
+                        style={{ color: color.base }}
+                      >
+                        {item.habit.name}
+                      </span>
+                      <span className={cn(
+                        "text-xs font-semibold tabular-nums",
+                        item.goalMet ? 'text-emerald-400' : 'text-neutral-400'
+                      )}>
+                        {item.completions} / {item.goal}
+                      </span>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full transition-all duration-300 rounded-full"
+                        style={{ 
+                          width: `${progress}%`,
+                          backgroundColor: item.goalMet ? '#6EE7B7' : color.base,
+                          boxShadow: item.goalMet ? `0 0 8px ${color.glow}` : 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+            <div className="text-xs text-neutral-500 italic">
+              No habits configured
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {nextWeek.length > 0 && renderWeekRow(nextWeek, 'Next Week')}
+      
+      {weekAfter.length > 0 && renderWeekRow(weekAfter, 'Week After')}
+      
+      {/* Simple Event Modal */}
+      {(selectedDate || selectedEvent) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
+          setSelectedDate(null);
+          setSelectedEvent(null);
+          setIsCreating(false);
+          setEditingEvent(null);
+        }}>
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-neutral-100">
+                {selectedEvent && !editingEvent ? 'Event Details' : editingEvent ? 'Edit Event' : isCreating ? `Add Event - ${selectedDate}` : selectedDate || 'Event'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setSelectedDate(null);
+                  setSelectedEvent(null);
+                  setIsCreating(false);
+                  setEditingEvent(null);
+                }}
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {selectedEvent ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm text-neutral-400">Title</div>
+                  <div className="text-neutral-100">{selectedEvent.title}</div>
+                </div>
+                {selectedEvent.notes && (
+                  <div>
+                    <div className="text-sm text-neutral-400">Notes</div>
+                    <div className="text-neutral-100">{selectedEvent.notes}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm text-neutral-400">Date</div>
+                  <div className="text-neutral-100">
+                    {selectedEvent.start_date === selectedEvent.end_date 
+                      ? selectedEvent.start_date 
+                      : `${selectedEvent.start_date} to ${selectedEvent.end_date}`}
+                  </div>
+                </div>
+                {selectedEvent.start_time && (
+                  <div>
+                    <div className="text-sm text-neutral-400">Time</div>
+                    <div className="text-neutral-100">{selectedEvent.start_time}{selectedEvent.end_time && ` - ${selectedEvent.end_time}`}</div>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={() => handleEditEvent(selectedEvent)}
+                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteEvent(selectedEvent.id)}
+                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedEvent(null);
+                      setSelectedDate(null);
+                    }}
+                    className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : isCreating || editingEvent ? (
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="e.g., Dentist, Team Meeting"
+                    autoFocus
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Category
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="personal">Personal</option>
+                    <option value="work">Work</option>
+                    <option value="health">Health</option>
+                    <option value="social">Social</option>
+                    <option value="learning">Learning</option>
+                    <option value="travel">Travel</option>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={formData.all_day}
+                      onChange={(e) => setFormData(prev => ({ ...prev, all_day: e.target.checked }))}
+                      className="rounded"
+                    />
+                    All day event
+                  </label>
+                </div>
+                
+                {!formData.all_day && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.start_time}
+                        onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                        End Time
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.end_time}
+                        onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    Notes
+                  </label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    rows={3}
+                    placeholder="Optional notes..."
+                  />
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors font-medium"
+                  >
+                    {editingEvent ? 'Update' : 'Create'} Event
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(null);
+                      setIsCreating(false);
+                      setEditingEvent(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm text-neutral-400">
+                  <p>Click on events to view details or use the + button to add new events.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setIsCreating(false);
+                  }}
+                  className="w-full px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+UpcomingCalendarModule.displayName = 'UpcomingCalendarModule';
+
+export type { UpcomingCalendarModuleRef };
+export default UpcomingCalendarModule;

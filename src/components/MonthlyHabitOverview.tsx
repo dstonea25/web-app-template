@@ -8,6 +8,7 @@ interface HabitStreak {
   current_streak: number;
   longest_streak: number;
   last_completed_date: string | null;
+  weekly_goal: number | null;
 }
 
 interface MonthlyHabitOverviewProps {
@@ -111,7 +112,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
 
       const { data, error } = await supabase
         .from('habit_streaks')
-        .select('habit_id, current_streak, longest_streak, last_completed_date');
+        .select('habit_id, current_streak, longest_streak, last_completed_date, weekly_goal');
 
       if (error) throw error;
 
@@ -136,7 +137,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
 
       const { data, error } = await supabase
         .from('habit_streaks')
-        .select('habit_id, current_streak, longest_streak, last_completed_date')
+        .select('habit_id, current_streak, longest_streak, last_completed_date, weekly_goal')
         .eq('habit_id', habitId)
         .maybeSingle();
       if (error) throw error;
@@ -305,14 +306,16 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
           return (
             <div key={habit.id} className="space-y-2">
               {/* Habit Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-4">
+                {/* Left: Habit name + streak */}
+                <div className="flex items-center gap-2">
                   <h4 
                     className="text-sm font-medium"
                     style={{ color: habitColor }}
                   >
                     {habit.name}
                   </h4>
+                  {/* Streak */}
                   {habitStreaks[habit.id] && (
                     <div className="flex items-center gap-1">
                       {habitStreaks[habit.id].current_streak === 0 ? (
@@ -347,32 +350,49 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                       {habit.rule}
                     </span>
                   )}
-                  {/* Monthly average */}
-                  {rollingStats[habit.id] && (
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="text-neutral-500">Monthly Avg</span>
-                      <span className="font-medium tabular-nums text-neutral-300">
-                        {rollingStats[habit.id].monthly.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
                 </div>
                 
-                 {/* Completion percentage with progress bar */}
-                 <div className="flex items-center gap-2">
-                   <div className="w-16 h-2 bg-neutral-700 rounded-full overflow-hidden">
-                     <div 
-                       className="h-full transition-all duration-300 rounded-full"
-                       style={{ 
-                         width: `${(habitDays.size / Math.max(1, currentDayInMonth)) * 100}%`,
-                         backgroundColor: habitColor 
-                       }}
-                     />
-                   </div>
-                   <div className="text-xs text-neutral-400 min-w-0">
-                     {habitDays.size}/{Math.max(1, currentDayInMonth)} ({Math.round((habitDays.size / Math.max(1, currentDayInMonth)) * 100)}%)
-                   </div>
-                 </div>
+                {/* Right: All stats with fixed-width labels */}
+                <div className="flex items-center gap-4 text-xs">
+                  {/* Monthly average */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-neutral-500">Monthly Avg</span>
+                    <span className="font-medium tabular-nums text-neutral-300 w-[28px] text-right">
+                      {rollingStats[habit.id]?.monthly.toFixed(1) ?? '—'}
+                    </span>
+                  </div>
+                  {/* Completion percentage */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-neutral-500">Cmp%</span>
+                    <span className="font-medium tabular-nums text-neutral-300 w-[28px] text-right">
+                      {Math.round((habitDays.size / Math.max(1, currentDayInMonth)) * 100)}%
+                    </span>
+                  </div>
+                  {/* Goal % */}
+                  {(() => {
+                    const weeklyGoal = habitStreaks[habit.id]?.weekly_goal;
+                    if (!weeklyGoal) return null;
+                    
+                    const weeksInMonth = daysInMonth / 7;
+                    const monthlyTarget = Math.round(weeklyGoal * weeksInMonth);
+                    const isComplete = habitDays.size >= monthlyTarget;
+                    const goalPercent = Math.round((habitDays.size / monthlyTarget) * 100);
+                    
+                    return (
+                      <div className="flex items-center gap-1">
+                        <span className="text-neutral-500">Goal%</span>
+                        <span className={`font-medium tabular-nums w-[36px] text-right ${isComplete ? 'text-emerald-400' : 'text-neutral-300'}`}>
+                          {goalPercent}%
+                        </span>
+                        <span className="text-neutral-500">(</span>
+                        <span className={`tabular-nums ${isComplete ? 'text-emerald-400' : 'text-neutral-300'}`}>
+                          {habitDays.size} of {monthlyTarget}
+                        </span>
+                        <span className="text-neutral-500">)</span>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
               
                {/* Day Cells Grid - Horizontal with tight spacing */}

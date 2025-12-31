@@ -170,6 +170,9 @@ export interface OkrKeyResult {
   baseline_value?: number | null;
   // Data source for current_value
   data_source?: OkrDataSource;
+  // Punted: deprioritized mid-period, excluded from challenges
+  punted?: boolean;
+  punted_at?: string;
   // Linked habit ID for auto-sync
   linked_habit_id?: string | null;
   // Whether to auto-sync from linked source
@@ -398,4 +401,104 @@ export interface CalendarPatternInput {
   default_affects_row_appearance: boolean;
   default_priority: number;
   is_active: boolean;
+}
+
+// Weekly Challenges
+export type ChallengeStoryType = 'slipping_habit' | 'placeholder';
+
+export interface SlippingHabitData {
+  habit_id: string;
+  habit_name: string;
+  weeks_tracked: number;
+  weeks_met: number;
+  avg_completion_rate: number;
+  recommended_count: 1;
+  recommended_period: 'week';
+  action_text: string;
+}
+
+export interface PlaceholderData {
+  reason: 'no_slipping_habits' | 'not_enough_slipping_habits' | 'v1_placeholder';
+  action_text: string;
+}
+
+export interface WeeklyChallenge {
+  id: string;
+  slot_index: 0 | 1 | 2;
+  action_text: string; // PRIMARY DISPLAY FIELD - one-line imperative
+  story_type: ChallengeStoryType;
+  story_data: SlippingHabitData | PlaceholderData;
+  title: string; // Same as action_text (legacy compat)
+  description: string | null; // Always null (deprecated)
+  completed: boolean;
+  completed_at: string | null;
+}
+
+export interface WeeklyChallengesWeekInfo {
+  year: number;
+  week_number: number;
+  week_start_date: string; // YYYY-MM-DD
+  generated_at: string;
+}
+
+export type RandomizationStrategy = 'slot_by_slot' | 'guaranteed_diversity';
+
+export interface ChallengeConfigData {
+  total_challenges: number;
+  randomization_strategy: RandomizationStrategy;
+}
+
+export interface WeeklyChallengesResponse {
+  week: WeeklyChallengesWeekInfo;
+  challenges: WeeklyChallenge[];
+  config?: ChallengeConfigData;
+}
+
+// Challenge Protocol Configuration
+export interface HabitsSlippingConfig {
+  enabled_habit_ids: string[];
+  lookback_days?: number;
+  min_weeks_tracked?: number;
+  slip_threshold_rate?: number;
+}
+
+export interface PlaceholderChallengeConfig {
+  action_text: string;
+  reason: string;
+}
+
+export interface PlaceholderProtocolConfig {
+  default_challenges: PlaceholderChallengeConfig[];
+}
+
+export interface PrioritiesProgressConfig {
+  enabled_pillars: string[];
+}
+
+export interface PrioritiesProgressData {
+  priority_id: string;
+  priority_title: string;
+  pillar_name: string;
+  pillar_emoji: string;
+}
+
+export interface OkrsProgressConfig {
+  enabled_kr_ids: string[];
+}
+
+export interface OkrsProgressData {
+  okr_id: string;
+  okr_objective: string;
+  okr_pillar: string;
+  okr_progress: number;
+  okr_quarter: string;
+}
+
+export interface ChallengeProtocol {
+  protocol_key: string;
+  display_name: string;
+  is_enabled: boolean;
+  max_per_week: number;
+  config: HabitsSlippingConfig | PlaceholderProtocolConfig | PrioritiesProgressConfig | OkrsProgressConfig | Record<string, unknown>;
+  updated_at: string;
 }

@@ -7,10 +7,12 @@ import { QuarterlySetupModal } from '../components/okrs/QuarterlySetupModal';
 import { DailyIntentionsModule } from '../components/intentions/DailyIntentionsModule';
 import { SessionTimerInline } from '../components/intentions/SessionTimerInline';
 import { CommittedPrioritiesModule } from '../components/CommittedPrioritiesModule';
+import UpcomingCalendarModule, { type UpcomingCalendarModuleRef } from '../components/UpcomingCalendarModule';
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
 import { fetchOkrsWithProgress, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
+import { Sparkles, ChevronRight } from 'lucide-react';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const { workMode } = useWorkMode();
@@ -34,10 +36,15 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   // Section visibility state
   const [sectionsVisible, setSectionsVisible] = useState({
     dailyIntentions: true,
+    upcomingCalendar: true,
     committedPriorities: true,
     importantTasks: true,
     okrs: true,
   });
+  
+  // Calendar quick add state
+  const [calendarNlInput, setCalendarNlInput] = useState('');
+  const calendarModuleRef = useRef<UpcomingCalendarModuleRef>(null);
   
   const toggleSection = (section: keyof typeof sectionsVisible) => {
     setSectionsVisible(prev => ({
@@ -260,6 +267,69 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   return (
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="grid gap-6">
+        <section>
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={() => toggleSection('upcomingCalendar')}
+              className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+            >
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+                Upcoming
+              </h2>
+              <svg
+                className={cn(
+                  "w-5 h-5 transition-transform duration-200",
+                  sectionsVisible.upcomingCalendar ? "rotate-180" : "rotate-0"
+                )}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Calendar Quick Add - Similar to Calendar Tab */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={calendarNlInput}
+                  onChange={(e) => setCalendarNlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && calendarNlInput.trim()) {
+                      e.preventDefault();
+                      calendarModuleRef.current?.createEventFromNl(calendarNlInput);
+                      setCalendarNlInput('');
+                    }
+                  }}
+                  placeholder="Quick add: 'Dentist 2pm' or 'Vacation Jan 11-15'"
+                  className="w-full px-4 py-2 pl-10 pr-10 bg-neutral-900 border border-neutral-700 rounded-full text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                />
+                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                {calendarNlInput.trim() && (
+                  <button
+                    onClick={() => {
+                      calendarModuleRef.current?.createEventFromNl(calendarNlInput);
+                      setCalendarNlInput('');
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
+                    title="Create event"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className={cn('mt-4', !sectionsVisible.upcomingCalendar && 'hidden')}>
+            <UpcomingCalendarModule 
+              ref={calendarModuleRef}
+              isVisible={sectionsVisible.upcomingCalendar} 
+            />
+          </div>
+        </section>
+
         <section>
           <div className="flex items-center justify-between">
             <button

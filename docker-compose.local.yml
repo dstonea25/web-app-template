@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      args:
+        - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
+        - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
+        - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    container_name: dashboard-app
+    ports:
+      - "3000:8080"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_AUTH_USERNAME=${VITE_AUTH_USERNAME}
+      - VITE_AUTH_PASSWORD=${VITE_AUTH_PASSWORD}
+      - VITE_N8N_WEBHOOK_TOKEN=${VITE_N8N_WEBHOOK_TOKEN}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    networks:
+      - dashboard-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  dashboard-network:
+    driver: bridge
+
+
