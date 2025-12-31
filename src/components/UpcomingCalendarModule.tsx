@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import type { CalendarEvent, CalendarEventInput, Habit, HabitYearlyStats } from '../types';
 import { tokens, cn } from '../theme/config';
 import { apiClient } from '../lib/api';
 import toast from '../lib/notifications/toast';
-import { X, Plus, MapPin } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { ChallengesModule } from './ChallengesModule';
 
 interface UpcomingCalendarModuleProps {
@@ -48,11 +48,11 @@ interface RowAppearance {
   ptoOnly: boolean;
 }
 
-const getCategoryStyle = (category?: string) => {
+const getCategoryStyle = (category?: string | null) => {
   return CATEGORY_COLORS[category || ''] || { bg: 'bg-neutral-800/30', text: 'text-neutral-300' };
 };
 
-const getCategoryBorderColor = (category?: string) => {
+const getCategoryBorderColor = (category?: string | null) => {
   const colorMap: Record<string, string> = {
     work: '#60A5FA',
     personal: '#C084FC',
@@ -329,11 +329,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     });
   };
   
-  const handleCreateEvent = () => {
-    setIsCreating(true);
-    setEditingEvent(null);
-  };
-  
   const handleEditEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
     setIsCreating(false);
@@ -513,7 +508,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
   const handleHabitCircleClick = async (
     habit: Habit, 
     date: string, 
-    isCompleted: boolean, 
     hasPlannedEvent: boolean,
     isFuture: boolean
   ) => {
@@ -616,25 +610,10 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     createEventFromNl
   }));
 
-  const selectedDayData = [...currentWeek, ...nextWeek, ...weekAfter].find(d => d.date === selectedDate);
-
   const renderWeekRow = (weekData: DayData[], label: string) => {
     const today = formatDateToYYYYMMDD(new Date());
     const selectedRange = getSelectedRange();
     
-    // Color mapping for habits
-    const HABIT_COLORS = [
-      { base: '#6EE7B7', glow: '#A7F3D0' }, // emerald
-      { base: '#5EEAD4', glow: '#99F6E4' }, // teal
-      { base: '#FBBF24', glow: '#FDE68A' }, // amber
-      { base: '#A3E635', glow: '#D9F99D' }, // olive
-      { base: '#FDBA74', glow: '#FED7AA' }, // terracotta
-      { base: '#FDA4AF', glow: '#FECDD3' }, // rose
-    ];
-    
-    const getHabitColor = (index: number) => {
-      return HABIT_COLORS[index % HABIT_COLORS.length];
-    };
     
     return (
       <div className="space-y-3">
@@ -712,7 +691,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                           key={habit.id}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleHabitCircleClick(habit, day.date, isCompleted, hasPlannedEvent, isFuture);
+                            handleHabitCircleClick(habit, day.date, hasPlannedEvent, isFuture);
                           }}
                           className={cn(
                             'w-3.5 h-3.5 rounded-full transition-all cursor-pointer relative flex items-center justify-center',
@@ -1191,5 +1170,4 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
 
 UpcomingCalendarModule.displayName = 'UpcomingCalendarModule';
 
-export type { UpcomingCalendarModuleRef };
 export default UpcomingCalendarModule;

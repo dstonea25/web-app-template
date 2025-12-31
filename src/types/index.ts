@@ -172,7 +172,7 @@ export interface OkrKeyResult {
   data_source?: OkrDataSource;
   // Punted: deprioritized mid-period, excluded from challenges
   punted?: boolean;
-  punted_at?: string;
+  punted_at?: string | null;
   // Linked habit ID for auto-sync
   linked_habit_id?: string | null;
   // Whether to auto-sync from linked source
@@ -427,11 +427,12 @@ export interface WeeklyChallenge {
   slot_index: 0 | 1 | 2;
   action_text: string; // PRIMARY DISPLAY FIELD - one-line imperative
   story_type: ChallengeStoryType;
-  story_data: SlippingHabitData | PlaceholderData;
+  story_data: SlippingHabitData | PlaceholderData | PrioritiesProgressData | OkrsProgressData;
   title: string; // Same as action_text (legacy compat)
   description: string | null; // Always null (deprecated)
   completed: boolean;
   completed_at: string | null;
+  protocol_key?: string; // Protocol that generated this challenge
 }
 
 export interface WeeklyChallengesWeekInfo {

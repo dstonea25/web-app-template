@@ -14,7 +14,6 @@ import { supabase } from '../lib/supabase';
 import toast from '../lib/notifications/toast';
 import type { 
   WeeklyChallenge, 
-  WeeklyChallengesWeekInfo, 
   SlippingHabitData, 
   HabitYearlyStats,
   ChallengeProtocol,
@@ -46,7 +45,6 @@ interface ChallengesModuleProps {
 
 export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, habitStats = {} }) => {
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
-  const [weekInfo, setWeekInfo] = useState<WeeklyChallengesWeekInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -77,7 +75,6 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
       // Sort by slot_index to ensure consistent order (0 → 2)
       const sorted = [...data.challenges].sort((a, b) => a.slot_index - b.slot_index);
       setChallenges(sorted);
-      setWeekInfo(data.week);
       
       // Update config values if present
       if (data.config?.total_challenges) {
@@ -89,8 +86,10 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
       
       // Fetch rolling stats for slipping habits
       const habitIds = sorted
-        .filter(c => c.story_type === 'slipping_habit' && c.story_data?.habit_id)
-        .map(c => (c.story_data as SlippingHabitData).habit_id);
+        .filter((c): c is WeeklyChallenge & { story_data: SlippingHabitData } => 
+          c.story_type === 'slipping_habit' && 'habit_id' in c.story_data
+        )
+        .map(c => c.story_data.habit_id);
       
       if (habitIds.length > 0) {
         const statsPromises = habitIds.map(async (habitId) => {
@@ -155,12 +154,14 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
         } else if (krData) {
           // Filter to only include KRs from active, non-archived OKRs
           const filteredKRs = krData.filter(kr => {
-            const okr = kr.okrs as { status: string; archived: boolean | null } | null;
+            const okrs = kr.okrs as any;
+            const okr = Array.isArray(okrs) ? okrs[0] : okrs;
             return okr && okr.status === 'active' && (okr.archived === false || okr.archived === null);
           });
           
           setAllKeyResults(filteredKRs.map(kr => {
-            const okr = kr.okrs as { objective: string; pillar: string };
+            const okrs = kr.okrs as any;
+            const okr = Array.isArray(okrs) ? okrs[0] : okrs;
             return {
               id: kr.id,
               description: kr.description,
@@ -361,7 +362,7 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
       // Update the challenge in state
       setChallenges(prev => prev.map(c => 
         c.id === challengeId 
-          ? { ...c, action_text: newChallenge.action_text, story_data: newChallenge.story_data } 
+          ? { ...c, action_text: newChallenge.action_text, story_data: newChallenge.story_data as unknown as WeeklyChallenge['story_data'] } 
           : c
       ));
       
@@ -390,12 +391,13 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
       // Sort by slot_index
       const sorted = [...data.challenges].sort((a, b) => a.slot_index - b.slot_index);
       setChallenges(sorted);
-      setWeekInfo(data.week);
       
       // Refetch rolling stats for new challenges
       const habitIds = sorted
-        .filter(c => c.story_type === 'slipping_habit' && c.story_data?.habit_id)
-        .map(c => (c.story_data as SlippingHabitData).habit_id);
+        .filter((c): c is WeeklyChallenge & { story_data: SlippingHabitData } => 
+          c.story_type === 'slipping_habit' && 'habit_id' in c.story_data
+        )
+        .map(c => c.story_data.habit_id);
       
       if (habitIds.length > 0) {
         const statsPromises = habitIds.map(async (habitId) => {
