@@ -991,7 +991,29 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                             <div className="px-3 pb-3 pt-1 border-t border-neutral-700/50">
                               <p className="text-xs text-neutral-500 mb-2">Enabled Key Results:</p>
                               <div className="space-y-1">
-                                {allKeyResults.map((kr) => {
+                                {allKeyResults
+                                  .slice()
+                                  .sort((a, b) => {
+                                    // Sort priority: active (0) → punted (1) → completed (2)
+                                    const aCompleted = Math.round(a.progress * 100) >= 100;
+                                    const bCompleted = Math.round(b.progress * 100) >= 100;
+                                    const aPunted = a.punted === true;
+                                    const bPunted = b.punted === true;
+                                    
+                                    const getPriority = (completed: boolean, punted: boolean) => {
+                                      if (completed) return 2;
+                                      if (punted) return 1;
+                                      return 0;
+                                    };
+                                    
+                                    const aPriority = getPriority(aCompleted, aPunted);
+                                    const bPriority = getPriority(bCompleted, bPunted);
+                                    
+                                    // Sort by priority first, then by progress (ascending for active ones)
+                                    if (aPriority !== bPriority) return aPriority - bPriority;
+                                    return a.progress - b.progress;
+                                  })
+                                  .map((kr) => {
                                   const isPunted = kr.punted === true;
                                   const progressPercent = Math.round(kr.progress * 100);
                                   const isCompleted = progressPercent >= 100;
