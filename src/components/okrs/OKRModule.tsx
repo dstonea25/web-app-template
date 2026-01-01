@@ -11,28 +11,43 @@ interface OKRModuleProps {
 }
 
 const PILLARS: OkrPillar[] = ['Power', 'Passion', 'Purpose', 'Production'];
-// Reuse Habit palette hues for pillar accents
-const PILLAR_COLORS: Record<OkrPillar, { base: string; glow: string }> = {
-  Power: { base: '#6EE7B7', glow: '#A7F3D0' },      // emerald
-  Passion: { base: '#FDA4AF', glow: '#FECDD3' },    // rose
-  Purpose: { base: '#A3E635', glow: '#D9F99D' },    // olive/lime
-  Production: { base: '#5EEAD4', glow: '#99F6E4' }, // teal
+
+// Global color scheme for OKRs
+const OKR_COLORS = {
+  inProgress: { base: '#6EE7B7', glow: '#A7F3D0' },  // emerald green
+  punted: { base: '#FBBF24', glow: '#FDE68A' },      // amber/orange
+  completed: { base: '#6EE7B7', glow: '#A7F3D0' },   // emerald with glow effect
 };
 
-function ProgressBar({ value, flash, color }: { value: number; flash?: boolean; color: string }) {
+function ProgressBar({ value, flash, isPunted, isCompleted }: { value: number; flash?: boolean; isPunted?: boolean; isCompleted?: boolean }) {
   const rounded = Math.max(0, Math.round(value || 0));
-  const isOverAchieved = rounded > 100;
-  
-  // For over-achievement, show full bar with special styling
   const displayWidth = Math.min(100, rounded);
-  const overColor = isOverAchieved ? '#34D399' : color; // Emerald-400 for over-achievement
+  
+  // Determine color based on state
+  let barColor = OKR_COLORS.inProgress.base; // Default: emerald green
+  
+  if (isPunted) {
+    barColor = OKR_COLORS.punted.base; // Amber/orange for punted
+  } else if (isCompleted) {
+    barColor = OKR_COLORS.completed.base; // Emerald for completed
+  }
   
   return (
-    <div className={cn('h-2 w-full rounded-full bg-neutral-800 overflow-hidden relative', flash && 'ring-2 ring-offset-2 ring-offset-neutral-950', isOverAchieved && 'ring-1 ring-emerald-400/50')} style={flash ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={rounded} role="progressbar">
-      <div className={cn('h-full transition-[width]', isOverAchieved && 'animate-pulse')} style={{ width: `${displayWidth}%`, backgroundColor: overColor }} />
-      {isOverAchieved && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-      )}
+    <div 
+      className={cn(
+        'h-2 w-full rounded-full bg-neutral-800 overflow-hidden relative',
+        flash && 'ring-2 ring-offset-2 ring-offset-neutral-950'
+      )} 
+      style={flash ? { boxShadow: `0 0 0 2px ${barColor}` } : undefined} 
+      aria-valuemin={0} 
+      aria-valuemax={100} 
+      aria-valuenow={rounded} 
+      role="progressbar"
+    >
+      <div 
+        className="h-full transition-all duration-300" 
+        style={{ width: `${displayWidth}%`, backgroundColor: barColor }} 
+      />
     </div>
   );
 }
@@ -211,7 +226,6 @@ function OKRSettingsModal({ okr, pillar, onClose, onUpdateDirection, onUpdateBas
 }
 
 function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, onUpdateTarget, onUpdateDirection, onUpdateBaseline, onUpdateDataSource, onRefresh, onPunt }: { pillar: OkrPillar; okr: Okr | null; onUpdateKr: (kr: OkrKeyResult, value: number | boolean) => Promise<void>; onUpdateObjective: (okrId: string, value: string) => void; onUpdateDesc: (kr: OkrKeyResult, value: string) => void; onUpdateTarget: (kr: OkrKeyResult, value: number) => void; onUpdateDirection: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline: (kr: OkrKeyResult, baseline: number) => void; onUpdateDataSource: (kr: OkrKeyResult, data_source: 'manual' | 'habit', linked_habit_id?: string | null) => void; onRefresh: () => Promise<void>; onPunt: (kr: OkrKeyResult, punted: boolean) => void; }) {
-  const accent = PILLAR_COLORS[pillar]?.base || '#5EEAD4';
   const [editingObjective, setEditingObjective] = useState(false);
   const [objectiveDraft, setObjectiveDraft] = useState<string>(okr?.objective || '');
   const objectiveRef = useRef<HTMLInputElement | null>(null);
@@ -288,7 +302,7 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
       </div>
       <div className="mt-2.5 space-y-3">
         {(okr?.key_results || []).map((kr) => (
-          <KeyResultRow key={kr.id} kr={kr} accent={accent} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} onPunt={onPunt} />
+          <KeyResultRow key={kr.id} kr={kr} onUpdate={(v) => onUpdateKr(kr, v)} onUpdateDesc={onUpdateDesc} onUpdateTarget={onUpdateTarget} onUpdateDirection={onUpdateDirection} onUpdateBaseline={onUpdateBaseline} onPunt={onPunt} />
         ))}
         {(!okr || !okr.key_results || okr.key_results.length === 0) && (
           <div className="py-3 text-sm text-neutral-400">No key results.</div>
@@ -301,7 +315,7 @@ function PillarCard({ pillar, okr, onUpdateKr, onUpdateObjective, onUpdateDesc, 
   );
 }
 
-function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarget, onUpdateBaseline, onPunt }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; accent: string; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; onPunt?: (kr: OkrKeyResult, punted: boolean) => void; }) {
+function KeyResultRow({ kr, onUpdate, saving, onUpdateDesc, onUpdateTarget, onUpdateBaseline, onPunt }: { kr: OkrKeyResult; onUpdate: (val: number | boolean) => void; saving?: boolean; onUpdateDesc?: (kr: OkrKeyResult, value: string) => void; onUpdateTarget?: (kr: OkrKeyResult, value: number) => void; onUpdateDirection?: (kr: OkrKeyResult, direction: 'up' | 'down') => void; onUpdateBaseline?: (kr: OkrKeyResult, baseline: number) => void; onPunt?: (kr: OkrKeyResult, punted: boolean) => void; }) {
   const [isPunting, setIsPunting] = useState(false);
   const [localValue, setLocalValue] = useState<number | boolean | ''>(() => {
     if (kr.kind === 'boolean') return Boolean(kr.current_value);
@@ -398,14 +412,14 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
           ? "border-neutral-800/50 opacity-60" 
           : "border-neutral-800 hover:bg-neutral-800/40 hover:border-neutral-700 hover:shadow-md"
     )}>
-      {/* Punt button - shows on hover, only for non-completed KRs */}
+      {/* Punt button - always visible on mobile, shows on hover on desktop, only for non-completed KRs */}
       {onPunt && !isCompleted && (
         <button
           onClick={handlePunt}
           disabled={isPunting}
           className={cn(
             "absolute -right-2 -top-2 p-1 rounded-full transition-all z-10",
-            "opacity-0 group-hover:opacity-100",
+            "opacity-100 md:opacity-0 md:group-hover:opacity-100",
             isPunted
               ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
               : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30",
@@ -466,12 +480,17 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
       )}
       {/* Line 2: Progress bar */}
       <div className="mt-2 sm:mt-2">
-        <ProgressBar value={progress} color={accent} />
+        <ProgressBar value={progress} isPunted={isPunted} isCompleted={isCompleted} />
       </div>
       {/* Line 3: left percent, right current/target or control */}
       <div className="mt-2 sm:mt-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <div className={cn('text-xs font-medium', progress > 100 ? 'text-emerald-400' : '')} style={progress <= 100 ? { color: accent } : undefined}>
+          <div 
+            className="text-xs font-medium" 
+            style={{ 
+              color: isPunted ? OKR_COLORS.punted.base : isCompleted ? OKR_COLORS.completed.base : OKR_COLORS.inProgress.base 
+            }}
+          >
             {progress}%
           </div>
           {progress > 100 && (
@@ -510,7 +529,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
                 pattern="[0-9]*"
               />
               <span className="text-neutral-400">%</span>
-              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
+              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-hidden />
             </div>
           ) : kr.direction === 'down' ? (
             // Countdown display: baseline → current → target (e.g., 252 → 250 → 245)
@@ -569,7 +588,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
               ) : (
                 <span className="text-emerald-400 font-medium cursor-text" aria-label="Target value" onClick={() => setEditingTarget(true)} title="Click to edit target">{String(kr.target_value ?? 0)}</span>
               )}
-              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
+              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-hidden />
             </div>
           ) : (
             // Count up display: current / target (can exceed target)
@@ -609,7 +628,7 @@ function KeyResultRow({ kr, onUpdate, saving, accent, onUpdateDesc, onUpdateTarg
               ) : (
                 <span className="text-neutral-300 cursor-text" aria-label="Target value" onClick={() => setEditingTarget(true)} title="Click to edit target">{String(kr.target_value ?? 0)}</span>
               )}
-              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-0 group-hover:opacity-100" aria-hidden />
+              <Pencil className="w-3.5 h-3.5 text-neutral-500 opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-hidden />
             </div>
           )}
         </div>

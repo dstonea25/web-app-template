@@ -268,6 +268,34 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     <div className={cn(tokens.layout.container, !isVisible && 'hidden')}>
       <div className="grid gap-6">
         <section>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => toggleSection('dailyIntentions')}
+              className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors"
+            >
+              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
+                Daily Intentions
+              </h2>
+              <svg
+                className={cn(
+                  "w-5 h-5 transition-transform duration-200",
+                  sectionsVisible.dailyIntentions ? "rotate-180" : "rotate-0"
+                )}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <SessionTimerInline />
+          </div>
+          <div className="mt-4">
+            <DailyIntentionsModule isVisible={sectionsVisible.dailyIntentions} />
+          </div>
+        </section>
+
+        <section>
           <div className="flex items-center justify-between gap-4">
             <button
               onClick={() => toggleSection('upcomingCalendar')}
@@ -327,34 +355,6 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               ref={calendarModuleRef}
               isVisible={sectionsVisible.upcomingCalendar} 
             />
-          </div>
-        </section>
-
-        <section>
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => toggleSection('dailyIntentions')}
-              className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors"
-            >
-              <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-                Daily Intentions
-              </h2>
-              <svg
-                className={cn(
-                  "w-5 h-5 transition-transform duration-200",
-                  sectionsVisible.dailyIntentions ? "rotate-180" : "rotate-0"
-                )}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <SessionTimerInline />
-          </div>
-          <div className="mt-4">
-            <DailyIntentionsModule isVisible={sectionsVisible.dailyIntentions} />
           </div>
         </section>
 

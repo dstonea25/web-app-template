@@ -95,6 +95,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   }, []);
 
   const allFilled = PILLARS.every(p => (drafts[p.key] || '').trim().length > 0);
+  const hasStarted = PILLARS.some(p => (drafts[p.key] || '').trim().length > 0);
 
   // Helper function to get compact streak display with both hot and cold streaks
   const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
@@ -192,7 +193,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
         {loading ? (
           <div className="py-4 text-center text-neutral-100">Loading intentions…</div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {PILLARS.map(p => (
               <div 
                 key={p.key} 
@@ -215,11 +216,12 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
                     )}>
                       {PLACEHOLDERS[p.key]}
                     </span>
-                    {!lockedIn && (
+                    {/* Streak display hidden for now - logic kept intact */}
+                    {/* {!lockedIn && (
                       <div className="w-6 text-center flex-shrink-0" title={getStreakTooltip(p.key)}>
                         {getCompactStreakDisplay(p.key)}
                       </div>
-                    )}
+                    )} */}
                   </div>
 
                   <input
@@ -259,7 +261,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
           </div>
         )}
 
-        {!lockedIn && (
+        {!lockedIn && hasStarted && (
           <div className="mt-4 flex items-center justify-end">
             <button
               className={cn(tokens.button.base, tokens.button.primary, 'disabled:opacity-50 disabled:cursor-not-allowed')}

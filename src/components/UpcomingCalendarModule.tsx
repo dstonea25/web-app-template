@@ -32,7 +32,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   learning: { bg: 'bg-amber-950/30', text: 'text-amber-300' },
   travel: { bg: 'bg-cyan-950/30', text: 'text-cyan-300' },
   location: { bg: 'bg-blue-950/40', text: 'text-blue-200' },
-  habit_reminder: { bg: 'bg-violet-950/30', text: 'text-violet-300' },
+  habit_reminder: { bg: 'bg-emerald-950/30', text: 'text-emerald-300' },
 };
 
 const ROW_COLORS = {
@@ -61,7 +61,7 @@ const getCategoryBorderColor = (category?: string | null) => {
     learning: '#FCD34D',
     travel: '#67E8F9',
     location: '#60A5FA',
-    habit_reminder: '#A78BFA',
+    habit_reminder: '#6EE7B7',
   };
   return colorMap[category || ''] || '#737373';
 };
@@ -99,7 +99,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
   // Form state for creating/editing events
   const [formData, setFormData] = useState({
     title: '',
-    category: 'personal',
+    category: '',
     notes: '',
     start_date: '',
     end_date: '',
@@ -338,7 +338,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     setConfirmedRangeEnd(null);
     setFormData({
       title: '',
-      category: 'personal',
+      category: '',
       notes: '',
       start_date: date,
       end_date: date,
@@ -354,7 +354,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     setSelectedEvent(null); // Clear so we show the form
     setFormData({
       title: event.title,
-      category: event.category || 'personal',
+      category: event.category || '',
       notes: event.notes || '',
       start_date: event.start_date,
       end_date: event.end_date,
@@ -449,9 +449,9 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       
       // Only create multi-day event if more than one day selected
       if (start !== end) {
-        setConfirmedRangeStart(start);
-        setConfirmedRangeEnd(end);
-        setSelectedDate(start);
+      setConfirmedRangeStart(start);
+      setConfirmedRangeEnd(end);
+      setSelectedDate(start);
         setDragEndDate(end);
         setIsCreating(true);
         setEditingEvent(null);
@@ -463,7 +463,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
         setSelectedDate(dragStartDate);
         setFormData({
           title: '',
-          category: 'personal',
+          category: '',
           notes: '',
           start_date: dragStartDate,
           end_date: dragStartDate,
@@ -703,7 +703,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       const parsedEvent = await apiClient.parseNaturalLanguageEvent(nlText);
       const input: CalendarEventInput = {
         title: parsedEvent.title,
-        category: parsedEvent.category || 'personal',
+        category: parsedEvent.category || '',
         notes: parsedEvent.notes,
         start_date: parsedEvent.start_date,
         end_date: parsedEvent.end_date,
@@ -818,24 +818,30 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                       return (
                         <button
                           key={habit.id}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleHabitCircleClick(habit, day.date, hasPlannedEvent, isFuture);
                           }}
                           className={cn(
-                            'w-3.5 h-3.5 rounded-full transition-all cursor-pointer relative flex items-center justify-center',
-                            'hover:scale-125 group/habit'
+                            'w-3.5 h-3.5 rounded-full transition-all cursor-pointer relative flex items-center justify-center text-[10px]',
+                            'hover:scale-125 group/habit',
+                            isCompleted && 'bg-emerald-600 border-none',
+                            !isCompleted && isFuture && hasPlannedEvent && 'bg-white/90 border-none',
+                            !isCompleted && !hasPlannedEvent && 'bg-neutral-800 border border-neutral-700 opacity-50'
                           )}
-                          style={{
-                            backgroundColor: isFuture && hasPlannedEvent ? '#FFFFFF' : 'transparent',
-                            border: !isCompleted && !hasPlannedEvent ? '1px solid #525252' : (isFuture && hasPlannedEvent ? '1px solid #FFFFFF' : 'none')
-                          }}
                           title={habit.name}
                         >
-                          {/* Show emoji when completed, nothing when just planned */}
-                          {isCompleted && (
-                            <span className="text-[10px] leading-none">{emoji}</span>
-                          )}
+                          <span className={cn(
+                            'leading-none',
+                            isCompleted && 'opacity-100',
+                            !isCompleted && isFuture && hasPlannedEvent && 'opacity-80',
+                            !isCompleted && !hasPlannedEvent && 'opacity-60'
+                          )}>
+                            {emoji}
+                          </span>
                           
                           {/* Hover tooltip */}
                           <span className="absolute top-5 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover/habit:opacity-100 transition-opacity delay-300 bg-neutral-800 border border-neutral-700 px-2 py-1 rounded text-[10px] text-neutral-200 pointer-events-none z-10 shadow-lg">
@@ -848,9 +854,14 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                   
                   {/* Location display - below habits, above events */}
                   {day.events.some(e => e.category === 'location') && (
-                    <div className="group/location relative px-2 py-1 mb-1 bg-blue-950/30 border border-blue-700/30 rounded text-[10px] text-blue-300 truncate hover:bg-blue-950/40 transition-colors">
+                    <div 
+                      className="group/location relative px-2 py-1 mb-1 bg-blue-950/30 border border-blue-700/30 rounded text-[10px] text-blue-300 truncate hover:bg-blue-950/40 transition-colors"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <span>📍 {day.events.find(e => e.category === 'location')?.title}</span>
                       <button
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
                           const locationEvent = day.events.find(ev => ev.category === 'location');
@@ -881,15 +892,17 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                               style.bg
                             )}
                             style={{ borderLeftColor: borderColor }}
+                            onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedEvent(event);
+                              handleEditEvent(event);
                             }}
                           >
                             <div className={cn('flex-1 min-w-0 text-[11px] font-medium break-words leading-tight', style.text)}>
                               {event.title}
                             </div>
                             <button
+                              onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteEvent(event.id);
@@ -921,7 +934,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
               day.date <= selectedRange.end;
             
             return (
-              <button
+                <button
                 key={day.date}
                 data-date={day.date}
                 onClick={() => {
@@ -929,7 +942,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                     setSelectedDate(day.date);
                     setFormData({
                       title: '',
-                      category: 'personal',
+                      category: '',
                       notes: '',
                       start_date: day.date,
                       end_date: day.date,
@@ -940,11 +953,11 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                     setIsCreating(true);
                     setEditingEvent(null);
                   }
-                }}
+                  }}
                 onTouchStart={(e) => handleTouchStart(day.date, e)}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                className={cn(
+                  className={cn(
                   'w-full text-left px-4 py-3 rounded-lg border transition-colors',
                   'hover:bg-neutral-800/50',
                   isPast && 'opacity-50',
@@ -998,23 +1011,27 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                           return (
                             <button
                               key={habit.id}
+                              onTouchStart={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleHabitCircleClick(habit, day.date, hasPlannedEvent, isFuture);
                               }}
                               className={cn(
-                                'w-5 h-5 rounded-full transition-all cursor-pointer flex items-center justify-center',
-                                'hover:scale-110'
+                                'w-5 h-5 rounded-full transition-all cursor-pointer flex items-center justify-center text-xs',
+                                isCompleted && 'bg-emerald-600 border-none',
+                                !isCompleted && isFuture && hasPlannedEvent && 'bg-white/90 border-none',
+                                !isCompleted && !hasPlannedEvent && 'bg-neutral-800 border border-neutral-700 opacity-50'
                               )}
-                              style={{
-                                backgroundColor: isFuture && hasPlannedEvent ? '#FFFFFF' : 'transparent',
-                                border: !isCompleted && !hasPlannedEvent ? '1px solid #525252' : (isFuture && hasPlannedEvent ? '1px solid #FFFFFF' : 'none')
-                              }}
                               title={habit.name}
                             >
-                              {isCompleted && (
-                                <span className="text-xs leading-none">{emoji}</span>
-                              )}
+                              <span className={cn(
+                                'leading-none',
+                                isCompleted && 'opacity-100',
+                                !isCompleted && isFuture && hasPlannedEvent && 'opacity-80',
+                                !isCompleted && !hasPlannedEvent && 'opacity-60'
+                              )}>
+                                {emoji}
+                              </span>
                             </button>
                           );
                         })}
@@ -1023,9 +1040,14 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                     
                     {/* Location facet */}
                     {day.events.some(e => e.category === 'location') && (
-                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300">
+                      <div 
+                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300"
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <span className="truncate">📍 {day.events.find(e => e.category === 'location')?.title}</span>
                         <button
+                          onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             const locationEvent = day.events.find(ev => ev.category === 'location');
@@ -1054,15 +1076,17 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                               style.bg
                             )}
                             style={{ borderLeftColor: borderColor }}
+                            onTouchStart={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedEvent(event);
+                              handleEditEvent(event);
                             }}
                           >
                             <div className={cn('flex-1 text-[11px] font-medium truncate', style.text)}>
                               {event.title}
                             </div>
                             <button
+                              onTouchStart={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteEvent(event.id);
@@ -1071,8 +1095,8 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                               title="Delete"
                             >
                               <X className="w-3 h-3" />
-                            </button>
-                          </div>
+                </button>
+              </div>
                         );
                       })}
                   </div>
@@ -1112,7 +1136,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       // Editing existing event
       setFormData({
         title: editingEvent.title,
-        category: editingEvent.category || 'personal',
+        category: editingEvent.category || '',
         notes: editingEvent.notes || '',
         start_date: editingEvent.start_date,
         end_date: editingEvent.end_date,
@@ -1125,7 +1149,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       const endDate = dragEndDate || selectedDate;
       setFormData({
         title: '',
-        category: 'personal',
+        category: '',
         notes: '',
         start_date: selectedDate,
         end_date: endDate,
@@ -1167,76 +1191,82 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
   const weekProgress = getCurrentWeekProgress();
   
   // Color mapping for habits (same as HabitWeeklyAchievementGrid)
-  const HABIT_COLORS = [
-    { base: '#6EE7B7', glow: '#A7F3D0' }, // emerald
-    { base: '#5EEAD4', glow: '#99F6E4' }, // teal
-    { base: '#FBBF24', glow: '#FDE68A' }, // amber
-    { base: '#A3E635', glow: '#D9F99D' }, // olive
-    { base: '#FDBA74', glow: '#FED7AA' }, // terracotta
-    { base: '#FDA4AF', glow: '#FECDD3' }, // rose
-  ];
+  // Global color scheme - single emerald green for all habits
+  const HABIT_COLOR = {
+    base: '#6EE7B7', // emerald green
+    glow: '#A7F3D0'  // lighter emerald for glow
+  };
   
-  const getHabitColor = (index: number) => {
-    return HABIT_COLORS[index % HABIT_COLORS.length];
+  const getHabitColor = (_index: number) => {
+    return HABIT_COLOR;
   };
 
   // Render challenges and habit goals section
   const renderChallengesAndGoals = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Weekly Challenges Module */}
-      <ChallengesModule habitStats={habitStats} />
-      
-      {/* Habit Progress Stats */}
-      {habits.length > 0 && currentWeek.length > 0 ? (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
-          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-            {weekProgress.map((item, idx) => {
-              const color = getHabitColor(idx);
-              const progress = item.goal > 0 ? Math.min((item.completions / item.goal) * 100, 100) : 0;
+        {/* Weekly Challenges Module */}
+        <ChallengesModule habitStats={habitStats} />
+        
+        {/* Habit Progress Stats */}
+        {habits.length > 0 && currentWeek.length > 0 ? (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            {weekProgress.map((item) => {
+              const emoji = getHabitEmoji(item.habit.name);
+              const badges = [];
               
-              return (
-                <div key={item.habit.id} className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span 
-                      className="text-sm font-medium"
-                      style={{ color: color.base }}
-                    >
-                      {item.habit.name}
-                    </span>
-                    <span className={cn(
-                      "text-xs font-semibold tabular-nums",
-                      item.goalMet ? 'text-emerald-400' : 'text-neutral-400'
-                    )}>
-                      {item.completions} / {item.goal}
-                    </span>
+              // Create array of badges (goal determines total, completions determines filled)
+              for (let i = 0; i < item.goal; i++) {
+                badges.push(i < item.completions);
+              }
+                
+                return (
+                <div key={item.habit.id} className="flex flex-col gap-2">
+                  {/* Habit name - white text */}
+                    <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-neutral-100">
+                        {item.habit.name}
+                      </span>
+                      <span className={cn(
+                        "text-xs font-semibold tabular-nums",
+                        item.goalMet ? 'text-emerald-400' : 'text-neutral-400'
+                      )}>
+                        {item.completions} / {item.goal}
+                      </span>
+                    </div>
+                    
+                  {/* Badge Collection */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {badges.map((isUnlocked, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          'w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-all',
+                          isUnlocked 
+                            ? 'bg-emerald-500/20 border border-emerald-500/50' 
+                            : 'bg-neutral-800/50 border border-neutral-700 opacity-40'
+                        )}
+                        title={isUnlocked ? 'Unlocked' : 'Locked'}
+                      >
+                        {isUnlocked ? emoji : '🔒'}
+                      </div>
+                    ))}
+                    </div>
                   </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full transition-all duration-300 rounded-full"
-                      style={{ 
-                        width: `${progress}%`,
-                        backgroundColor: item.goalMet ? '#6EE7B7' : color.base,
-                        boxShadow: item.goalMet ? `0 0 8px ${color.glow}` : 'none'
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
-          <div className="text-xs text-neutral-500 italic">
-            No habits configured
+        ) : (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+            <div className="text-xs text-neutral-500 italic">
+              No habits configured
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
   );
 
   return (
@@ -1261,7 +1291,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       {weekAfter.length > 0 && renderWeekRow(weekAfter, 'Week After')}
       
       {/* Simple Event Modal */}
-      {(selectedDate || selectedEvent) && (
+      {(selectedDate || editingEvent) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
           setSelectedDate(null);
           setSelectedEvent(null);
@@ -1274,7 +1304,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-neutral-100">
-                {selectedEvent && !editingEvent ? 'Event Details' : editingEvent ? 'Edit Event' : isCreating ? `Add Event - ${selectedDate}` : selectedDate || 'Event'}
+                {editingEvent ? 'Edit Event' : `Add Event${selectedDate ? ` - ${selectedDate}` : ''}`}
               </h3>
               <button 
                 onClick={() => {
@@ -1292,57 +1322,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
               </button>
             </div>
             
-            {selectedEvent ? (
-              <div className="space-y-3">
-                <div>
-                  <div className="text-sm text-neutral-400">Title</div>
-                  <div className="text-neutral-100">{selectedEvent.title}</div>
-                </div>
-                {selectedEvent.notes && (
-                  <div>
-                    <div className="text-sm text-neutral-400">Notes</div>
-                    <div className="text-neutral-100">{selectedEvent.notes}</div>
-                  </div>
-                )}
-                <div>
-                  <div className="text-sm text-neutral-400">Date</div>
-                  <div className="text-neutral-100">
-                    {selectedEvent.start_date === selectedEvent.end_date 
-                      ? selectedEvent.start_date 
-                      : `${selectedEvent.start_date} to ${selectedEvent.end_date}`}
-                  </div>
-                </div>
-                {selectedEvent.start_time && (
-                  <div>
-                    <div className="text-sm text-neutral-400">Time</div>
-                    <div className="text-neutral-100">{selectedEvent.start_time}{selectedEvent.end_time && ` - ${selectedEvent.end_time}`}</div>
-                  </div>
-                )}
-                <div className="flex gap-2 pt-4">
-                  <button
-                    onClick={() => handleEditEvent(selectedEvent)}
-                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteEvent(selectedEvent.id)}
-                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedEvent(null);
-                      setSelectedDate(null);
-                    }}
-                    className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded-lg transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : isCreating || editingEvent ? (
+            {(isCreating || editingEvent) && (
               <form onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-300 mb-1.5">
@@ -1368,6 +1348,7 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
+                    <option value="">None</option>
                     <option value="personal">Personal</option>
                     <option value="work">Work</option>
                     <option value="health">Health</option>
@@ -1463,6 +1444,20 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                   >
                     {editingEvent ? 'Update' : 'Create'} Event
                   </button>
+                  {editingEvent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteEvent(editingEvent.id);
+                        setSelectedDate(null);
+                        setIsCreating(false);
+                        setEditingEvent(null);
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-medium"
+                    >
+                      Delete
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1476,21 +1471,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                   </button>
                 </div>
               </form>
-            ) : (
-              <div className="space-y-3">
-                <div className="text-sm text-neutral-400">
-                  <p>Click on events to view details or use the + button to add new events.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedDate(null);
-                    setIsCreating(false);
-                  }}
-                  className="w-full px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded-lg transition-colors"
-                >
-                  Close
-                </button>
-              </div>
             )}
           </div>
         </div>

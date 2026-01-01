@@ -9,24 +9,10 @@ interface HabitWeeklyAchievementGridProps {
   isVisible?: boolean;
 }
 
-// Color palette matching other habit views
-const PALETTE = {
-  emerald:   { base: '#6EE7B7', glow: '#A7F3D0' },
-  teal:      { base: '#5EEAD4', glow: '#99F6E4' },
-  amber:     { base: '#FBBF24', glow: '#FDE68A' },
-  olive:     { base: '#A3E635', glow: '#D9F99D' },
-  terracotta:{ base: '#FDBA74', glow: '#FED7AA' },
-  rose:      { base: '#FDA4AF', glow: '#FECDD3' },
-};
-
-const COLOR_CYCLE = [PALETTE.emerald, PALETTE.teal, PALETTE.amber, PALETTE.olive, PALETTE.terracotta, PALETTE.rose];
-
-const HABIT_COLOR_BY_ID: Record<string, { base: string; glow: string }> = {
-  workout: PALETTE.emerald,
-  building: PALETTE.terracotta,
-  reading: PALETTE.olive,
-  writing: PALETTE.amber,
-  fasting: PALETTE.teal,
+// Global color scheme - single emerald green for all habits
+const HABIT_COLOR = {
+  base: '#6EE7B7',  // emerald green
+  glow: '#A7F3D0'   // lighter emerald for glow
 };
 
 export const HabitWeeklyAchievementGrid: React.FC<HabitWeeklyAchievementGridProps> = ({
@@ -43,14 +29,10 @@ export const HabitWeeklyAchievementGrid: React.FC<HabitWeeklyAchievementGridProp
   const [goalInputValue, setGoalInputValue] = React.useState<string>('');
   const [yearlyStats, setYearlyStats] = React.useState<Record<string, { weekly_goal: number | null }>>({});
 
-  // Color mapping function
-  const colorForHabit = React.useCallback((habitId: string) => {
-    const mapped = HABIT_COLOR_BY_ID[habitId];
-    if (mapped) return mapped;
-    const idx = Math.max(0, habits.findIndex(h => h.id === habitId));
-    const i = (idx >= 0 ? idx : 0) % COLOR_CYCLE.length;
-    return COLOR_CYCLE[i];
-  }, [habits]);
+  // Color mapping function - returns single global color
+  const colorForHabit = React.useCallback((_habitId: string) => {
+    return HABIT_COLOR;
+  }, []);
 
   // Track if data has been loaded
   const hasLoadedAchievements = React.useRef(false);

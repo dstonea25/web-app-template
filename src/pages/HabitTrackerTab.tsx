@@ -101,32 +101,15 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   }, []);
 
   // Color palette per habit (cycles if more habits). Colors chosen from existing theme hues.
-  // Earthy theme palette (no blue/purple): emerald, teal, amber, olive, terracotta, rose
-  // Brighter "on" tones for dark background (stroke/number) + matching glow
-  const PALETTE = React.useMemo(() => ({
-    emerald:   { base: '#6EE7B7', glow: '#A7F3D0' },
-    teal:      { base: '#5EEAD4', glow: '#99F6E4' },
-    amber:     { base: '#FBBF24', glow: '#FDE68A' },
-    olive:     { base: '#A3E635', glow: '#D9F99D' },
-    terracotta:{ base: '#FDBA74', glow: '#FED7AA' },
-    rose:      { base: '#FDA4AF', glow: '#FECDD3' },
+  // Global color scheme - single emerald green for all habits
+  const HABIT_COLOR = React.useMemo(() => ({
+    base: '#6EE7B7',  // emerald green
+    glow: '#A7F3D0'   // lighter emerald for glow
   }), []);
-  const COLOR_CYCLE = React.useMemo(() => [PALETTE.emerald, PALETTE.teal, PALETTE.amber, PALETTE.olive, PALETTE.terracotta, PALETTE.rose], [PALETTE]);
-  const HABIT_COLOR_BY_ID = React.useMemo<Record<string, { base: string; glow: string }>>(() => ({
-    workout: PALETTE.emerald,
-    building: PALETTE.terracotta,
-    reading: PALETTE.olive,
-    writing: PALETTE.amber,
-    fasting: PALETTE.teal,
-  }), [PALETTE]);
-  const colorForHabit = React.useCallback((habitId: string | null | undefined) => {
-    if (!habitId) return COLOR_CYCLE[0];
-    const mapped = HABIT_COLOR_BY_ID[habitId];
-    if (mapped) return mapped;
-    const idx = Math.max(0, habits.findIndex(h => h.id === habitId));
-    const i = (idx >= 0 ? idx : 0) % COLOR_CYCLE.length;
-    return COLOR_CYCLE[i];
-  }, [habits, HABIT_COLOR_BY_ID, COLOR_CYCLE]);
+  
+  const colorForHabit = React.useCallback((_habitId: string | null | undefined) => {
+    return HABIT_COLOR;
+  }, [HABIT_COLOR]);
   const initialHabitsRef = React.useRef<Habit[]>(habits);
   const initStartRef = React.useRef<number | null>(null);
   const switchStartRef = React.useRef<number | null>(null);
