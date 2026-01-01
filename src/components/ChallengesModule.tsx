@@ -1035,11 +1035,14 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                                                 : 'border-neutral-500'
                                         )}
                                       >
-                                        {/* Only show check icon if enabled AND available */}
-                                        {isEnabled && !isUnavailable && <Check className="w-2.5 h-2.5 text-white" />}
-                                        {/* Show special indicator icons for unavailable KRs - no checkmark */}
-                                        {isCompleted && <span className="text-[8px] text-emerald-400/50">✓</span>}
-                                        {isPunted && !isCompleted && <span className="text-[8px] text-amber-400/50">⏸</span>}
+                                        {/* Mutually exclusive: either show enabled checkmark OR status icon */}
+                                        {isCompleted ? (
+                                          <span className="text-[8px] text-emerald-400/50">✓</span>
+                                        ) : isPunted ? (
+                                          <span className="text-[8px] text-amber-400/50">⏸</span>
+                                        ) : isEnabled ? (
+                                          <Check className="w-2.5 h-2.5 text-white" />
+                                        ) : null}
                                       </div>
                                       <span>{pillarEmoji}</span>
                                       <span className={cn(
