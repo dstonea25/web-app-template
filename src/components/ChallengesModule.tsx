@@ -1035,12 +1035,10 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                                                 : 'border-neutral-500'
                                         )}
                                       >
-                                        {/* Mutually exclusive: either show enabled checkmark OR status icon */}
-                                        {isCompleted ? (
-                                          <span className="text-[8px] text-emerald-400/50">✓</span>
-                                        ) : isPunted ? (
+                                        {/* Show checkmark only for enabled KRs, pause icon for punted, nothing for completed */}
+                                        {isPunted ? (
                                           <span className="text-[8px] text-amber-400/50">⏸</span>
-                                        ) : isEnabled ? (
+                                        ) : isEnabled && !isCompleted ? (
                                           <Check className="w-2.5 h-2.5 text-white" />
                                         ) : null}
                                       </div>
