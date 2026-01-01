@@ -564,7 +564,7 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
               <div
                 key={challenge.id}
                 className={cn(
-                  'group relative flex items-center gap-3 py-2 px-2 rounded-lg transition-all -mx-1',
+                  'group relative flex items-start gap-3 py-2 px-2 rounded-lg transition-all -mx-1',
                   challenge.completed 
                     ? 'opacity-60' 
                     : 'hover:bg-neutral-800/50'
@@ -595,7 +595,7 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                 {/* Action Text */}
                 <span
                   className={cn(
-                    'text-sm flex-1 truncate',
+                    'text-sm flex-1 break-words',
                     challenge.completed ? 'text-neutral-500 line-through' : 'text-neutral-100'
                   )}
                 >
@@ -1035,9 +1035,11 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                                                 : 'border-neutral-500'
                                         )}
                                       >
-                                        {!isUnavailable && isEnabled && <Check className="w-2.5 h-2.5 text-white" />}
-                                        {isCompleted && <span className="text-[8px]">✓</span>}
-                                        {isPunted && !isCompleted && <span className="text-[8px]">⏸</span>}
+                                        {/* Only show check icon if enabled AND available */}
+                                        {isEnabled && !isUnavailable && <Check className="w-2.5 h-2.5 text-white" />}
+                                        {/* Show special indicator icons for unavailable KRs - no checkmark */}
+                                        {isCompleted && <span className="text-[8px] text-emerald-400/50">✓</span>}
+                                        {isPunted && !isCompleted && <span className="text-[8px] text-amber-400/50">⏸</span>}
                                       </div>
                                       <span>{pillarEmoji}</span>
                                       <span className={cn(
