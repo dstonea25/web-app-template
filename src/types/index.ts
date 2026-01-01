@@ -96,6 +96,7 @@ export interface Habit {
   id: string;
   name: string;
   rule?: string;
+  display_order?: number;
 }
 
 export interface HabitEvent {

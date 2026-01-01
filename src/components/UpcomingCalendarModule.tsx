@@ -3,7 +3,7 @@ import type { CalendarEvent, CalendarEventInput, Habit, HabitYearlyStats } from 
 import { tokens, cn } from '../theme/config';
 import { apiClient } from '../lib/api';
 import toast from '../lib/notifications/toast';
-import { X, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
 import { ChallengesModule } from './ChallengesModule';
 
 interface UpcomingCalendarModuleProps {
@@ -115,6 +115,11 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
   const [confirmedRangeStart, setConfirmedRangeStart] = useState<string | null>(null);
   const [confirmedRangeEnd, setConfirmedRangeEnd] = useState<string | null>(null);
   
+  // Mobile long press state
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isLongPressActive, setIsLongPressActive] = useState(false);
+  
   // Habit tracking state
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitEntries, setHabitEntries] = useState<{ habitId: string; date: string; complete: boolean }[]>([]);
@@ -148,6 +153,20 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     
     return () => clearTimeout(timer);
   }, [isVisible]);
+
+  // Listen for habit reordering events and reload habits
+  useEffect(() => {
+    const handleHabitsReordered = () => {
+      // Reload habits data when reordered
+      loadHabitsData();
+    };
+
+    window.addEventListener('dashboard:habits-reordered', handleHabitsReordered as EventListener);
+    return () => {
+      window.removeEventListener('dashboard:habits-reordered', handleHabitsReordered as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadUpcomingEvents = async () => {
     try {
@@ -394,10 +413,13 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
         toast.success('Event created');
       }
       
-      // Close modal
+      // Close modal and clear drag states
       setIsCreating(false);
       setEditingEvent(null);
       setSelectedDate(null);
+      setDragEndDate(null);
+      setConfirmedRangeStart(null);
+      setConfirmedRangeEnd(null);
     } catch (error) {
       console.error('Failed to save event:', error);
       toast.error('Failed to save event');
@@ -424,11 +446,116 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       // Confirm the range
       const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
       const end = dragStartDate < dragEndDate ? dragEndDate : dragStartDate;
-      setConfirmedRangeStart(start);
-      setConfirmedRangeEnd(end);
-      setSelectedDate(start);
+      
+      // Only create multi-day event if more than one day selected
+      if (start !== end) {
+        setConfirmedRangeStart(start);
+        setConfirmedRangeEnd(end);
+        setSelectedDate(start);
+        setDragEndDate(end);
+        setIsCreating(true);
+        setEditingEvent(null);
+        setIsDragging(false);
+        setDragStartDate(null);
+        return; // Keep dragEndDate for the form
+      } else {
+        // Single day - open event form
+        setSelectedDate(dragStartDate);
+        setFormData({
+          title: '',
+          category: 'personal',
+          notes: '',
+          start_date: dragStartDate,
+          end_date: dragStartDate,
+          start_time: '',
+          end_time: '',
+          all_day: true,
+        });
+        setIsCreating(true);
+        setEditingEvent(null);
+      }
     }
     setIsDragging(false);
+    setDragStartDate(null);
+    setDragEndDate(null);
+  };
+
+  // Mobile touch handlers for long press + drag
+  const handleTouchStart = (date: string, e: React.TouchEvent) => {
+    // Don't start if touching an event
+    if ((e.target as HTMLElement).closest('.group\\/event, .group\\/location')) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+    
+    // Start long press timer (500ms)
+    const timer = setTimeout(() => {
+      setIsLongPressActive(true);
+      setIsDragging(true);
+      setDragStartDate(date);
+      setDragEndDate(date);
+      setConfirmedRangeStart(null);
+      setConfirmedRangeEnd(null);
+      
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500);
+    
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    
+    // If long press hasn't activated yet, check if user moved too much (cancel long press)
+    if (!isLongPressActive && touchStartPos && longPressTimer) {
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+      
+      // If moved more than 10px, cancel long press (user is scrolling)
+      if (deltaX > 10 || deltaY > 10) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+        setTouchStartPos(null);
+      }
+      return;
+    }
+    
+    // If long press is active and dragging, find the element under the touch
+    if (isLongPressActive && isDragging && dragStartDate) {
+      e.preventDefault(); // Prevent scrolling during drag selection
+      
+      // Find element at touch position
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const dayButton = element?.closest('[data-date]');
+      
+      if (dayButton) {
+        const date = dayButton.getAttribute('data-date');
+        if (date) {
+          setDragEndDate(date);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    // Clean up long press timer if still pending
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    // If long press was active, finalize the selection
+    if (isLongPressActive) {
+      handleDragEnd();
+      setIsLongPressActive(false);
+    }
+    
+    setTouchStartPos(null);
   };
 
   const getSelectedRange = () => {
@@ -618,7 +745,9 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     return (
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-neutral-400">{label}</h3>
-        <div className="grid grid-cols-7 gap-2">
+        
+        {/* Desktop: 7-column grid layout */}
+        <div className="hidden md:grid md:grid-cols-7 gap-2">
           {weekData.map((day) => {
             const isToday = day.date === today;
             const isPast = day.date < today;
@@ -633,9 +762,9 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
             return (
               <div key={day.date} className="relative group/day">
                 <button
+                  data-date={day.date}
                   onMouseDown={(e) => handleDragStart(day.date, e)}
                   onMouseEnter={() => handleDragOver(day.date)}
-                  onClick={() => handleDayClick(day.date)}
                   className={cn(
                     'w-full h-full min-h-[120px] text-left p-3 rounded-lg border transition-all',
                     'hover:bg-neutral-800/50',
@@ -775,11 +904,28 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                       })}
                   </div>
                 </button>
-                
-                {/* Quick Add Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Mobile: Compact row layout (similar to Calendar Tab mobile) */}
+        <div className="md:hidden space-y-2">
+          {weekData.map((day) => {
+            const isToday = day.date === today;
+            const isPast = day.date < today;
+            const isSelected = selectedDate === day.date;
+            const rowAppearance = getRowAppearance(day);
+            const isInDragRange = selectedRange && 
+              day.date >= selectedRange.start && 
+              day.date <= selectedRange.end;
+            
+            return (
+              <button
+                key={day.date}
+                data-date={day.date}
+                onClick={() => {
+                  if (!isDragging) {
                     setSelectedDate(day.date);
                     setFormData({
                       title: '',
@@ -793,18 +939,145 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                     });
                     setIsCreating(true);
                     setEditingEvent(null);
-                  }}
-                  className={cn(
-                    'absolute bottom-2 left-1/2 -translate-x-1/2',
-                    'opacity-0 group-hover/day:opacity-100',
-                    'p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full',
-                    'transition-all shadow-lg hover:scale-110 z-10'
-                  )}
-                  title="Quick add event"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                  }
+                }}
+                onTouchStart={(e) => handleTouchStart(day.date, e)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                className={cn(
+                  'w-full text-left px-4 py-3 rounded-lg border transition-colors',
+                  'hover:bg-neutral-800/50',
+                  isPast && 'opacity-50',
+                  isInDragRange && 'bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/50',
+                  !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500',
+                  !isInDragRange && !isSelected && rowAppearance.bg,
+                  !isInDragRange && !isSelected && rowAppearance.border,
+                  isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                  isDragging && 'select-none',
+                )}
+              >
+                {/* Mobile Layout: Date | Content */}
+                <div className="flex gap-3">
+                  {/* Left: Date info */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className={cn(
+                      'text-sm font-medium w-9',
+                      day.isWeekend ? 'text-emerald-400' : 'text-neutral-400'
+                    )}>
+                      {day.dayOfWeek}
+                    </span>
+                    <div className="w-2.5 flex items-center justify-center flex-shrink-0">
+                      {rowAppearance.hasPto && (
+                        <div className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm" title="PTO" />
+                      )}
+                    </div>
+                    <span className={cn(
+                      'text-lg font-semibold w-8',
+                      day.isWeekend ? 'text-emerald-300' : 'text-neutral-100'
+                    )}>
+                      {day.dayNumber}
+                    </span>
+                  </div>
+                  
+                  {/* Right: Content column */}
+                  <div className="flex-1 space-y-2 min-w-0">
+                    {/* Habit Circles Row */}
+                    {habits.length > 0 && (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {habits.slice(0, 6).map((habit) => {
+                          const isCompleted = isHabitCompletedOnDate(habit.id, day.date);
+                          const isFuture = day.date > today;
+                          const hasPlannedEvent = allEvents.some(e => 
+                            e.category === 'habit_reminder' &&
+                            e.title.toLowerCase().includes(habit.name.toLowerCase()) &&
+                            e.start_date <= day.date && 
+                            e.end_date >= day.date
+                          );
+                          const emoji = getHabitEmoji(habit.name);
+                          
+                          return (
+                            <button
+                              key={habit.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHabitCircleClick(habit, day.date, hasPlannedEvent, isFuture);
+                              }}
+                              className={cn(
+                                'w-5 h-5 rounded-full transition-all cursor-pointer flex items-center justify-center',
+                                'hover:scale-110'
+                              )}
+                              style={{
+                                backgroundColor: isFuture && hasPlannedEvent ? '#FFFFFF' : 'transparent',
+                                border: !isCompleted && !hasPlannedEvent ? '1px solid #525252' : (isFuture && hasPlannedEvent ? '1px solid #FFFFFF' : 'none')
+                              }}
+                              title={habit.name}
+                            >
+                              {isCompleted && (
+                                <span className="text-xs leading-none">{emoji}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {/* Location facet */}
+                    {day.events.some(e => e.category === 'location') && (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300">
+                        <span className="truncate">📍 {day.events.find(e => e.category === 'location')?.title}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const locationEvent = day.events.find(ev => ev.category === 'location');
+                            if (locationEvent) handleDeleteEvent(locationEvent.id);
+                          }}
+                          className="flex-shrink-0 text-blue-400 hover:text-blue-200 p-0.5"
+                          title="Remove location"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Event pills */}
+                    {day.events
+                      .filter(event => !event.is_pto && event.category !== 'location')
+                      .map(event => {
+                        const style = getCategoryStyle(event.category);
+                        const borderColor = getCategoryBorderColor(event.category);
+                        
+                        return (
+                          <div
+                            key={event.id}
+                            className={cn(
+                              'group/event flex items-center gap-1.5 px-2 py-1 rounded border-l-2',
+                              style.bg
+                            )}
+                            style={{ borderLeftColor: borderColor }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                            }}
+                          >
+                            <div className={cn('flex-1 text-[11px] font-medium truncate', style.text)}>
+                              {event.title}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event.id);
+                              }}
+                              className="text-neutral-400 hover:text-rose-400 flex-shrink-0"
+                              title="Delete"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </button>
             );
           })}
         </div>
@@ -823,6 +1096,45 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, [isDragging, dragStartDate, dragEndDate]);
+
+  // Cleanup long press timer on unmount or when cancelled
+  useEffect(() => {
+    return () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+      }
+    };
+  }, [longPressTimer]);
+
+  // Update form data when creating multi-day event or editing
+  useEffect(() => {
+    if (editingEvent) {
+      // Editing existing event
+      setFormData({
+        title: editingEvent.title,
+        category: editingEvent.category || 'personal',
+        notes: editingEvent.notes || '',
+        start_date: editingEvent.start_date,
+        end_date: editingEvent.end_date,
+        start_time: editingEvent.start_time || '',
+        end_time: editingEvent.end_time || '',
+        all_day: editingEvent.all_day ?? true,
+      });
+    } else if (isCreating && selectedDate) {
+      // Creating new event - use drag end date if available
+      const endDate = dragEndDate || selectedDate;
+      setFormData({
+        title: '',
+        category: 'personal',
+        notes: '',
+        start_date: selectedDate,
+        end_date: endDate,
+        start_time: '',
+        end_time: '',
+        all_day: true,
+      });
+    }
+  }, [editingEvent, isCreating, selectedDate, dragEndDate]);
 
   if (!isVisible) {
     return null;
@@ -868,69 +1180,82 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     return HABIT_COLORS[index % HABIT_COLORS.length];
   };
 
+  // Render challenges and habit goals section
+  const renderChallengesAndGoals = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Weekly Challenges Module */}
+      <ChallengesModule habitStats={habitStats} />
+      
+      {/* Habit Progress Stats */}
+      {habits.length > 0 && currentWeek.length > 0 ? (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            {weekProgress.map((item, idx) => {
+              const color = getHabitColor(idx);
+              const progress = item.goal > 0 ? Math.min((item.completions / item.goal) * 100, 100) : 0;
+              
+              return (
+                <div key={item.habit.id} className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span 
+                      className="text-sm font-medium"
+                      style={{ color: color.base }}
+                    >
+                      {item.habit.name}
+                    </span>
+                    <span className={cn(
+                      "text-xs font-semibold tabular-nums",
+                      item.goalMet ? 'text-emerald-400' : 'text-neutral-400'
+                    )}>
+                      {item.completions} / {item.goal}
+                    </span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full transition-all duration-300 rounded-full"
+                      style={{ 
+                        width: `${progress}%`,
+                        backgroundColor: item.goalMet ? '#6EE7B7' : color.base,
+                        boxShadow: item.goalMet ? `0 0 8px ${color.glow}` : 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
+          <div className="text-xs text-neutral-500 italic">
+            No habits configured
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-
-      {/* Calendar Weeks */}
-      {currentWeek.length > 0 && renderWeekRow(currentWeek, 'This Week')}
       
-      {/* Challenges and Habit Goals Row */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Weekly Challenges Module */}
-        <ChallengesModule habitStats={habitStats} />
-        
-        {/* Habit Progress Stats */}
-        {habits.length > 0 && currentWeek.length > 0 ? (
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-              {weekProgress.map((item, idx) => {
-                const color = getHabitColor(idx);
-                const progress = item.goal > 0 ? Math.min((item.completions / item.goal) * 100, 100) : 0;
-                
-                return (
-                  <div key={item.habit.id} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span 
-                        className="text-sm font-medium"
-                        style={{ color: color.base }}
-                      >
-                        {item.habit.name}
-                      </span>
-                      <span className={cn(
-                        "text-xs font-semibold tabular-nums",
-                        item.goalMet ? 'text-emerald-400' : 'text-neutral-400'
-                      )}>
-                        {item.completions} / {item.goal}
-                      </span>
-                    </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full transition-all duration-300 rounded-full"
-                        style={{ 
-                          width: `${progress}%`,
-                          backgroundColor: item.goalMet ? '#6EE7B7' : color.base,
-                          boxShadow: item.goalMet ? `0 0 8px ${color.glow}` : 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-neutral-400 mb-3">Habit Goals</h4>
-            <div className="text-xs text-neutral-500 italic">
-              No habits configured
-            </div>
-          </div>
-        )}
+      {/* Mobile: Challenges and Habit Goals ABOVE weeks */}
+      <div className="md:hidden">
+        {renderChallengesAndGoals()}
       </div>
       
+      {/* This Week */}
+      {currentWeek.length > 0 && renderWeekRow(currentWeek, 'This Week')}
+      
+      {/* Desktop: Challenges and Habit Goals AFTER first week */}
+      <div className="hidden md:block">
+        {renderChallengesAndGoals()}
+      </div>
+      
+      {/* Remaining Weeks */}
       {nextWeek.length > 0 && renderWeekRow(nextWeek, 'Next Week')}
       
       {weekAfter.length > 0 && renderWeekRow(weekAfter, 'Week After')}
@@ -942,6 +1267,9 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
           setSelectedEvent(null);
           setIsCreating(false);
           setEditingEvent(null);
+          setDragEndDate(null);
+          setConfirmedRangeStart(null);
+          setConfirmedRangeEnd(null);
         }}>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -954,6 +1282,9 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
                   setSelectedEvent(null);
                   setIsCreating(false);
                   setEditingEvent(null);
+                  setDragEndDate(null);
+                  setConfirmedRangeStart(null);
+                  setConfirmedRangeEnd(null);
                 }}
                 className="text-neutral-400 hover:text-neutral-200"
               >

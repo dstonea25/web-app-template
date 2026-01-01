@@ -528,12 +528,49 @@ export class ApiClient {
     if (this.inFlightHabitsPromise) return this.inFlightHabitsPromise;
     const t0 = performance.now();
     this.inFlightHabitsPromise = (async () => {
-      const { data, error } = await supabase
-        .from('habits')
-        .select('id, name')
-        .order('created_at', { ascending: true });
+      // Try to get display_order, but fallback gracefully if column doesn't exist
+      let query = supabase.from('habits').select('id, name, display_order');
+      
+      // Check if display_order column exists by trying the query
+      const { data, error } = await query;
+      
+      if (error && error.message.includes('display_order')) {
+        // Column doesn't exist yet, fetch without it
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('habits')
+          .select('id, name')
+          .order('created_at', { ascending: true });
+        
+        if (fallbackError) throw fallbackError;
+        const habits = ((fallbackData || []) as { id: string; name: string }[]).map((h) => ({ 
+          id: h.id, 
+          name: h.name
+        }));
+        this.habitsCache = habits;
+        this.writeCache(ApiClient.HABITS_CACHE_KEY, habits);
+        const t1 = performance.now();
+        console.log('supabase:fetchHabits ms:', Math.round(t1 - t0));
+        return habits;
+      }
+      
       if (error) throw error;
-      const habits = ((data || []) as { id: string; name: string }[]).map((h) => ({ id: h.id, name: h.name }));
+      
+      // Sort: display_order first (nulls last), then created_at
+      const sortedData = (data || []).sort((a: any, b: any) => {
+        if (a.display_order == null && b.display_order == null) {
+          // Both null, maintain original order (by id or created_at if available)
+          return 0;
+        }
+        if (a.display_order == null) return 1; // a goes after b
+        if (b.display_order == null) return -1; // b goes after a
+        return a.display_order - b.display_order;
+      });
+      
+      const habits = sortedData.map((h: any) => ({ 
+        id: h.id, 
+        name: h.name,
+        display_order: h.display_order 
+      }));
       this.habitsCache = habits;
       this.writeCache(ApiClient.HABITS_CACHE_KEY, habits);
       const t1 = performance.now();
@@ -546,6 +583,33 @@ export class ApiClient {
     } finally {
       this.inFlightHabitsPromise = null;
     }
+  }
+
+  async updateHabitDisplayOrder(habitOrders: { id: string; display_order: number }[]): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase not configured');
+    }
+
+    // Update each habit's display_order
+    const updates = habitOrders.map(({ id, display_order }) =>
+      supabase
+        .from('habits')
+        .update({ display_order })
+        .eq('id', id)
+    );
+
+    const results = await Promise.all(updates);
+    
+    // Check for errors
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      throw new Error(`Failed to update habit order: ${errors[0].error?.message}`);
+    }
+
+    // Clear cache to force refresh
+    this.habitsCache = null;
+    this.writeCache(ApiClient.HABITS_CACHE_KEY, null);
   }
 
   async fetchHabitEntriesForYear(year: number): Promise<{ habitId: string; date: string; complete: boolean }[]> {

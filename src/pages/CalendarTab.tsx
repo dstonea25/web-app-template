@@ -229,6 +229,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [confirmedRangeStart, setConfirmedRangeStart] = useState<string | null>(null);
   const [confirmedRangeEnd, setConfirmedRangeEnd] = useState<string | null>(null);
   
+  // Mobile long press state
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isLongPressActive, setIsLongPressActive] = useState(false);
+  
   // Track which months are expanded (default: current month + all future)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => {
     const today = new Date();
@@ -1036,6 +1041,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     }
   }, [isDragging, dragStartDate, dragEndDate]);
 
+  // Cleanup long press timer on unmount or when cancelled
+  useEffect(() => {
+    return () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+      }
+    };
+  }, [longPressTimer]);
+
   // Close settings when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1315,6 +1329,84 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     setIsDragging(false);
     setDragStartDate(null);
     setDragEndDate(null);
+  };
+
+  // Mobile touch handlers for long press + drag
+  const handleTouchStart = (date: string, e: React.TouchEvent) => {
+    // Don't start if touching an event
+    if ((e.target as HTMLElement).closest('.group\\/event, .group\\/location')) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+    
+    // Start long press timer (500ms)
+    const timer = setTimeout(() => {
+      setIsLongPressActive(true);
+      setIsDragging(true);
+      setDragStartDate(date);
+      setDragEndDate(date);
+      setConfirmedRangeStart(null);
+      setConfirmedRangeEnd(null);
+      
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500);
+    
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    
+    // If long press hasn't activated yet, check if user moved too much (cancel long press)
+    if (!isLongPressActive && touchStartPos && longPressTimer) {
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+      
+      // If moved more than 10px, cancel long press (user is scrolling)
+      if (deltaX > 10 || deltaY > 10) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+        setTouchStartPos(null);
+      }
+      return;
+    }
+    
+    // If long press is active and dragging, find the element under the touch
+    if (isLongPressActive && isDragging && dragStartDate) {
+      e.preventDefault(); // Prevent scrolling during drag selection
+      
+      // Find element at touch position
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const dayButton = element?.closest('[data-date]');
+      
+      if (dayButton) {
+        const date = dayButton.getAttribute('data-date');
+        if (date) {
+          setDragEndDate(date);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    // Clean up long press timer if still pending
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    // If long press was active, finalize the selection
+    if (isLongPressActive) {
+      handleDragEnd();
+      setIsLongPressActive(false);
+    }
+    
+    setTouchStartPos(null);
   };
 
   // Get the selected date range for visual feedback
@@ -1663,6 +1755,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                       const hasEvents = day.events.filter(e => !e.is_pto && e.category !== 'location').length > 0; // Exclude PTO and location from event count
                     const isToday = day.date === today;
                     const rowAppearance = getRowAppearance(day);
+                    const isInDragRange = selectedRange.includes(day.date);
                     
                     return (
                       <div
@@ -1674,67 +1767,84 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                       >
                         <button
                           ref={isToday ? todayRef : undefined}
-                          onClick={() => handleDayClick(day.date)}
+                          data-date={day.date}
+                          onClick={() => !isDragging && handleDayClick(day.date)}
+                          onTouchStart={(e) => handleTouchStart(day.date, e)}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
                           className={cn(
                             'w-full text-left px-4 py-3 rounded-lg border transition-colors',
                             'hover:bg-neutral-800/50',
-                            isSelected && 'bg-neutral-800 border-emerald-500',
-                            !isSelected && rowAppearance.bg,
-                            !isSelected && rowAppearance.border,
-                            isToday && !isSelected && 'ring-2 ring-emerald-400/50',
+                            isInDragRange && 'bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/50',
+                            !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500',
+                            !isInDragRange && !isSelected && rowAppearance.bg,
+                            !isInDragRange && !isSelected && rowAppearance.border,
+                            isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                            isDragging && 'select-none',
                           )}
                           style={{ 
                             scrollMarginTop: isToday ? '200px' : undefined // Space for 2-3 days above + sticky header
                           }}
                         >
-                        <div className="flex items-center gap-3">
-                          {/* Date info */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                        {/* Mobile compact layout: Date left | Facets right */}
+                        <div className="flex gap-3">
+                          {/* Left: Date info - fixed column widths for alignment */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {/* Column 1: Day name - fixed width */}
                             <span className={cn(
-                              'text-sm font-medium w-12',
+                              'text-sm font-medium w-9',
                               day.isWeekend ? 'text-emerald-400' : 'text-neutral-400'
                             )}>
                               {day.dayOfWeek}
                             </span>
+                            {/* Column 2: PTO dot space - fixed width, centered */}
+                            <div className="w-2.5 flex items-center justify-center flex-shrink-0">
+                              {rowAppearance.hasPto && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveDayMetadata(day.date, 'pto');
+                                  }}
+                                  className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
+                                  title="Out of Office (PTO) - Click to remove"
+                                />
+                              )}
+                            </div>
+                            {/* Column 3: Day number - fixed width */}
                             <span className={cn(
-                              'text-lg font-semibold',
+                              'text-lg font-semibold w-8',
                               day.isWeekend ? 'text-emerald-300' : 'text-neutral-100'
                             )}>
                               {day.dayNumber}
                             </span>
-                            {/* Gold PTO indicator dot - Click to remove */}
-                            {rowAppearance.hasPto && !rowAppearance.ptoOnly && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveDayMetadata(day.date, 'pto');
-                                }}
-                                className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
-                                title="Out of Office (PTO) - Click to remove"
-                              />
-                            )}
-                            {/* Location indicator - Click to remove */}
-                            {day.events.some(e => e.category === 'location') && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveDayMetadata(day.date, 'location');
-                                }}
-                                className="text-xs hover:scale-110 transition-transform cursor-pointer"
-                                title={`📍 ${day.events.find(e => e.category === 'location')?.title} - Click to remove`}
-                              >
-                                📍
-                              </button>
-                            )}
                           </div>
                           
-                            {/* Event pills - left-aligned (exclude PTO) */}
-                          {hasEvents && (
-                            <div className="flex items-center gap-2 flex-wrap flex-1">
-                                {day.events
-                                  .filter(event => !event.is_pto) // PTO doesn't show as pill
-                                  .slice(0, 3)
-                                  .map(event => {
+                          {/* Right: Facets column - location first, then events */}
+                          <div className="flex-1 space-y-2 min-w-0">
+                            {/* Location facet - first */}
+                            {day.events.some(e => e.category === 'location') && (
+                              <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300 hover:bg-blue-950/40 transition-colors">
+                                <span className="truncate">📍 {day.events.find(e => e.category === 'location')?.title}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveDayMetadata(day.date, 'location');
+                                  }}
+                                  className="flex-shrink-0 text-blue-400 hover:text-blue-200 hover:bg-blue-900/50 rounded p-0.5 transition-colors"
+                                  title="Remove location"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            
+                            {/* Event facets - below location */}
+                            {hasEvents && (
+                              <div className="flex flex-wrap gap-2">
+                                  {day.events
+                                    .filter(event => !event.is_pto && event.category !== 'location')
+                                    .slice(0, 3)
+                                    .map(event => {
                                 const style = getCategoryStyle(event.category);
                                 return (
                                   <div
@@ -1751,11 +1861,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                       handleViewEvent(event);
                                     }}
                                   >
-                                    {/* Colored dot */}
                                     <span className={cn('w-2 h-2 rounded-full flex-shrink-0', style.dot)} />
-                                    {/* Event name */}
                                     <span className={cn('truncate max-w-[100px]', style.text)}>{event.title}</span>
-                                    {/* Delete X - white/light colored for visibility */}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1769,13 +1876,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                   </div>
                                 );
                               })}
-                                {day.events.filter(e => !e.is_pto && e.category !== 'location').length > 3 && (
-                                <span className="text-xs text-neutral-400">
-                                    +{day.events.filter(e => !e.is_pto && e.category !== 'location').length - 3} more
-                                </span>
-                              )}
-                            </div>
-                          )}
+                                  {day.events.filter(e => !e.is_pto && e.category !== 'location').length > 3 && (
+                                  <span className="text-xs text-neutral-400">
+                                      +{day.events.filter(e => !e.is_pto && e.category !== 'location').length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         </button>
                         
@@ -1976,12 +2084,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
 
         {/* Month index (right side) - Vertically centered with background, auto-hide */}
         <div className={cn(
-          'hidden md:block fixed right-6 top-1/2 -translate-y-1/2 z-20',
-          'transition-opacity duration-300',
+          'fixed z-20 transition-opacity duration-300',
+          // Mobile: right-4, bottom-20 (above scroll button)
+          // Desktop: right-6, vertically centered
+          'right-4 bottom-20 md:right-6 md:top-1/2 md:-translate-y-1/2 md:bottom-auto',
           showMonthIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}>
           <div className="bg-neutral-900/95 border border-neutral-700 rounded-xl p-2 shadow-xl backdrop-blur-sm">
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5 max-h-[50vh] overflow-y-auto">
               {monthLabels.map(month => (
                 <button
                   key={`${month.year}-${month.index}`}

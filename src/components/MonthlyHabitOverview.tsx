@@ -52,15 +52,17 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
   const [habitStreaks, setHabitStreaks] = React.useState<Record<string, HabitStreak>>({});
   const [rollingStats, setRollingStats] = React.useState<Record<string, { monthly: number }>>({});
 
-  // Generate month options for selector
+  // Generate month options for selector (2025 onwards - when data starts)
   const monthOptions = React.useMemo(() => {
     const options = [];
     const now = new Date();
     const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
     
-    // Show current year and previous year
-    for (let year = currentYear - 1; year <= currentYear; year++) {
-      for (let month = 0; month < 12; month++) {
+    // Show all months from 2025 to current month of current year
+    for (let year = 2025; year <= currentYear; year++) {
+      const endMonth = year === currentYear ? currentMonth : 11;
+      for (let month = 0; month <= endMonth; month++) {
         const date = new Date(year, month, 1);
         options.push({
           value: `${year}-${month}`,
@@ -70,7 +72,8 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
         });
       }
     }
-    return options;
+    // Reverse so most recent months appear first
+    return options.reverse();
   }, []);
 
   // Get days in selected month
@@ -249,9 +252,6 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
       <header className="mb-6">
         {/* Month Selector */}
         <div className="flex items-center gap-3">
-          <label htmlFor="month-selector" className="text-sm text-neutral-300">
-            Month:
-          </label>
           <select
             id="month-selector"
             value={`${selectedMonth.year}-${selectedMonth.month}`}
@@ -306,9 +306,9 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
           return (
             <div key={habit.id} className="space-y-2">
               {/* Habit Header */}
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                 {/* Left: Habit name + streak */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 
                     className="text-sm font-medium"
                     style={{ color: habitColor }}
@@ -346,14 +346,14 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                     </div>
                   )}
                   {habit.rule && (
-                    <span className="text-xs text-neutral-400 italic">
+                    <span className="text-xs text-neutral-400 italic hidden sm:inline">
                       {habit.rule}
                     </span>
                   )}
                 </div>
                 
                 {/* Right: All stats with fixed-width labels */}
-                <div className="flex items-center gap-4 text-xs">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:gap-4">
                   {/* Monthly average */}
                   <div className="flex items-center gap-1">
                     <span className="text-neutral-500">Monthly Avg</span>
@@ -379,7 +379,7 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                     const goalPercent = Math.round((habitDays.size / monthlyTarget) * 100);
                     
                     return (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         <span className="text-neutral-500">Goal%</span>
                         <span className={`font-medium tabular-nums w-[36px] text-right ${isComplete ? 'text-emerald-400' : 'text-neutral-300'}`}>
                           {goalPercent}%

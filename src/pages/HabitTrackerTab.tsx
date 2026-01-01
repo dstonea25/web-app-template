@@ -6,6 +6,7 @@ import { apiClient } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { MonthlyHabitOverview } from '../components/MonthlyHabitOverview';
 import { HabitWeeklyAchievementGrid } from '../components/HabitWeeklyAchievementGrid';
+import { HabitSettingsModal } from '../components/HabitSettingsModal';
 
 interface HabitTrackerTabProps {
   isVisible?: boolean;
@@ -31,7 +32,8 @@ const useMonths = (year: number) => {
 // No dummy data: all data must come from database
 
 export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) => {
-  const year = getCurrentYear();
+  const [selectedYear, setSelectedYear] = React.useState(getCurrentYear());
+  const year = selectedYear;
   const months = useMonths(year);
   const [, startTransition] = React.useTransition();
   const DEBUG = true;
@@ -52,10 +54,51 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   const [isMonthlyCollapsed, setIsMonthlyCollapsed] = React.useState(false);
   const [isWeeklyCollapsed, setIsWeeklyCollapsed] = React.useState(false);
   const [isYearlyCollapsed, setIsYearlyCollapsed] = React.useState(false);
+  const [showYearSelector, setShowYearSelector] = React.useState(false);
+  const [showSettingsModal, setShowSettingsModal] = React.useState(false);
   
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const tooltipRef = React.useRef<HTMLDivElement | null>(null);
   const rafRef = React.useRef<number | null>(null);
+  
+  // Responsive sizing: track if mobile viewport for yearly calendar optimization
+  const [isMobileView, setIsMobileView] = React.useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  );
+
+  // Habit emoji mapping (matches UpcomingCalendarModule)
+  const habitEmojis = React.useMemo<Record<string, string>>(() => ({
+    'working out': '💪',
+    'building': '🔨',
+    'reading': '📚',
+    'writing': '✍️',
+    'fasting': '🍽️',
+    'no spend': '💰',
+  }), []);
+  
+  const getHabitEmoji = React.useCallback((habitName: string): string => {
+    const key = habitName.toLowerCase().trim();
+    return habitEmojis[key] || habitName.charAt(0).toUpperCase();
+  }, [habitEmojis]);
+
+  // Update mobile view on resize (debounced for performance)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    let timeoutId: number;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        setIsMobileView(window.innerWidth < 640);
+      }, 150);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // Color palette per habit (cycles if more habits). Colors chosen from existing theme hues.
   // Earthy theme palette (no blue/purple): emerald, teal, amber, olive, terracotta, rose
@@ -110,6 +153,52 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   }, [validDaysByMonth, year]);
 
   // SVG-based calendar rendering for performance
+
+  // Reload data when year changes - clear loaded habits and reload selected habit
+  React.useEffect(() => {
+    if (!isVisible || !habits.length || !isSupabaseConfigured) return;
+    
+    let isCancelled = false;
+    const loadYearData = async () => {
+      setIsHabitLoading(true);
+      // Clear loaded habits for the new year
+      setLoadedHabits(new Set());
+      
+      const habitToLoad = selectedHabitId || habits[0]?.id;
+      if (!habitToLoad) {
+        setIsHabitLoading(false);
+        return;
+      }
+      
+      try {
+        const entries = await apiClient.fetchHabitEntriesForHabit(selectedYear, habitToLoad);
+        if (isCancelled) return;
+        
+        setCalendarData(prev => {
+          const next: Record<string, Set<string>> = { ...prev };
+          const set = new Set<string>();
+          for (const e of entries) if (e.complete) set.add(e.date);
+          next[habitToLoad] = set;
+          return next;
+        });
+        setLoadedHabits(new Set([habitToLoad]));
+        
+        if (!selectedHabitId) {
+          setSelectedHabitId(habitToLoad);
+        }
+      } catch (err) {
+        console.error('Failed to load year data:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsHabitLoading(false);
+        }
+      }
+    };
+    
+    loadYearData();
+    return () => { isCancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, isVisible]);
 
   // Load habits and entries from Supabase (current year only). Fallback to defaults if not configured or empty.
   React.useEffect(() => {
@@ -178,7 +267,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
           return;
         }
         const selected = selectedHabitId || remoteHabits[0]?.id || '';
-        const entriesSelected = selected ? await apiClient.fetchHabitEntriesForHabit(year, selected) : [];
+        const entriesSelected = selected ? await apiClient.fetchHabitEntriesForHabit(selectedYear, selected) : [];
         if (isCancelled) return;
 
         const localRulesMap = new Map<string, string | undefined>(
@@ -233,7 +322,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       const others = habits.map(h => h.id).filter(id => id !== selectedHabitId);
       for (const hid of others) {
         try {
-          const entries = await apiClient.fetchHabitEntriesForHabit(getCurrentYear(), hid);
+          const entries = await apiClient.fetchHabitEntriesForHabit(selectedYear, hid);
           setCalendarData(prev => {
             const next: Record<string, Set<string>> = { ...prev };
             const set = new Set<string>();
@@ -250,7 +339,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       // requestIdleCallback cancellation not strictly needed here
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habits, selectedHabitId]);
+  }, [habits, selectedHabitId, selectedYear]);
 
   const handleSelectHabit = (habitId: string) => {
     switchStartRef.current = performance.now();
@@ -260,7 +349,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       const isLoaded = loadedHabits.has(habitId);
       if (!isLoaded) {
         setIsHabitLoading(true);
-        apiClient.fetchHabitEntriesForHabit(getCurrentYear(), habitId)
+        apiClient.fetchHabitEntriesForHabit(selectedYear, habitId)
           .then(entries => {
             setCalendarData(prev => {
               const next: Record<string, Set<string>> = { ...prev };
@@ -309,11 +398,11 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     });
     setIsSaving(true);
     try {
-      if (isSupabaseConfigured) {
+        if (isSupabaseConfigured) {
         const res = await apiClient.upsertHabitEntry({ habitId, date: dateIso, isDone: nextVal, source: 'frontend' });
         if (!res.success) throw new Error(res.error || 'Failed');
         // Light refetch for this habit only to reconcile with DB-side logic (e.g., triggers)
-        apiClient.fetchHabitEntriesForHabit(getCurrentYear(), habitId)
+        apiClient.fetchHabitEntriesForHabit(selectedYear, habitId)
           .then(entries => {
             setCalendarData(prev => {
               const next: Record<string, Set<string>> = { ...prev };
@@ -355,20 +444,25 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
       {habits.map((h) => {
         const { base } = colorForHabit(h.id);
         const isActive = selectedHabitId === h.id;
+        const emoji = getHabitEmoji(h.name);
+        const count = loadedHabits.has(h.id) ? (calendarData[h.id]?.size ?? 0) : 0;
         return (
         <button
           key={h.id}
           onClick={() => handleSelectHabit(h.id)}
           className={cn(
-              'px-3 py-1 rounded-full text-sm font-medium cursor-pointer border transition-colors',
+              'px-3 py-1 rounded-full text-base font-medium cursor-pointer border transition-colors',
+              'min-w-[80px]', // Fixed width to handle 3 digits (emoji + " - 999")
               !isActive && 'text-neutral-200',
           )}
             style={isActive ? { backgroundColor: base, color: '#0b0f0e', borderColor: base } : { borderColor: base, color: base }}
             aria-pressed={isActive}
-          title={h.rule || undefined}
+          title={`${h.name}${h.rule ? ' - ' + h.rule : ''}`}
         >
-          {h.name}
-          {isActive && loadedHabits.has(h.id) ? ` - ${calendarData[h.id]?.size ?? 0}` : ''}
+          <span className="inline-flex items-center justify-center gap-1">
+            <span>{emoji}</span>
+            <span className="tabular-nums text-sm min-w-[24px] text-center">{count}</span>
+          </span>
         </button>
         );
       })}
@@ -384,9 +478,11 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
   };
 
   const renderCalendar = () => {
-    // Visual constants (match approximate sizing from button grid)
-    const size = 28; // px diameter
-    const gap = 4; // px gap
+    // Visual constants - responsive sizing for mobile vs desktop
+    // Mobile: 22px hexagons fit full year on most screens (286px wide)
+    // Desktop: 28px hexagons for better clickability
+    const size = isMobileView ? 22 : 28; // px diameter
+    const gap = isMobileView ? 2 : 4; // px gap
     const headerH = 0; // labels are in sticky header; no vertical offset needed in SVG
     const cols = 12;
     const rows = 31;
@@ -395,10 +491,15 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
     const disabled = isInitialLoading || isHabitLoading;
 
     const { base: activeColor, glow: hoverGlow } = colorForHabit(selectedHabitId);
+    // Responsive text and stroke sizes
+    const fontSize = isMobileView ? 10 : 12;
+    const strokeWidth = isMobileView ? 1.5 : 2;
+    const innerStrokeWidth = isMobileView ? 0.75 : 1;
+    
     return (
       <div className="space-y-2">
-        <div className={cn('overflow-x-auto sm:overflow-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
-          <div className="flex justify-start sm:justify-center">
+        <div className={cn('overflow-x-visible -mx-2 sm:mx-0', disabled && 'opacity-50')}>
+          <div className="flex justify-center">
             <div ref={wrapperRef} className="relative inline-block px-2 sm:px-0" style={{ contentVisibility: 'auto' as any }}>
               {/* Sticky month header (HTML) */}
               <div
@@ -406,7 +507,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                 style={{ width, background: '#0a0a0a' }}
               >
                 <div
-                  className="grid text-[10px] capitalize"
+                  className={cn('grid capitalize', isMobileView ? 'text-[8px]' : 'text-[10px]')}
                   style={{ gridTemplateColumns: `repeat(${cols}, ${size}px)`, gap }}
                 >
                   {months.map(({ monthLabel }, m) => (
@@ -469,7 +570,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                         `}
                         fill="none"
                         stroke={stroke}
-                        strokeWidth={2}
+                        strokeWidth={strokeWidth}
                         pointerEvents="none"
                       />
                       {complete && (
@@ -485,7 +586,7 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                           fill="none"
                           stroke="#ffffff"
                           strokeOpacity={0.35}
-                          strokeWidth={1}
+                          strokeWidth={innerStrokeWidth}
                           pointerEvents="none"
                         />
                       )}
@@ -538,8 +639,8 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
                       />
                       <text
                         x={cx}
-                        y={cy + 3}
-                        fontSize={12}
+                        y={cy + (isMobileView ? 2.5 : 3)}
+                        fontSize={fontSize}
                         fontWeight={600}
                         textAnchor="middle"
                         fill={textFill}
@@ -662,14 +763,54 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
           <div className="mt-4">
             <div className="mb-6 p-6 rounded-2xl border border-neutral-800 bg-neutral-900">
         <header className="mb-4">
-          <div className="flex items-center justify-between mb-2">
+          {/* Loading status - desktop only */}
+          <div className="hidden sm:flex items-center justify-between mb-2">
+            <div className="flex-1">
+              {(isSaving || isInitialLoading || isHabitLoading) && (
+                <div className="text-xs text-neutral-400">
+                  {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
+                </div>
+              )}
+            </div>
+            {/* Settings Button - Desktop */}
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="p-2 text-neutral-400 hover:text-emerald-400 transition-colors"
+              title="Settings"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Title with cog - responsive */}
+          <div className="relative flex items-center justify-center">
+            <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'text-center')}>
+              {habits.find(h => h.id === selectedHabitId)?.name || 'Select a Habit'}
+            </h2>
+            {/* Year Selector Cog - Mobile (absolute positioned to right) */}
+            <button
+              onClick={() => setShowYearSelector(true)}
+              className="sm:hidden absolute right-0 p-2 text-neutral-400 hover:text-emerald-400 transition-colors"
+              title={`Year: ${selectedYear}`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Loading status - mobile */}
+          <div className="sm:hidden text-center mt-1">
             {(isSaving || isInitialLoading || isHabitLoading) && (
               <div className="text-xs text-neutral-400">
                 {isInitialLoading ? 'Loading…' : (isHabitLoading ? 'Loading habit…' : 'Sending…')}
               </div>
             )}
           </div>
-          <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text, 'text-center')}>{year}</h2>
         </header>
         {isInitialLoading ? (
           <div className="py-16 flex items-center justify-center">
@@ -687,9 +828,71 @@ export const HabitTrackerTab: React.FC<HabitTrackerTabProps> = ({ isVisible }) =
           </>
         )}
             </div>
+            
+            {/* Year Selector Modal - Mobile */}
+            {showYearSelector && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 sm:hidden" onClick={() => setShowYearSelector(false)}>
+                <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-neutral-100">Select Year</h3>
+                    <button 
+                      onClick={() => setShowYearSelector(false)}
+                      className="text-neutral-400 hover:text-neutral-200"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Array.from({ length: getCurrentYear() - 2025 + 1 }, (_, i) => 2025 + i).map((y) => (
+                      <button
+                        key={y}
+                        onClick={() => {
+                          setSelectedYear(y);
+                          setShowYearSelector(false);
+                        }}
+                        className={cn(
+                          'px-4 py-3 rounded-lg font-medium transition-colors',
+                          y === selectedYear
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                        )}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
+      
+      {/* Habit Settings Modal */}
+      <HabitSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        initialHabits={habits}
+        selectedYear={selectedYear}
+        onYearChange={setSelectedYear}
+        onHabitsReordered={async (reorderedHabits) => {
+          // Update local state immediately for responsive UI
+          setHabits(reorderedHabits);
+          
+          // Broadcast to other components that need to reload
+          window.dispatchEvent(new CustomEvent('dashboard:habits-reordered'));
+          
+          // Force refetch from API to get fresh data everywhere
+          try {
+            const freshHabits = await apiClient.fetchHabitsFromSupabase();
+            setHabits(freshHabits);
+          } catch (error) {
+            console.error('Failed to reload habits after reorder:', error);
+          }
+        }}
+      />
     </div>
   );
 };
