@@ -30,7 +30,7 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<IntentionPillar, string>>({ Power: '', Passion: '', Purpose: '', Production: '' });
   const [lockedIn, setLockedIn] = useState<boolean>(false);
-  const [streakStats, setStreakStats] = useState<IntentionStatsRow[]>([]);
+  const [_streakStats, setStreakStats] = useState<IntentionStatsRow[]>([]);
   const [completionStatus, setCompletionStatus] = useState<Record<IntentionPillar, boolean>>({ Power: false, Passion: false, Purpose: false, Production: false });
 
   const today = useMemo(() => getTodayLocalDate(), []);
@@ -98,46 +98,46 @@ export const DailyIntentionsModule: React.FC<{ isVisible?: boolean }>= ({ isVisi
   const hasStarted = PILLARS.some(p => (drafts[p.key] || '').trim().length > 0);
 
   // Helper function to get compact streak display with both hot and cold streaks
-  const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
-    const stat = streakStats.find(s => s.pillar === pillar);
-    if (!stat) return ''; // Loading state
-    
-    // Show hot streak for > 1 day
-    if (stat.current_streak > 1) {
-      return '🔥';
-    }
-    
-    // Show cold streak if streak is 0 and we have a last_completed_date
-    if (stat.current_streak === 0 && stat.last_completed_date) {
-      return '❄️';
-    }
-    
-    // Default: no emoji (first day or just completed yesterday)
-    return '';
-  };
+  // Streak display functions - kept for potential future use
+  // const getCompactStreakDisplay = (pillar: IntentionPillar): string => {
+  //   const stat = streakStats.find(s => s.pillar === pillar);
+  //   if (!stat) return ''; // Loading state
+  //   
+  //   // Show hot streak for > 1 day
+  //   if (stat.current_streak > 1) {
+  //     return '🔥';
+  //   }
+  //   
+  //   // Show cold streak if streak is 0 and we have a last_completed_date
+  //   if (stat.current_streak === 0 && stat.last_completed_date) {
+  //     return '❄️';
+  //   }
+  //   
+  //   // Default: no emoji (first day or just completed yesterday)
+  //   return '';
+  // };
 
-  // Helper function to get tooltip text for streaks
-  const getStreakTooltip = (pillar: IntentionPillar): string => {
-    const stat = streakStats.find(s => s.pillar === pillar);
-    if (!stat) return '';
-    
-    if (stat.current_streak > 1) {
-      return `${stat.current_streak}-day hot streak!`;
-    }
-    
-    if (stat.current_streak === 0 && stat.last_completed_date) {
-      const lastDate = new Date(stat.last_completed_date);
-      const now = new Date();
-      const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-      return `Cold for ${daysSince} ${daysSince === 1 ? 'day' : 'days'}`;
-    }
-    
-    if (stat.current_streak === 1) {
-      return 'Completed yesterday!';
-    }
-    
-    return '';
-  };
+  // const getStreakTooltip = (pillar: IntentionPillar): string => {
+  //   const stat = streakStats.find(s => s.pillar === pillar);
+  //   if (!stat) return '';
+  //   
+  //   if (stat.current_streak > 1) {
+  //     return `${stat.current_streak}-day hot streak!`;
+  //   }
+  //   
+  //   if (stat.current_streak === 0 && stat.last_completed_date) {
+  //     const lastDate = new Date(stat.last_completed_date);
+  //     const now = new Date();
+  //     const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+  //     return `Cold for ${daysSince} ${daysSince === 1 ? 'day' : 'days'}`;
+  //   }
+  //   
+  //   if (stat.current_streak === 1) {
+  //     return 'Completed yesterday!';
+  //   }
+  //   
+  //   return '';
+  // };
 
   const onChangeDraft = (pillar: IntentionPillar, value: string) => {
     setDrafts(prev => {

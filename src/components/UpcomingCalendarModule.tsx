@@ -91,7 +91,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [allEvents, setAllEvents] = useState<CalendarEvent[]>([]);
@@ -329,29 +328,10 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
     });
   };
 
-  const handleDayClick = (date: string) => {
-    setSelectedDate(date);
-    setIsCreating(false);
-    setEditingEvent(null);
-    setDragEndDate(null);
-    setConfirmedRangeStart(null);
-    setConfirmedRangeEnd(null);
-    setFormData({
-      title: '',
-      category: '',
-      notes: '',
-      start_date: date,
-      end_date: date,
-      start_time: '',
-      end_time: '',
-      all_day: true,
-    });
-  };
   
   const handleEditEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
     setIsCreating(false);
-    setSelectedEvent(null); // Clear so we show the form
     setFormData({
       title: event.title,
       category: event.category || '',
@@ -623,7 +603,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       regenerateWeeks(updatedEvents);
       
       toast.success('Event deleted');
-      setSelectedEvent(null);
     } catch (error) {
       console.error('Failed to delete event:', error);
       toast.error('Failed to delete event');
@@ -1190,17 +1169,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
 
   const weekProgress = getCurrentWeekProgress();
   
-  // Color mapping for habits (same as HabitWeeklyAchievementGrid)
-  // Global color scheme - single emerald green for all habits
-  const HABIT_COLOR = {
-    base: '#6EE7B7', // emerald green
-    glow: '#A7F3D0'  // lighter emerald for glow
-  };
-  
-  const getHabitColor = (_index: number) => {
-    return HABIT_COLOR;
-  };
-
   // Render challenges and habit goals section
   const renderChallengesAndGoals = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1294,7 +1262,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       {(selectedDate || editingEvent) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
           setSelectedDate(null);
-          setSelectedEvent(null);
           setIsCreating(false);
           setEditingEvent(null);
           setDragEndDate(null);
@@ -1309,7 +1276,6 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
               <button 
                 onClick={() => {
                   setSelectedDate(null);
-                  setSelectedEvent(null);
                   setIsCreating(false);
                   setEditingEvent(null);
                   setDragEndDate(null);
