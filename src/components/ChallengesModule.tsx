@@ -992,11 +992,12 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
                               <p className="text-xs text-neutral-500 mb-2">Enabled Key Results:</p>
                               <div className="space-y-1">
                                 {allKeyResults.map((kr) => {
-                                  const isEnabled = enabledKRIds.includes(kr.id);
                                   const isPunted = kr.punted === true;
                                   const progressPercent = Math.round(kr.progress * 100);
                                   const isCompleted = progressPercent >= 100;
                                   const isUnavailable = isPunted || isCompleted;
+                                  // Only show as enabled if in the list AND not completed/punted
+                                  const isEnabled = enabledKRIds.includes(kr.id) && !isUnavailable;
                                   const pillarEmoji = kr.okr_pillar === 'Power' ? '💪' : kr.okr_pillar === 'Passion' ? '❤️' : kr.okr_pillar === 'Purpose' ? '🧠' : '🎯';
                                   return (
                                     <button
