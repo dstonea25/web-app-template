@@ -353,6 +353,38 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
     }
   };
 
+  // Auto-cleanup: Remove completed/punted KRs from enabled list when settings open
+  useEffect(() => {
+    if (!showSettings || allKeyResults.length === 0) return;
+    
+    const protocol = protocols.find(p => p.protocol_key === 'okrs_progress');
+    if (!protocol) return;
+    
+    const config = protocol.config as OkrsProgressConfig;
+    const currentKRIds = config.enabled_kr_ids || [];
+    
+    // Filter out completed (progress >= 1) or punted KRs
+    const validKRIds = currentKRIds.filter(krId => {
+      const kr = allKeyResults.find(k => k.id === krId);
+      if (!kr) return false; // KR not found, remove it
+      const isCompleted = kr.progress >= 1;
+      const isPunted = kr.punted === true;
+      return !isCompleted && !isPunted;
+    });
+    
+    // If any KRs were filtered out, update the protocol
+    if (validKRIds.length !== currentKRIds.length) {
+      console.log(`Auto-removing ${currentKRIds.length - validKRIds.length} completed/punted KRs from okrs_progress protocol`);
+      challengesService.updateProtocol('okrs_progress', {
+        config: { enabled_kr_ids: validKRIds }
+      }).then(updated => {
+        setProtocols(prev => prev.map(p => p.protocol_key === 'okrs_progress' ? updated : p));
+      }).catch(err => {
+        console.error('Failed to auto-cleanup KRs:', err);
+      });
+    }
+  }, [showSettings, allKeyResults, protocols]);
+
   // Handle reroll challenge
   const handleRerollChallenge = async (challengeId: string) => {
     setRerollingId(challengeId);
