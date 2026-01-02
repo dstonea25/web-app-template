@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { tokens, cn } from '../theme/config';
 import { toast } from '../lib/notifications/toast';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { Plus, ChevronDown, Edit3, Check, X, Upload, User, Sparkles, Clock, ArrowRight, Settings, Eye, EyeOff, Calendar, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Plus, ChevronDown, Edit3, Check, X, Upload, User, Sparkles, Settings, Eye, EyeOff } from 'lucide-react';
 
 // ============================================================================
 // THE FOUR PILLARS (Fixed, non-editable)
@@ -101,102 +101,7 @@ interface GrowthTabProps {
   isVisible?: boolean;
 }
 
-// Card selector - subtle inline dropdown
-const CardSelector: React.FC<{
-  cards: GrowthCard[];
-  selectedCard: GrowthCard | null;
-  onSelect: (card: GrowthCard) => void;
-  onCreateNew: () => void;
-  side: 'left' | 'right';
-}> = ({ cards, selectedCard, onSelect, onCreateNew, side }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const getCardLabel = (card: GrowthCard): string => {
-    if (card.card_type === 'year' && card.year) {
-      return `${card.year} Me`;
-    }
-    if (card.card_type === 'future' && card.future_age) {
-      return `${card.future_age}-year-old Me`;
-    }
-    return card.title;
-  };
-
-  const getCardTypeLabel = (card: GrowthCard): string => {
-    if (card.card_type === 'current') return 'Present';
-    if (card.card_type === 'ideal') return 'Aspiration';
-    if (card.card_type === 'year') return 'Past Year';
-    if (card.card_type === 'future') return 'Future Self';
-    return card.card_type;
-  };
-
-  // Filter to show appropriate cards based on side
-  const filteredCards = side === 'left' 
-    ? cards // Left side can be any card (but typically current)
-    : cards.filter(c => c.card_type !== 'current'); // Right side typically future-focused
-
-  return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          'flex items-center gap-1 text-xs transition-colors mt-1',
-          'text-neutral-500 hover:text-neutral-300'
-        )}
-      >
-        <span>Change</span>
-        <ChevronDown className={cn('w-3 h-3 transition-transform', isOpen && 'rotate-180')} />
-      </button>
-      
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)} 
-          />
-          <div className={cn(
-            'absolute z-50 mt-2 w-56 rounded-xl border border-neutral-700 bg-neutral-900 shadow-xl',
-            side === 'right' ? 'right-0' : 'left-0'
-          )}>
-            <div className="p-1.5 max-h-72 overflow-y-auto">
-              {filteredCards.map((card) => (
-                <button
-                  key={card.id}
-                  onClick={() => {
-                    onSelect(card);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    'w-full text-left px-3 py-2 rounded-lg transition-colors',
-                    'hover:bg-neutral-800',
-                    selectedCard?.id === card.id && 'bg-emerald-500/10 text-emerald-400'
-                  )}
-                >
-                  <div className="text-sm font-medium">{getCardLabel(card)}</div>
-                  <div className="text-xs text-neutral-500">{getCardTypeLabel(card)}</div>
-                </button>
-              ))}
-            </div>
-            <div className="border-t border-neutral-700 p-1.5">
-              <button
-                onClick={() => {
-                  onCreateNew();
-                  setIsOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm',
-                  'text-emerald-400 hover:bg-emerald-500/10'
-                )}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create new card...</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+// Removed CardSelector - no longer used in the UI
 
 // Inline editable text component
 const InlineEdit: React.FC<{
@@ -660,7 +565,6 @@ const AddPastVersionCard: React.FC<{
 // Past Self Card - A standalone vertical card for the timeline
 const PastSelfCard: React.FC<{
   card: GrowthCard;
-  dimensions: GrowthDimension[];
   dimensionValues: GrowthDimensionValue[];
   onUpdateImage: (url: string | null) => Promise<void>;
   onUpdateTitle: (title: string) => Promise<void>;
@@ -668,7 +572,6 @@ const PastSelfCard: React.FC<{
   dimensionsByPillar: Record<PillarId, (GrowthDimension & { pillar: PillarId })[]>;
 }> = ({ 
   card, 
-  dimensions, 
   dimensionValues, 
   onUpdateImage, 
   onUpdateTitle, 
@@ -1371,13 +1274,7 @@ export const GrowthTab: React.FC<GrowthTabProps> = ({ isVisible = true }) => {
     return grouped;
   }, [dimensions]);
 
-  // Check if dimension has content on either side
-  const hasDimensionContent = useCallback((dimensionId: string): boolean => {
-    if (!leftCard || !rightCard) return false;
-    const leftValue = getDimensionValue(leftCard.id, dimensionId);
-    const rightValue = getDimensionValue(rightCard.id, dimensionId);
-    return !!(leftValue.trim() || rightValue.trim());
-  }, [leftCard, rightCard, getDimensionValue]);
+  // Removed hasDimensionContent - no longer used
 
   // Loading state
   if (!isVisible) return null;
@@ -1843,7 +1740,6 @@ export const GrowthTab: React.FC<GrowthTabProps> = ({ isVisible = true }) => {
                         ) : item.card && (
                           <PastSelfCard
                             card={item.card}
-                            dimensions={dimensions.filter(d => !d.archived)}
                             dimensionValues={dimensionValues}
                             dimensionsByPillar={dimensionsByPillar}
                             onUpdateImage={(url) => updateCardImage(item.card!.id, url)}
