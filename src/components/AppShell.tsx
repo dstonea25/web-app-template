@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home, Target, Zap, Calendar } from 'lucide-react';
+import { CheckSquare, Timer, Lightbulb, LogOut, Layers, Activity, Home, Target, Zap, Calendar, TrendingUp } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import WorkModeToggle from './WorkModeToggle';
@@ -15,6 +15,7 @@ import { PrioritiesTab } from '../pages/PrioritiesTab';
 import { HabitTrackerTab } from '../pages/HabitTrackerTab';
 import { ChallengesTab } from '../pages/ChallengesTab';
 import { CalendarTab } from '../pages/CalendarTab';
+import { GrowthTab } from '../pages/GrowthTab';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,7 +49,7 @@ export const AppShell: React.FC = () => {
       const savedTab = localStorage.getItem('dashboard-active-tab');
       const enabledTabs = TAB_REGISTRY.filter(tab => tab.enabled).sort((a, b) => a.order - b.order);
       const firstEnabledId = (enabledTabs[0]?.id === 'time' ? 'time_tracking' : enabledTabs[0]?.id) as ModuleId | undefined;
-      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'priorities', 'time_tracking', 'allocations', 'habit_tracker', 'challenges', 'calendar'].includes(savedTab);
+      const isValidSaved = savedTab && ['home', 'todos', 'ideas', 'priorities', 'time_tracking', 'allocations', 'habit_tracker', 'challenges', 'calendar', 'growth'].includes(savedTab);
       return (isValidSaved ? (savedTab as ModuleId) : (firstEnabledId || 'home')) as ModuleId;
     } catch {
       return 'home';
@@ -106,7 +107,8 @@ export const AppShell: React.FC = () => {
       'layers': <Layers className={cn('w-5 h-5', tokens.icon?.default)} />,
       'activity': <Activity className={cn('w-5 h-5', tokens.icon?.default)} />,
       'zap': <Zap className={cn('w-5 h-5', tokens.icon?.default)} />,
-      'calendar': <Calendar className={cn('w-5 h-5', tokens.icon?.default)} />
+      'calendar': <Calendar className={cn('w-5 h-5', tokens.icon?.default)} />,
+      'trending-up': <TrendingUp className={cn('w-5 h-5', tokens.icon?.default)} />
     };
     
     return {
@@ -126,6 +128,7 @@ export const AppShell: React.FC = () => {
   const HabitTrackerTabAny = HabitTrackerTab as React.FC<any>;
   const ChallengesTabAny = ChallengesTab as React.FC<any>;
   const CalendarTabAny = CalendarTab as React.FC<any>;
+  const GrowthTabAny = GrowthTab as React.FC<any>;
 
   const handleModuleChange = (module: ModuleId) => {
     setActiveModule(module);
@@ -177,6 +180,7 @@ export const AppShell: React.FC = () => {
       allocations: 'Manage your rewards and indulgences',
       habit_tracker: 'Build better habits, one day at a time',
       challenges: 'Push yourself with new challenges',
+      growth: 'Reflect on who you are and who you want to become',
     };
 
     return subtitles[activeModule] || '';
@@ -270,6 +274,11 @@ export const AppShell: React.FC = () => {
                 <ChallengesTabAny isVisible={activeModule === 'challenges'} />
               </section>
             )}
+            {visitedTabs.has('growth') && (
+              <section style={{ display: activeModule === 'growth' ? 'block' : 'none' }}>
+                <GrowthTabAny isVisible={activeModule === 'growth'} />
+              </section>
+            )}
           </main>
         </div>
       </div>
@@ -331,6 +340,11 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('challenges') && (
             <section style={{ display: activeModule === 'challenges' ? 'block' : 'none' }}>
               <ChallengesTabAny isVisible={activeModule === 'challenges'} />
+            </section>
+          )}
+          {visitedTabs.has('growth') && (
+            <section style={{ display: activeModule === 'growth' ? 'block' : 'none' }}>
+              <GrowthTabAny isVisible={activeModule === 'growth'} />
             </section>
           )}
         </main>

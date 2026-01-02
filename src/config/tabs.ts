@@ -1,5 +1,5 @@
 export type AppTab = { 
-  id: 'home' | 'todos' | 'ideas' | 'priorities' | 'time' | 'allocations' | 'habit_tracker' | 'challenges' | 'calendar'; 
+  id: 'home' | 'todos' | 'ideas' | 'priorities' | 'time' | 'allocations' | 'habit_tracker' | 'challenges' | 'calendar' | 'growth'; 
   title: string; 
   route: string; 
   icon: string; 
@@ -16,5 +16,6 @@ export const TAB_REGISTRY: AppTab[] = [
   { id: 'ideas', title: 'Ideas', route: '/ideas', icon: 'lightbulb', order: 15, enabled: true },
   { id: 'time', title: 'Time Tracking', route: '/time', icon: 'timer', order: 20, enabled: true },
   { id: 'allocations', title: 'Allocations', route: '/allocations', icon: 'layers', order: 25, enabled: true },
+  { id: 'growth', title: 'Growth', route: '/growth', icon: 'trending-up', order: 30, enabled: true },
   { id: 'challenges', title: 'Challenges', route: '/challenges', icon: 'zap', order: 35, enabled: true }
 ];
