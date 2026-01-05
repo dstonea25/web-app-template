@@ -175,33 +175,44 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       const today = new Date();
       const currentYear = today.getFullYear();
       
-      const eventsPromises = [apiClient.fetchCalendarEventsForYear(currentYear)];
-      if (today.getMonth() === 11) {
-        eventsPromises.push(apiClient.fetchCalendarEventsForYear(currentYear + 1));
+      // Calculate the Monday of the current week to check for year boundaries
+      const todayDayOfWeek = today.getDay();
+      const todayDaysFromMonday = todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1;
+      const mondayOfWeek = new Date(today);
+      mondayOfWeek.setDate(today.getDate() - todayDaysFromMonday);
+      
+      // Determine which years we need to fetch
+      const yearsToFetch = new Set([currentYear]);
+      
+      // If Monday is in a different year, fetch that year too
+      if (mondayOfWeek.getFullYear() !== currentYear) {
+        yearsToFetch.add(mondayOfWeek.getFullYear());
       }
+      
+      // If we're in December, also fetch next year
+      if (today.getMonth() === 11) {
+        yearsToFetch.add(currentYear + 1);
+      }
+      
+      const eventsPromises = Array.from(yearsToFetch).map(year => 
+        apiClient.fetchCalendarEventsForYear(year)
+      );
       
       const results = await Promise.all(eventsPromises);
       const events = results.flat();
       setAllEvents(events);
       
-      // Calculate the Monday of the current week
-      const currentDayOfWeek = today.getDay();
-      const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-      
-      const mondayOfCurrentWeek = new Date(today);
-      mondayOfCurrentWeek.setDate(today.getDate() - daysFromMonday);
-      
       // Generate current week (Monday - Sunday)
       const currentWeekData: DayData[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(mondayOfCurrentWeek);
-        date.setDate(mondayOfCurrentWeek.getDate() + i);
+        const date = new Date(mondayOfWeek);
+        date.setDate(mondayOfWeek.getDate() + i);
         currentWeekData.push(createDayData(date, events));
       }
       
       // Generate next week (Monday - Sunday)
-      const mondayOfNextWeek = new Date(mondayOfCurrentWeek);
-      mondayOfNextWeek.setDate(mondayOfCurrentWeek.getDate() + 7);
+      const mondayOfNextWeek = new Date(mondayOfWeek);
+      mondayOfNextWeek.setDate(mondayOfWeek.getDate() + 7);
       
       const nextWeekData: DayData[] = [];
       for (let i = 0; i < 7; i++) {
@@ -239,21 +250,56 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
       const today = new Date();
       const currentYear = today.getFullYear();
       
-      // Load habits, entries, and stats in parallel
-      const [habitsData, entriesData, statsData] = await Promise.all([
+      // Calculate the Monday of the current week
+      const habitsDayOfWeek = today.getDay();
+      const habitsDaysFromMonday = habitsDayOfWeek === 0 ? 6 : habitsDayOfWeek - 1;
+      const habitsMonday = new Date(today);
+      habitsMonday.setDate(today.getDate() - habitsDaysFromMonday);
+      
+      const mondayYear = habitsMonday.getFullYear();
+      
+      // Determine which years we need to fetch (handle year boundary)
+      const yearsToFetch = [currentYear];
+      if (mondayYear !== currentYear) {
+        yearsToFetch.push(mondayYear);
+      }
+      
+      // Load habits and entries/stats for all required years
+      const [habitsData, ...yearDataResults] = await Promise.all([
         apiClient.fetchHabitsFromSupabase(),
-        apiClient.fetchHabitEntriesForYear(currentYear),
-        apiClient.fetchHabitYearlyStats(currentYear)
+        ...yearsToFetch.flatMap(year => [
+          apiClient.fetchHabitEntriesForYear(year),
+          apiClient.fetchHabitYearlyStats(year)
+        ])
       ]);
       
-      setHabits(habitsData);
-      setHabitEntries(entriesData);
-      
-      // Convert stats array to keyed object
+      // Combine all entries and stats from multiple years
+      const allEntries: typeof habitEntries = [];
       const statsMap: Record<string, HabitYearlyStats> = {};
-      statsData.forEach(stat => {
-        statsMap[stat.habit_id] = stat;
-      });
+      
+      for (let i = 0; i < yearsToFetch.length; i++) {
+        const entriesData = yearDataResults[i * 2] as typeof habitEntries;
+        const statsData = yearDataResults[i * 2 + 1] as HabitYearlyStats[];
+        
+        allEntries.push(...entriesData);
+        
+        // Stats for current year take precedence
+        if (yearsToFetch[i] === currentYear) {
+          statsData.forEach(stat => {
+            statsMap[stat.habit_id] = stat;
+          });
+        } else {
+          // Only add stats if not already present
+          statsData.forEach(stat => {
+            if (!statsMap[stat.habit_id]) {
+              statsMap[stat.habit_id] = stat;
+            }
+          });
+        }
+      }
+      
+      setHabits(habitsData);
+      setHabitEntries(allEntries);
       setHabitStats(statsMap);
     } catch (err) {
       console.error('Failed to load habits data:', err);
