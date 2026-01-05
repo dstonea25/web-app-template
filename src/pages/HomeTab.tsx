@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { Todo, Okr } from '../types';
+import type { Todo, Okr, MonthTheme, MonthThemeInput, YearTheme, YearThemeInput } from '../types';
 import { tokens, cn } from '../theme/config';
 import { HomeTodosTable } from '../components/HomeTodosTable';
 import { OKRModule } from '../components/okrs/OKRModule';
@@ -12,7 +12,9 @@ import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCach
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
 import { fetchOkrsWithProgress, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
-import { Sparkles, ChevronRight } from 'lucide-react';
+import { Sparkles, ChevronRight, Target, X } from 'lucide-react';
+import { apiClient } from '../lib/api';
+import { toast } from '../lib/notifications/toast';
 
 export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true }) => {
   const { workMode } = useWorkMode();
@@ -46,6 +48,24 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   const [calendarNlInput, setCalendarNlInput] = useState('');
   const calendarModuleRef = useRef<UpcomingCalendarModuleRef>(null);
   
+  // Month theme state
+  const [currentMonthTheme, setCurrentMonthTheme] = useState<MonthTheme | null>(null);
+  const [showMonthThemeEditor, setShowMonthThemeEditor] = useState(false);
+  const [monthThemeForm, setMonthThemeForm] = useState<{
+    theme: string;
+    focusAreas: string[];
+    nonFocusAreas: string[];
+  }>({ theme: '', focusAreas: ['', '', ''], nonFocusAreas: ['', ''] });
+  
+  // Year theme state
+  const [currentYearTheme, setCurrentYearTheme] = useState<YearTheme | null>(null);
+  const [showYearThemeEditor, setShowYearThemeEditor] = useState(false);
+  const [yearThemeForm, setYearThemeForm] = useState<{
+    theme: string;
+    focusAreas: string[];
+    nonFocusAreas: string[];
+  }>({ theme: '', focusAreas: ['', '', ''], nonFocusAreas: ['', ''] });
+  
   const toggleSection = (section: keyof typeof sectionsVisible) => {
     setSectionsVisible(prev => ({
       ...prev,
@@ -58,6 +78,8 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     hasLoadedRef.current = true;
     loadTodos();
     loadQuarterInfo();
+    loadCurrentMonthTheme();
+    loadCurrentYearTheme();
   }, [isVisible]);
 
   const loadQuarterInfo = async () => {
@@ -72,6 +94,101 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
       setNextQuarter(next);
     } catch (error) {
       console.error('Failed to load quarter info:', error);
+    }
+  };
+
+  const loadCurrentMonthTheme = async () => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1; // 1-12 (getMonth returns 0-11, so add 1)
+      
+      // Fetch all themes for the current year
+      const themes = await apiClient.fetchMonthThemesForYear(year);
+      
+      // Find the theme for the current month
+      const theme = themes.find(t => t.month === month) || null;
+      
+      setCurrentMonthTheme(theme);
+    } catch (error) {
+      console.error('Failed to load month theme:', error);
+    }
+  };
+
+  const loadCurrentYearTheme = async () => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const theme = await apiClient.fetchYearTheme(year);
+      setCurrentYearTheme(theme);
+    } catch (error) {
+      console.error('Failed to load year theme:', error);
+    }
+  };
+
+  const openMonthThemeEditor = () => {
+    const theme = currentMonthTheme;
+    setMonthThemeForm({
+      theme: theme?.theme || '',
+      focusAreas: theme?.focus_areas?.length ? [...theme.focus_areas] : ['', '', ''],
+      nonFocusAreas: theme?.non_focus_areas?.length ? [...theme.non_focus_areas] : ['', ''],
+    });
+    setShowMonthThemeEditor(true);
+  };
+
+  const handleSaveMonthTheme = async () => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      
+      const input: MonthThemeInput = {
+        year,
+        month,
+        theme: monthThemeForm.theme.trim() || null,
+        focus_areas: monthThemeForm.focusAreas.filter(a => a.trim()),
+        non_focus_areas: monthThemeForm.nonFocusAreas.filter(a => a.trim()),
+      };
+      
+      const saved = await apiClient.upsertMonthTheme(input);
+      setCurrentMonthTheme(saved);
+      setShowMonthThemeEditor(false);
+      toast.success('Month theme saved');
+    } catch (error) {
+      console.error('Failed to save month theme:', error);
+      toast.error('Failed to save theme');
+    }
+  };
+
+  const openYearThemeEditor = () => {
+    const theme = currentYearTheme;
+    setYearThemeForm({
+      theme: theme?.theme || '',
+      focusAreas: theme?.focus_areas?.length ? [...theme.focus_areas] : ['', '', ''],
+      nonFocusAreas: theme?.non_focus_areas?.length ? [...theme.non_focus_areas] : ['', ''],
+    });
+    setShowYearThemeEditor(true);
+  };
+
+  const handleSaveYearTheme = async () => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      
+      const input: YearThemeInput = {
+        year,
+        theme: yearThemeForm.theme.trim() || null,
+        focus_areas: yearThemeForm.focusAreas.filter(a => a.trim()),
+        non_focus_areas: yearThemeForm.nonFocusAreas.filter(a => a.trim()),
+      };
+      
+      const saved = await apiClient.upsertYearTheme(input);
+      setCurrentYearTheme(saved);
+      setShowYearThemeEditor(false);
+      toast.success('Year theme saved');
+    } catch (error) {
+      console.error('Failed to save year theme:', error);
+      toast.error('Failed to save theme');
     }
   };
 
@@ -350,6 +467,83 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               </div>
             </div>
           </div>
+          
+          {/* Month Theme Display */}
+          {sectionsVisible.upcomingCalendar && (() => {
+            const hasTheme = currentMonthTheme && (
+              currentMonthTheme.theme || 
+              (currentMonthTheme.focus_areas && currentMonthTheme.focus_areas.filter(a => a && a.trim()).length > 0) || 
+              (currentMonthTheme.non_focus_areas && currentMonthTheme.non_focus_areas.filter(a => a && a.trim()).length > 0)
+            );
+            
+            return (
+              <div className="mt-4 p-3 bg-neutral-900/50 border border-neutral-800 rounded-lg">
+                {hasTheme ? (
+                <div className="space-y-2">
+                  {/* Theme */}
+                  {currentMonthTheme.theme && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">This Month's Theme:</span>
+                      <button
+                        onClick={openMonthThemeEditor}
+                        className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                      >
+                        "{currentMonthTheme.theme}"
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Focus and Non-Focus Areas */}
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {/* Focus Areas */}
+                    {currentMonthTheme.focus_areas?.filter(a => a).length > 0 && (
+                      <>
+                        <span className="text-xs text-neutral-500">Focus:</span>
+                        {currentMonthTheme.focus_areas.filter(a => a).map((area, idx) => (
+                          <button
+                            key={`focus-${idx}`}
+                            onClick={openMonthThemeEditor}
+                            className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                          >
+                            {area}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Non-Focus Areas */}
+                    {currentMonthTheme.non_focus_areas?.filter(a => a).length > 0 && (
+                      <>
+                        <span className="text-xs text-neutral-500">Non Focus:</span>
+                        {currentMonthTheme.non_focus_areas.filter(a => a).map((area, idx) => (
+                          <button
+                            key={`non-focus-${idx}`}
+                            onClick={openMonthThemeEditor}
+                            className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                          >
+                            {area}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-400">This Month's Theme:</span>
+                  <button
+                    onClick={openMonthThemeEditor}
+                    className="text-sm text-neutral-500 hover:text-neutral-400 transition-colors flex items-center gap-1.5"
+                  >
+                    <Target className="w-3.5 h-3.5" />
+                    <span>Set Theme</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+          })()}
+          
           <div className={cn('mt-4', !sectionsVisible.upcomingCalendar && 'hidden')}>
             <UpcomingCalendarModule 
               ref={calendarModuleRef}
@@ -378,9 +572,163 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <div className="mt-4">
-            <CommittedPrioritiesModule isVisible={sectionsVisible.committedPriorities} />
-          </div>
+          {sectionsVisible.committedPriorities && (
+            <div className="mt-4 space-y-4">
+              {/* Year Theme Display for Priorities */}
+              {(() => {
+                const hasTheme = currentYearTheme && (
+                  currentYearTheme.theme || 
+                  (currentYearTheme.focus_areas && currentYearTheme.focus_areas.filter(a => a && a.trim()).length > 0) || 
+                  (currentYearTheme.non_focus_areas && currentYearTheme.non_focus_areas.filter(a => a && a.trim()).length > 0)
+                );
+                
+                return (
+                  <div className="p-3 bg-neutral-900/50 border border-neutral-800 rounded-lg">
+                    {hasTheme ? (
+                    <div className="space-y-2">
+                      {/* Theme */}
+                      {currentYearTheme.theme && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-400">This Year's Theme:</span>
+                          <button
+                            onClick={openYearThemeEditor}
+                            className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                          >
+                            "{currentYearTheme.theme}"
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Focus and Non-Focus Areas */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {/* Focus Areas */}
+                        {currentYearTheme.focus_areas?.filter(a => a).length > 0 && (
+                          <>
+                            <span className="text-xs text-neutral-500">Focus:</span>
+                            {currentYearTheme.focus_areas.filter(a => a).map((area, idx) => (
+                              <button
+                                key={`focus-${idx}`}
+                                onClick={openYearThemeEditor}
+                                className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        
+                        {/* Non-Focus Areas */}
+                        {currentYearTheme.non_focus_areas?.filter(a => a).length > 0 && (
+                          <>
+                            <span className="text-xs text-neutral-500">Non Focus:</span>
+                            {currentYearTheme.non_focus_areas.filter(a => a).map((area, idx) => (
+                              <button
+                                key={`non-focus-${idx}`}
+                                onClick={openYearThemeEditor}
+                                className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">This Year's Theme:</span>
+                      <button
+                        onClick={openYearThemeEditor}
+                        className="text-sm text-neutral-500 hover:text-neutral-400 transition-colors flex items-center gap-1.5"
+                      >
+                        <Target className="w-3.5 h-3.5" />
+                        <span>Set Theme</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+              })()}
+
+              {/* This Month's Theme */}
+              {(() => {
+                const hasTheme = currentMonthTheme && (
+                  currentMonthTheme.theme ||
+                  (currentMonthTheme.focus_areas && currentMonthTheme.focus_areas.filter(a => a).length > 0) ||
+                  (currentMonthTheme.non_focus_areas && currentMonthTheme.non_focus_areas.filter(a => a).length > 0)
+                );
+                
+                return (
+                  <div className="mt-4 p-3 bg-neutral-900/50 border border-neutral-800 rounded-lg">
+                    {hasTheme ? (
+                      <div className="space-y-2">
+                        {/* Theme */}
+                        {currentMonthTheme.theme && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-neutral-400">This Month's Theme:</span>
+                            <button
+                              onClick={openMonthThemeEditor}
+                              className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                            >
+                              "{currentMonthTheme.theme}"
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Focus and Non-Focus Areas */}
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {/* Focus Areas */}
+                          {currentMonthTheme.focus_areas?.filter(a => a).length > 0 && (
+                            <>
+                              <span className="text-xs text-neutral-500">Focus:</span>
+                              {currentMonthTheme.focus_areas.filter(a => a).map((area, idx) => (
+                                <button
+                                  key={`month-focus-${idx}`}
+                                  onClick={openMonthThemeEditor}
+                                  className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                                >
+                                  {area}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          
+                          {/* Non-Focus Areas */}
+                          {currentMonthTheme.non_focus_areas?.filter(a => a).length > 0 && (
+                            <>
+                              <span className="text-xs text-neutral-500">Non Focus:</span>
+                              {currentMonthTheme.non_focus_areas.filter(a => a).map((area, idx) => (
+                                <button
+                                  key={`month-non-focus-${idx}`}
+                                  onClick={openMonthThemeEditor}
+                                  className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                                >
+                                  {area}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-neutral-400">This Month's Theme:</span>
+                        <button
+                          onClick={openMonthThemeEditor}
+                          className="text-sm text-neutral-500 hover:text-neutral-400 transition-colors flex items-center gap-1.5"
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                          <span>Set Theme</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              
+              <CommittedPrioritiesModule isVisible={sectionsVisible.committedPriorities} />
+            </div>
+          )}
         </section>
 
         <section>
@@ -420,9 +768,87 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               </button>
             )}
           </div>
-          <div className="mt-4">
-            <OKRModule key={okrsKey} isVisible={sectionsVisible.okrs} hideHeader={true} />
-          </div>
+          {sectionsVisible.okrs && (
+            <div className="mt-4 space-y-4">
+              {/* Year Theme Display for OKRs */}
+              {(() => {
+                const hasTheme = currentYearTheme && (
+                  currentYearTheme.theme || 
+                  (currentYearTheme.focus_areas && currentYearTheme.focus_areas.filter(a => a && a.trim()).length > 0) || 
+                  (currentYearTheme.non_focus_areas && currentYearTheme.non_focus_areas.filter(a => a && a.trim()).length > 0)
+                );
+                
+                return (
+                  <div className="p-3 bg-neutral-900/50 border border-neutral-800 rounded-lg">
+                    {hasTheme ? (
+                    <div className="space-y-2">
+                      {/* Theme */}
+                      {currentYearTheme.theme && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-400">This Year's Theme:</span>
+                          <button
+                            onClick={openYearThemeEditor}
+                            className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                          >
+                            "{currentYearTheme.theme}"
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Focus and Non-Focus Areas */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {/* Focus Areas */}
+                        {currentYearTheme.focus_areas?.filter(a => a).length > 0 && (
+                          <>
+                            <span className="text-xs text-neutral-500">Focus:</span>
+                            {currentYearTheme.focus_areas.filter(a => a).map((area, idx) => (
+                              <button
+                                key={`okr-focus-${idx}`}
+                                onClick={openYearThemeEditor}
+                                className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        
+                        {/* Non-Focus Areas */}
+                        {currentYearTheme.non_focus_areas?.filter(a => a).length > 0 && (
+                          <>
+                            <span className="text-xs text-neutral-500">Non Focus:</span>
+                            {currentYearTheme.non_focus_areas.filter(a => a).map((area, idx) => (
+                              <button
+                                key={`okr-non-focus-${idx}`}
+                                onClick={openYearThemeEditor}
+                                className="px-2 py-0.5 bg-neutral-800 text-neutral-300 rounded-full text-xs hover:bg-neutral-700 transition-colors"
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">This Year's Theme:</span>
+                      <button
+                        onClick={openYearThemeEditor}
+                        className="text-sm text-neutral-500 hover:text-neutral-400 transition-colors flex items-center gap-1.5"
+                      >
+                        <Target className="w-3.5 h-3.5" />
+                        <span>Set Theme</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+              })()}
+              
+              <OKRModule key={okrsKey} isVisible={sectionsVisible.okrs} hideHeader={true} />
+            </div>
+          )}
         </section>
 
         <section>
@@ -464,6 +890,340 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
             onClose={() => setShowQuarterlySetup(false)}
             onCreate={handleCreateQuarterOKRs}
           />
+        )}
+        
+        {/* Month Theme Editor Modal/Bottom Sheet */}
+        {showMonthThemeEditor && (
+          <>
+            {/* Desktop: Modal */}
+            <div className="hidden sm:block fixed inset-0 bg-black/50 z-50" onClick={() => setShowMonthThemeEditor(false)} />
+            <div className="hidden sm:block fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-neutral-100">
+                  {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  onClick={() => setShowMonthThemeEditor(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Theme Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
+                  <input
+                    type="text"
+                    value={monthThemeForm.theme}
+                    onChange={(e) => setMonthThemeForm(prev => ({ ...prev, theme: e.target.value }))}
+                    placeholder="Theme"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                </div>
+                
+                {/* Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={monthThemeForm.focusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...monthThemeForm.focusAreas];
+                          newAreas[i] = e.target.value;
+                          setMonthThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
+                        }}
+                        placeholder={`Focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Non Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={monthThemeForm.nonFocusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...monthThemeForm.nonFocusAreas];
+                          newAreas[i] = e.target.value;
+                          setMonthThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
+                        }}
+                        placeholder={`Non-focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSaveMonthTheme}
+                  className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+            
+            {/* Mobile: Bottom Sheet */}
+            <div className="sm:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setShowMonthThemeEditor(false)} />
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-neutral-800 rounded-t-3xl shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 bg-neutral-700 rounded-full" />
+              </div>
+              
+              <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 px-4 pb-3 pt-1 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-neutral-100">
+                  {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  onClick={() => setShowMonthThemeEditor(false)}
+                  className="p-2 text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-4 pb-8">
+                {/* Theme Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
+                  <input
+                    type="text"
+                    value={monthThemeForm.theme}
+                    onChange={(e) => setMonthThemeForm(prev => ({ ...prev, theme: e.target.value }))}
+                    placeholder="Theme"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                </div>
+                
+                {/* Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={monthThemeForm.focusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...monthThemeForm.focusAreas];
+                          newAreas[i] = e.target.value;
+                          setMonthThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
+                        }}
+                        placeholder={`Focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Non Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={monthThemeForm.nonFocusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...monthThemeForm.nonFocusAreas];
+                          newAreas[i] = e.target.value;
+                          setMonthThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
+                        }}
+                        placeholder={`Non-focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSaveMonthTheme}
+                  className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Year Theme Editor Modal/Bottom Sheet */}
+        {showYearThemeEditor && (
+          <>
+            {/* Desktop: Modal */}
+            <div className="hidden sm:block fixed inset-0 bg-black/50 z-50" onClick={() => setShowYearThemeEditor(false)} />
+            <div className="hidden sm:block fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-neutral-100">
+                  {new Date().getFullYear()}
+                </h3>
+                <button
+                  onClick={() => setShowYearThemeEditor(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Theme Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
+                  <input
+                    type="text"
+                    value={yearThemeForm.theme}
+                    onChange={(e) => setYearThemeForm(prev => ({ ...prev, theme: e.target.value }))}
+                    placeholder="Theme"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                </div>
+                
+                {/* Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={yearThemeForm.focusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...yearThemeForm.focusAreas];
+                          newAreas[i] = e.target.value;
+                          setYearThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
+                        }}
+                        placeholder={`Focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Non Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={yearThemeForm.nonFocusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...yearThemeForm.nonFocusAreas];
+                          newAreas[i] = e.target.value;
+                          setYearThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
+                        }}
+                        placeholder={`Non-focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSaveYearTheme}
+                  className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+            
+            {/* Mobile: Bottom Sheet */}
+            <div className="sm:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setShowYearThemeEditor(false)} />
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-neutral-800 rounded-t-3xl shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 bg-neutral-700 rounded-full" />
+              </div>
+              
+              <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 px-4 pb-3 pt-1 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-neutral-100">
+                  {new Date().getFullYear()}
+                </h3>
+                <button
+                  onClick={() => setShowYearThemeEditor(false)}
+                  className="p-2 text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-4 pb-8">
+                {/* Theme Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
+                  <input
+                    type="text"
+                    value={yearThemeForm.theme}
+                    onChange={(e) => setYearThemeForm(prev => ({ ...prev, theme: e.target.value }))}
+                    placeholder="Theme"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                </div>
+                
+                {/* Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={yearThemeForm.focusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...yearThemeForm.focusAreas];
+                          newAreas[i] = e.target.value;
+                          setYearThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
+                        }}
+                        placeholder={`Focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Non Focus Areas Section */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
+                  <div className="space-y-2">
+                    {[0, 1].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={yearThemeForm.nonFocusAreas[i] || ''}
+                        onChange={(e) => {
+                          const newAreas = [...yearThemeForm.nonFocusAreas];
+                          newAreas[i] = e.target.value;
+                          setYearThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
+                        }}
+                        placeholder={`Non-focus ${i + 1}`}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSaveYearTheme}
+                  className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

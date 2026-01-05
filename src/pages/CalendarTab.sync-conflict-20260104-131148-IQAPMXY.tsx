@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useTransition, useCallback } from 'react';
 import { tokens, cn } from '../theme/config';
-import { Calendar, X, Plus, Edit2, Trash2, Settings, ChevronRight, ChevronDown, Sparkles, BarChart3, Target, CircleDot, Check, Flag, Link2, Minus } from 'lucide-react';
+import { Calendar, X, Plus, Edit2, Trash2, Settings, ChevronRight, ChevronDown, Sparkles, BarChart3 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
-import type { CalendarEvent, CalendarEventInput, MonthTheme, MonthThemeInput, YearTheme, YearThemeInput, YearGoal, YearGoalInput, Habit } from '../types';
+import type { CalendarEvent, CalendarEventInput } from '../types';
 
 interface CalendarTabProps {
   isVisible?: boolean;
@@ -163,39 +163,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
   const [showNlSheet, setShowNlSheet] = useState(false); // Mobile bottom sheet
   const [isYearHeaderVisible, setIsYearHeaderVisible] = useState(true); // Track year header visibility
   const [activeMonthDropdown, setActiveMonthDropdown] = useState<string | null>(null); // Which month's dropdown is open
-  
-  // Month themes state
-  const [monthThemes, setMonthThemes] = useState<Map<string, MonthTheme>>(new Map());
-  const [editingThemeMonth, setEditingThemeMonth] = useState<string | null>(null); // 'YYYY-MM' format
-  const [focusField, setFocusField] = useState<string | null>(null); // Which field to focus: 'theme', 'focus-0', 'focus-1', 'focus-2', 'non-focus-0', 'non-focus-1'
-  const [themeFormData, setThemeFormData] = useState<{
-    theme: string;
-    focusAreas: string[];
-    nonFocusAreas: string[];
-  }>({ theme: '', focusAreas: [], nonFocusAreas: [] });
-  
-  // Refs for month theme input fields
-  const themeInputRef = useRef<HTMLInputElement>(null);
-  const focusInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const nonFocusInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  
-  // Year themes and goals state
-  const [showYearSettings, setShowYearSettings] = useState(false);
-  const [yearTheme, setYearTheme] = useState<YearTheme | null>(null);
-  const [yearGoals, setYearGoals] = useState<YearGoal[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [yearThemeForm, setYearThemeForm] = useState<{
-    theme: string;
-    focusAreas: string[];
-    nonFocusAreas: string[];
-  }>({ theme: '', focusAreas: ['', '', ''], nonFocusAreas: ['', ''] });
-  const [newGoalForm, setNewGoalForm] = useState<{
-    title: string;
-    targetValue: number;
-    dataSource: 'manual' | 'habit';
-    linkedHabitId: string | null;
-  }>({ title: '', targetValue: 1, dataSource: 'manual', linkedHabitId: null });
-  const [editingLinkForGoal, setEditingLinkForGoal] = useState<string | null>(null); // Track which goal is being linked
   
   // Animated placeholder
   const [placeholderText, setPlaceholderText] = useState('');
@@ -571,119 +538,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     
     loadEvents();
   }, [startYear, endYear, isVisible]);
- 
-  // Load month themes for the year range
-  useEffect(() => {
-    if (!isVisible) return;
-    
-    const loadMonthThemes = async () => {
-      try {
-        const yearsToFetch = [];
-        for (let y = startYear; y <= endYear; y++) {
-          yearsToFetch.push(y);
-        }
-        
-        const results = await Promise.all(
-          yearsToFetch.map(y => apiClient.fetchMonthThemesForYear(y))
-        );
-        
-        const themesMap = new Map<string, MonthTheme>();
-        results.flat().forEach(theme => {
-          const key = `${theme.year}-${String(theme.month).padStart(2, '0')}`;
-          themesMap.set(key, theme);
-        });
-        
-        setMonthThemes(themesMap);
-      } catch (error) {
-        console.error('Failed to load month themes:', error);
-      }
-    };
-    
-    loadMonthThemes();
-  }, [startYear, endYear, isVisible]);
-
-  // Load year theme, goals, and habits
-  useEffect(() => {
-    if (!isVisible) return;
-    
-    const loadYearData = async () => {
-      try {
-        const [theme, goals, habitsData] = await Promise.all([
-          apiClient.fetchYearTheme(selectedYear),
-          apiClient.fetchYearGoals(selectedYear),
-          apiClient.fetchHabitsFromSupabase(),
-        ]);
-        
-        setYearTheme(theme);
-        setYearGoals(goals);
-        setHabits(habitsData);
-        
-        // Initialize form with existing data
-        if (theme) {
-          setYearThemeForm({
-            theme: theme.theme || '',
-            focusAreas: theme.focus_areas?.length ? [...theme.focus_areas, '', '', ''].slice(0, 3) : ['', '', ''],
-            nonFocusAreas: theme.non_focus_areas?.length ? [...theme.non_focus_areas, '', ''].slice(0, 2) : ['', ''],
-          });
-        } else {
-          setYearThemeForm({ theme: '', focusAreas: ['', '', ''], nonFocusAreas: ['', ''] });
-        }
-      } catch (error) {
-        console.error('Failed to load year data:', error);
-      }
-    };
-    
-    loadYearData();
-  }, [selectedYear, isVisible]);
-
-  // Sync habit-linked goals when year settings opens
-  useEffect(() => {
-    if (!showYearSettings || !isVisible) return;
-    
-    const syncLinkedGoals = async () => {
-      const linkedGoals = yearGoals.filter(g => g.data_source === 'habit' && g.linked_habit_id && g.auto_sync);
-      if (linkedGoals.length === 0) return;
-      
-      try {
-        await Promise.all(linkedGoals.map(g => apiClient.syncHabitToYearGoal(g.id)));
-        // Refresh goals
-        const refreshed = await apiClient.fetchYearGoals(selectedYear);
-        setYearGoals(refreshed);
-      } catch (error) {
-        console.error('Failed to sync linked goals:', error);
-      }
-    };
-    
-    syncLinkedGoals();
-  }, [showYearSettings, isVisible]);
-
-  // Effect to focus the correct input field when the month theme editor opens
-  useEffect(() => {
-    if (editingThemeMonth && focusField) {
-      // Use a longer timeout to ensure the sidebar is fully rendered
-      const timeoutId = setTimeout(() => {
-        if (focusField === 'theme' && themeInputRef.current) {
-          themeInputRef.current.focus();
-          themeInputRef.current.select();
-        } else if (focusField.startsWith('focus-')) {
-          const index = parseInt(focusField.split('-')[1]);
-          if (focusInputRefs.current[index]) {
-            focusInputRefs.current[index]?.focus();
-            focusInputRefs.current[index]?.select();
-          }
-        } else if (focusField.startsWith('non-focus-')) {
-          const index = parseInt(focusField.split('-')[1]);
-          if (nonFocusInputRefs.current[index]) {
-            nonFocusInputRefs.current[index]?.focus();
-            nonFocusInputRefs.current[index]?.select();
-          }
-        }
-        setFocusField(null); // Reset focus field after focusing
-      }, 400);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [editingThemeMonth, focusField]);
 
   const scrollToMonth = (monthIndex: number, year: number) => {
     const targetId = `month-${year}-${monthIndex}`;
@@ -1166,163 +1020,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
     toast.success('Deletion undone');
   };
 
-  // Month theme handlers
-  const handleSaveMonthTheme = async (year: number, month: number) => {
-    try {
-      const input: MonthThemeInput = {
-        year,
-        month,
-        theme: themeFormData.theme.trim() || null,
-        focus_areas: themeFormData.focusAreas.filter(a => a.trim()),
-        non_focus_areas: themeFormData.nonFocusAreas.filter(a => a.trim()),
-      };
-      
-      const saved = await apiClient.upsertMonthTheme(input);
-      
-      // Update local state
-      const key = `${year}-${String(month).padStart(2, '0')}`;
-      setMonthThemes(prev => {
-        const next = new Map(prev);
-        next.set(key, saved);
-        return next;
-      });
-      
-      setEditingThemeMonth(null);
-      toast.success('Month theme saved');
-    } catch (error) {
-      console.error('Failed to save month theme:', error);
-      toast.error('Failed to save month theme');
-    }
-  };
-
-  const openThemeEditor = (year: number, monthIndex: number, fieldToFocus?: string) => {
-    const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`; // Note: monthIndex is 0-11, month is 1-12
-    const existing = monthThemes.get(key);
-    
-    setThemeFormData({
-      theme: existing?.theme || '',
-      focusAreas: existing?.focus_areas?.length ? [...existing.focus_areas] : ['', '', ''],
-      nonFocusAreas: existing?.non_focus_areas?.length ? [...existing.non_focus_areas] : ['', ''],
-    });
-    
-    setFocusField(fieldToFocus || 'theme'); // Default to theme field
-    setEditingThemeMonth(key);
-    setShowYearSettings(false); // Close year settings when opening month theme editor
-  };
-
-  // Year theme handlers
-  const handleSaveYearTheme = async () => {
-    try {
-      const input: YearThemeInput = {
-        year: selectedYear,
-        theme: yearThemeForm.theme.trim() || null,
-        focus_areas: yearThemeForm.focusAreas.filter(a => a.trim()),
-        non_focus_areas: yearThemeForm.nonFocusAreas.filter(a => a.trim()),
-      };
-      
-      const saved = await apiClient.upsertYearTheme(input);
-      setYearTheme(saved);
-      toast.success('Year theme saved');
-    } catch (error) {
-      console.error('Failed to save year theme:', error);
-      toast.error('Failed to save year theme');
-    }
-  };
-
-  // Year goal handlers
-  const handleAddGoal = async () => {
-    if (!newGoalForm.title.trim()) {
-      toast.error('Please enter a goal title');
-      return;
-    }
-    
-    try {
-      const input: YearGoalInput = {
-        year: selectedYear,
-        title: newGoalForm.title.trim(),
-        target_value: newGoalForm.targetValue,
-        data_source: newGoalForm.dataSource,
-        linked_habit_id: newGoalForm.dataSource === 'habit' ? newGoalForm.linkedHabitId : null,
-        auto_sync: newGoalForm.dataSource === 'habit',
-        display_order: yearGoals.length,
-      };
-      
-      const created = await apiClient.createYearGoal(input);
-      
-      // If linked to habit, sync immediately
-      if (created.data_source === 'habit' && created.linked_habit_id) {
-        const count = await apiClient.syncHabitToYearGoal(created.id);
-        created.current_value = count;
-        created.completed = count >= created.target_value;
-        toast.success(`Goal created! Synced ${count} completions from habit`);
-      } else {
-        toast.success('Goal created');
-      }
-      
-      setYearGoals(prev => [...prev, created]);
-      setNewGoalForm({ title: '', targetValue: 1, dataSource: 'manual', linkedHabitId: null });
-    } catch (error) {
-      console.error('Failed to create goal:', error);
-      toast.error('Failed to create goal');
-    }
-  };
-
-  const handleUpdateGoalProgress = async (goal: YearGoal, delta: number) => {
-    const newValue = Math.max(0, goal.current_value + delta);
-    const completed = newValue >= goal.target_value;
-    
-    // Optimistic update
-    setYearGoals(prev => prev.map(g => 
-      g.id === goal.id 
-        ? { ...g, current_value: newValue, completed, completed_at: completed && !g.completed ? new Date().toISOString() : g.completed_at }
-        : g
-    ));
-    
-    try {
-      await apiClient.updateYearGoal(goal.id, { 
-        current_value: newValue,
-        completed,
-        completed_at: completed && !goal.completed ? new Date().toISOString() : goal.completed_at
-      });
-    } catch (error) {
-      // Revert on error
-      setYearGoals(prev => prev.map(g => g.id === goal.id ? goal : g));
-      toast.error('Failed to update progress');
-    }
-  };
-
-  const handleDeleteGoal = async (goalId: string) => {
-    const goal = yearGoals.find(g => g.id === goalId);
-    
-    // Optimistic delete
-    setYearGoals(prev => prev.filter(g => g.id !== goalId));
-    
-    try {
-      await apiClient.deleteYearGoal(goalId);
-      toast.success('Goal deleted');
-    } catch (error) {
-      // Revert on error
-      if (goal) setYearGoals(prev => [...prev, goal]);
-      toast.error('Failed to delete goal');
-    }
-  };
-
-  const handleSyncGoal = async (goal: YearGoal) => {
-    if (goal.data_source !== 'habit' || !goal.linked_habit_id) return;
-    
-    try {
-      const count = await apiClient.syncHabitToYearGoal(goal.id);
-      setYearGoals(prev => prev.map(g => 
-        g.id === goal.id 
-          ? { ...g, current_value: count, completed: count >= g.target_value }
-          : g
-      ));
-      toast.success(`Synced: ${count}/${goal.target_value}`);
-    } catch (error) {
-      toast.error('Failed to sync');
-    }
-  };
-
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -1802,24 +1499,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                     </option>
                   ))}
                 </select>
-                 
-                {/* Year Settings Button */}
-                <button
-                  onClick={() => {
-                    setShowYearSettings(true);
-                    setEditingThemeMonth(null); // Close month editor if year settings is opened
-                  }}
-                  className={cn(
-                    tokens.button.ghost,
-                    'p-2',
-                    showYearSettings && 'bg-neutral-800',
-                    (yearTheme || yearGoals.length > 0) && !showYearSettings && 'text-violet-400'
-                  )}
-                  title="Year theme & goals"
-                >
-                  <Flag className="w-5 h-5" />
-                </button>
-                 
                 {selectedYear !== currentYear && (
                   <button
                     onClick={() => startTransition(() => setSelectedYear(currentYear))}
@@ -1976,147 +1655,43 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                   )}
                 >
                   <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-xl px-4 py-3 hover:bg-neutral-800/50 transition-colors">
-                    {/* Top row: Month name + actions */}
                     <div className="flex items-center justify-between gap-3">
-                      {/* Month name and theme - left side */}
-                      <div className="flex items-center gap-3 flex-1">
-                        <h2 
-                          onClick={() => toggleMonth(group.year, group.monthIndex)}
-                          className={cn(
-                            tokens.typography.scale.h3, 
-                            tokens.typography.weights.semibold, 
-                            tokens.palette.dark.text,
-                            "cursor-pointer hover:text-neutral-200 transition-colors"
-                          )}
-                        >
+                      {/* Month name - clickable area */}
+                      <button
+                        onClick={() => toggleMonth(group.year, group.monthIndex)}
+                        className="flex-1 text-left"
+                      >
+                        <h2 className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
                           {group.monthName}
                         </h2>
-                        {(() => {
-                          const themeKey = `${group.year}-${String(group.monthIndex + 1).padStart(2, '0')}`;
-                          const monthTheme = monthThemes.get(themeKey);
-                          const hasTheme = monthTheme && (monthTheme.theme || (monthTheme.focus_areas?.length > 0) || (monthTheme.non_focus_areas?.length > 0));
-                          
-                          if (hasTheme && monthTheme?.theme) {
-                            return (
-                              <button
-                                onClick={() => openThemeEditor(group.year, group.monthIndex, 'theme')}
-                                className="text-sm text-amber-400/90 hover:text-amber-400 font-medium truncate max-w-[200px] hidden sm:inline transition-colors"
-                                title="Edit month theme"
-                              >
-                                "{monthTheme.theme}"
-                              </button>
-                            );
-                          } else if (!hasTheme) {
-                            return (
-                              <button
-                                onClick={() => openThemeEditor(group.year, group.monthIndex, 'theme')}
-                                className="text-sm text-neutral-500 hover:text-neutral-400 font-medium hidden sm:inline-flex items-center gap-1.5 transition-colors"
-                                title="Set month theme"
-                              >
-                                <Target className="w-3.5 h-3.5" />
-                                <span>Set Theme</span>
-                              </button>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
+                      </button>
                       
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2">
-                        {/* Add button - shown when year header is not visible AND month is expanded (sticky) */}
-                        {!isYearHeaderVisible && isExpanded && (
-                          <button
-                            onClick={() => {
-                              setActiveMonthDropdown(activeMonthDropdown === monthKey ? null : monthKey);
-                            }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/30 rounded-full text-xs font-medium text-emerald-300 transition-colors flex-shrink-0"
-                            title="Add event"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Add</span>
-                          </button>
-                        )}
-                        
-                        {/* Collapse/expand chevron - clickable */}
+                      {/* Add button - shown when year header is not visible AND month is expanded (sticky) */}
+                      {!isYearHeaderVisible && isExpanded && (
                         <button
-                          onClick={() => toggleMonth(group.year, group.monthIndex)}
-                          className="flex-shrink-0"
+                          onClick={() => {
+                            setActiveMonthDropdown(activeMonthDropdown === monthKey ? null : monthKey);
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/30 rounded-full text-xs font-medium text-emerald-300 transition-colors flex-shrink-0"
+                          title="Add event"
                         >
-                          {isExpanded ? (
-                            <ChevronDown className="w-5 h-5 text-neutral-400" />
-                          ) : (
-                            <ChevronRight className="w-5 h-5 text-neutral-400" />
-                          )}
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Add</span>
                         </button>
-                      </div>
-                    </div>
-                    
-                    {/* Theme display row - shown when theme exists and expanded */}
-                    {(() => {
-                      const themeKey = `${group.year}-${String(group.monthIndex + 1).padStart(2, '0')}`;
-                      const monthTheme = monthThemes.get(themeKey);
-                      const hasTheme = monthTheme && (monthTheme.theme || (monthTheme.focus_areas?.length > 0) || (monthTheme.non_focus_areas?.length > 0));
-                      const isEditingTheme = editingThemeMonth === themeKey;
+                      )}
                       
-                      if (hasTheme && isExpanded && !isEditingTheme) {
-                        return (
-                          <div className="mt-3 pt-3 border-t border-neutral-800/50">
-                            {/* Mobile: Theme on its own line */}
-                            {monthTheme?.theme && (
-                              <div className="sm:hidden text-sm text-amber-400/90 font-medium mb-2">
-                                "{monthTheme.theme}"
-                              </div>
-                            )}
-                            
-                            <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-                              {/* Focus areas */}
-                              {monthTheme?.focus_areas && monthTheme.focus_areas.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-neutral-400 flex items-center gap-1">
-                                    <Target className="w-3 h-3" />
-                                    Focus:
-                                  </span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {monthTheme.focus_areas.map((area, i) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => openThemeEditor(group.year, group.monthIndex, `focus-${i}`)}
-                                        className="px-2 py-0.5 bg-neutral-800/50 hover:bg-neutral-700/50 border border-neutral-700/50 rounded text-neutral-300 transition-colors cursor-pointer"
-                                      >
-                                        {area}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Non-focus areas */}
-                              {monthTheme?.non_focus_areas && monthTheme.non_focus_areas.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-neutral-400 flex items-center gap-1">
-                                    <CircleDot className="w-3 h-3" />
-                                    Non Focus:
-                                  </span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {monthTheme.non_focus_areas.map((area, i) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => openThemeEditor(group.year, group.monthIndex, `non-focus-${i}`)}
-                                        className="px-2 py-0.5 bg-neutral-800/50 hover:bg-neutral-700/50 border border-neutral-700/50 rounded text-neutral-300 transition-colors cursor-pointer"
-                                      >
-                                        {area}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                      {/* Collapse/expand chevron - clickable */}
+                      <button
+                        onClick={() => toggleMonth(group.year, group.monthIndex)}
+                        className="flex-shrink-0"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5 text-neutral-400" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-neutral-400" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -2225,22 +1800,13 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             {/* Column 2: PTO dot space - fixed width, centered */}
                             <div className="w-2.5 flex items-center justify-center flex-shrink-0">
                               {rowAppearance.hasPto && (
-                                <div
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRemoveDayMetadata(day.date, 'pto');
                                   }}
                                   className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
                                   title="Out of Office (PTO) - Click to remove"
-                                  role="button"
-                                  tabIndex={0}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      handleRemoveDayMetadata(day.date, 'pto');
-                                    }
-                                  }}
                                 />
                               )}
                             </div>
@@ -2297,25 +1863,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                   >
                                     <span className={cn('w-2 h-2 rounded-full flex-shrink-0', style.dot)} />
                                     <span className={cn('truncate max-w-[100px]', style.text)}>{event.title}</span>
-                                    <div
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteEvent(event.id);
                                       }}
-                                      className="text-neutral-400 opacity-70 group-hover:opacity-100 hover:text-rose-400 transition-all ml-0.5 cursor-pointer"
+                                      className="text-neutral-400 opacity-70 group-hover:opacity-100 hover:text-rose-400 transition-all ml-0.5"
                                       title="Delete event"
-                                      role="button"
-                                      tabIndex={0}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                          handleDeleteEvent(event.id);
-                                        }
-                                      }}
                                     >
                                       <X className="w-3 h-3" />
-                                    </div>
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -2401,45 +1958,27 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                 </span>
                                 {/* Gold PTO indicator dot - Click to remove */}
                                 {rowAppearance.hasPto && (
-                                  <div
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleRemoveDayMetadata(day.date, 'pto');
                                     }}
                                     className="w-2 h-2 rounded-full bg-yellow-400 border border-yellow-300 shadow-sm hover:bg-yellow-500 transition-colors cursor-pointer"
                                     title="Out of Office (PTO) - Click to remove"
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleRemoveDayMetadata(day.date, 'pto');
-                                      }
-                                    }}
                                   />
                                 )}
                                 {/* Location indicator - Click to remove */}
                                 {day.events.some(e => e.category === 'location') && (
-                                  <div
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleRemoveDayMetadata(day.date, 'location');
                                     }}
                                     className="text-xs hover:scale-110 transition-transform cursor-pointer"
                                     title={`📍 ${day.events.find(e => e.category === 'location')?.title} - Click to remove`}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleRemoveDayMetadata(day.date, 'location');
-                                      }
-                                    }}
                                   >
                                     📍
-                                  </div>
+                                  </button>
                                 )}
                               </div>
                               <span className={cn(
@@ -2454,25 +1993,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             {day.events.some(e => e.category === 'location') && (
                               <div className="group/location relative mb-2 px-2 py-1 bg-blue-950/30 border border-blue-700/30 rounded text-xs text-blue-300 truncate hover:bg-blue-950/40 transition-colors">
                                 <span>📍 {day.events.find(e => e.category === 'location')?.title}</span>
-                                <div
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRemoveDayMetadata(day.date, 'location');
                                   }}
-                                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-blue-400 hover:text-blue-200 hover:bg-blue-900/50 rounded opacity-0 group-hover/location:opacity-100 transition-opacity cursor-pointer"
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-blue-400 hover:text-blue-200 hover:bg-blue-900/50 rounded opacity-0 group-hover/location:opacity-100 transition-opacity"
                                   title="Remove location"
-                                  role="button"
-                                  tabIndex={0}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      handleRemoveDayMetadata(day.date, 'location');
-                                    }
-                                  }}
                                 >
                                   <X className="w-3 h-3" />
-                                </div>
+                                </button>
                               </div>
                             )}
                             
@@ -2505,25 +2035,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                                       {event.title}
                                     </div>
                                     {/* Delete X - on hover */}
-                                    <div
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteEvent(event.id);
                                       }}
-                                      className="opacity-0 group-hover/event:opacity-100 text-neutral-400 hover:text-rose-400 transition-all flex-shrink-0 cursor-pointer"
+                                      className="opacity-0 group-hover/event:opacity-100 text-neutral-400 hover:text-rose-400 transition-all flex-shrink-0"
                                       title="Delete event"
-                                      role="button"
-                                      tabIndex={0}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                          handleDeleteEvent(event.id);
-                                        }
-                                      }}
                                     >
                                       <X className="w-3 h-3" />
-                                    </div>
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -2665,897 +2186,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
             </div>
           </div>
         )}
-
-        {/* Desktop: Year Settings sidebar */}
-        {showYearSettings && !selectedDate && (
-          <div className="hidden lg:block w-1/3 flex-shrink-0 sticky top-6 self-start max-h-[calc(100vh-8rem)] overflow-auto">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl">
-              {/* Header */}
-              <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-neutral-100">
-                    {selectedYear}
-                  </h3>
-                  <button
-                    onClick={() => setShowYearSettings(false)}
-                    className={cn(tokens.button.ghost, 'p-2')}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-4 space-y-6">
-                {/* Year Theme Section */}
-                <div className="space-y-4">
-                  {/* Theme input */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
-                    <input
-                      type="text"
-                      value={yearThemeForm.theme}
-                      onChange={(e) => setYearThemeForm(prev => ({ ...prev, theme: e.target.value }))}
-                      placeholder="Theme"
-                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                    />
-                  </div>
-                  
-                  {/* Focus areas */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
-                    <div className="space-y-2">
-                      {[0, 1, 2].map(i => (
-                        <input
-                          key={i}
-                          type="text"
-                          value={yearThemeForm.focusAreas[i] || ''}
-                          onChange={(e) => {
-                            const newAreas = [...yearThemeForm.focusAreas];
-                            newAreas[i] = e.target.value;
-                            setYearThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
-                          }}
-                          placeholder={`Focus ${i + 1}`}
-                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Non-focus areas */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
-                    <div className="space-y-2">
-                      {[0, 1].map(i => (
-                        <input
-                          key={i}
-                          type="text"
-                          value={yearThemeForm.nonFocusAreas[i] || ''}
-                          onChange={(e) => {
-                            const newAreas = [...yearThemeForm.nonFocusAreas];
-                            newAreas[i] = e.target.value;
-                            setYearThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
-                          }}
-                          placeholder={`Non-focus ${i + 1}`}
-                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleSaveYearTheme}
-                    className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Save
-                  </button>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-neutral-700" />
-
-                {/* Year Goals Section - Table View */}
-                <div className="space-y-3">
-                  <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider">Goals</div>
-                  
-                  {/* Goals Table */}
-                  <div className="space-y-1">
-                    {/* Existing Goals */}
-                    {yearGoals.map(goal => {
-                      const progress = goal.target_value > 0 ? (goal.current_value / goal.target_value) * 100 : 0;
-                      const linkedHabit = goal.linked_habit_id ? habits.find(h => h.id === goal.linked_habit_id) : null;
-                      const isEditingLink = editingLinkForGoal === goal.id;
-                      
-                      return (
-                        <div key={goal.id} className="space-y-1">
-                          <div className="flex items-center gap-2 p-2 bg-neutral-800/50 border border-neutral-700/50 rounded-lg group hover:bg-neutral-800 transition-colors">
-                            {/* Link toggle button */}
-                            <button
-                              onClick={() => setEditingLinkForGoal(isEditingLink ? null : goal.id)}
-                              className={cn(
-                                'p-1.5 rounded transition-colors flex-shrink-0',
-                                isEditingLink || linkedHabit 
-                                  ? 'text-blue-400 bg-blue-900/20 hover:bg-blue-900/30' 
-                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700'
-                              )}
-                              title={linkedHabit ? `Linked to ${linkedHabit.name}` : 'Link to habit'}
-                            >
-                              <Link2 className="w-3.5 h-3.5" />
-                            </button>
-                            
-                            {/* Goal title - editable when in link mode */}
-                            <div className="flex-1 min-w-0">
-                              {isEditingLink ? (
-                                /* Show habit selector when linking */
-                                <select
-                                  value={goal.linked_habit_id || ''}
-                                  onChange={async (e) => {
-                                    const habitId = e.target.value || null;
-                                    const selectedHabit = habitId ? habits.find(h => h.id === habitId) : null;
-                                    
-                                    try {
-                                      await apiClient.updateYearGoal(goal.id, {
-                                        title: selectedHabit ? selectedHabit.name : goal.title,
-                                        data_source: habitId ? 'habit' : 'manual',
-                                        linked_habit_id: habitId,
-                                        auto_sync: habitId ? true : false
-                                      });
-                                      
-                                      // Update local state
-                                      setYearGoals(prev => prev.map(g => 
-                                        g.id === goal.id 
-                                          ? { 
-                                              ...g, 
-                                              title: selectedHabit ? selectedHabit.name : g.title,
-                                              data_source: habitId ? 'habit' : 'manual', 
-                                              linked_habit_id: habitId, 
-                                              auto_sync: habitId ? true : false 
-                                            }
-                                          : g
-                                      ));
-                                      
-                                      if (habitId) {
-                                        await handleSyncGoal({ ...goal, linked_habit_id: habitId });
-                                      }
-                                      
-                                      setEditingLinkForGoal(null);
-                                      toast.success(habitId ? 'Goal linked to habit' : 'Goal unlinked');
-                                    } catch (error) {
-                                      toast.error('Failed to update goal link');
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                                >
-                                  <option value="" className="bg-neutral-800">Manual goal</option>
-                                  {habits.map(habit => (
-                                    <option key={habit.id} value={habit.id} className="bg-neutral-800">{habit.name}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                /* Normal display */
-                                <div className="flex items-center gap-2 mb-1">
-                                  {goal.completed && <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
-                                  <span className={cn(
-                                    'text-sm truncate',
-                                    goal.completed ? 'text-emerald-300' : 'text-neutral-100'
-                                  )}>
-                                    {goal.title}
-                                  </span>
-                                  {linkedHabit && <Link2 className="w-3 h-3 text-blue-400 flex-shrink-0" />}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Progress */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-neutral-400 tabular-nums whitespace-nowrap">
-                                {goal.current_value}/{goal.target_value}
-                              </span>
-                              <div className="w-16 h-1.5 bg-neutral-700 rounded-full overflow-hidden">
-                                <div 
-                                  className={cn(
-                                    'h-full rounded-full transition-all',
-                                    goal.completed ? 'bg-emerald-500' : 'bg-violet-500'
-                                  )}
-                                  style={{ width: `${Math.min(progress, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* Actions */}
-                            <div className="flex items-center gap-0.5">
-                              {/* Manual controls */}
-                              {goal.data_source === 'manual' && !goal.completed && (
-                                <>
-                                  <button
-                                    onClick={() => handleUpdateGoalProgress(goal, -1)}
-                                    className="p-1.5 text-neutral-400 hover:text-rose-400 hover:bg-neutral-700 rounded transition-colors"
-                                    title="Decrease"
-                                  >
-                                    <Minus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleUpdateGoalProgress(goal, 1)}
-                                    className="p-1.5 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-700 rounded transition-colors"
-                                    title="Increase"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-                              
-                              {/* Sync button for linked goals */}
-                              {linkedHabit && (
-                                <button
-                                  onClick={() => handleSyncGoal(goal)}
-                                  className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
-                                  title="Sync from habit"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                </button>
-                              )}
-                              
-                              {/* Delete */}
-                              <button
-                                onClick={() => handleDeleteGoal(goal.id)}
-                                className="p-1.5 text-neutral-400 hover:text-rose-400 hover:bg-neutral-700 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Add new goal row */}
-                    <div className="flex items-center gap-2 p-2 bg-neutral-800/30 border border-neutral-700/30 border-dashed rounded-lg">
-                      {/* Link toggle button */}
-                      <button
-                        onClick={() => {
-                          const newDataSource = newGoalForm.dataSource === 'manual' ? 'habit' : 'manual';
-                          setNewGoalForm(prev => ({
-                            ...prev,
-                            dataSource: newDataSource,
-                            title: '',
-                            linkedHabitId: newDataSource === 'habit' && habits.length > 0 ? habits[0].id : null
-                          }));
-                          // If switching to habit mode and there are habits, set the title to the first habit's name
-                          if (newDataSource === 'habit' && habits.length > 0) {
-                            setNewGoalForm(prev => ({ ...prev, title: habits[0].name }));
-                          }
-                        }}
-                        className={cn(
-                          'p-1.5 rounded transition-colors flex-shrink-0',
-                          newGoalForm.dataSource === 'habit'
-                            ? 'text-blue-400 bg-blue-900/20 hover:bg-blue-900/30'
-                            : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700'
-                        )}
-                        title={newGoalForm.dataSource === 'habit' ? 'Switch to manual' : 'Link to habit'}
-                      >
-                        <Link2 className="w-3.5 h-3.5" />
-                      </button>
-                      
-                      {/* Manual mode: text input */}
-                      {newGoalForm.dataSource === 'manual' ? (
-                        <input
-                          type="text"
-                          value={newGoalForm.title}
-                          onChange={(e) => setNewGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="Add goal..."
-                          className="flex-1 px-2 py-1 bg-transparent border-none text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none"
-                        />
-                      ) : (
-                        /* Link mode: habit selector */
-                        <select
-                          value={newGoalForm.linkedHabitId || ''}
-                          onChange={(e) => {
-                            const habitId = e.target.value;
-                            const selectedHabit = habits.find(h => h.id === habitId);
-                            setNewGoalForm(prev => ({
-                              ...prev,
-                              linkedHabitId: habitId,
-                              title: selectedHabit ? selectedHabit.name : ''
-                            }));
-                          }}
-                          className="flex-1 px-2 py-1 bg-transparent border-none text-sm text-neutral-100 focus:outline-none"
-                        >
-                          {habits.map(habit => (
-                            <option key={habit.id} value={habit.id} className="bg-neutral-800">{habit.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      
-                      <input
-                        type="number"
-                        min="1"
-                        value={newGoalForm.targetValue}
-                        onChange={(e) => setNewGoalForm(prev => ({ ...prev, targetValue: Math.max(1, parseInt(e.target.value) || 1) }))}
-                        className="w-12 px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-                        placeholder="0"
-                      />
-                      <button
-                        onClick={handleAddGoal}
-                        disabled={!newGoalForm.title.trim() || (newGoalForm.dataSource === 'habit' && !newGoalForm.linkedHabitId)}
-                        className={cn(
-                          'p-1.5 rounded transition-colors flex-shrink-0',
-                          newGoalForm.title.trim() && (newGoalForm.dataSource !== 'habit' || newGoalForm.linkedHabitId)
-                            ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20'
-                            : 'text-neutral-600 cursor-not-allowed'
-                        )}
-                        title="Add goal"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Desktop: Month Theme sidebar */}
-        {editingThemeMonth && !selectedDate && !showYearSettings && (
-          <div className="hidden lg:block w-1/3 flex-shrink-0 sticky top-6 self-start max-h-[calc(100vh-8rem)] overflow-auto">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl">
-              {/* Header */}
-              <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-neutral-100">
-                    {(() => {
-                      const [, month] = editingThemeMonth.split('-').map(Number);
-                      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                      return monthNames[month - 1];
-                    })()}
-                  </h3>
-                  <button
-                    onClick={() => setEditingThemeMonth(null)}
-                    className={cn(tokens.button.ghost, 'p-2')}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-4 space-y-4">
-                {/* Theme input */}
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
-                  <input
-                    ref={themeInputRef}
-                    type="text"
-                    value={themeFormData.theme}
-                    onChange={(e) => setThemeFormData(prev => ({ ...prev, theme: e.target.value }))}
-                    placeholder="Theme"
-                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                  />
-                </div>
-                
-                {/* Focus areas */}
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
-                  <div className="space-y-2">
-                    {[0, 1, 2].map(i => (
-                      <input
-                        key={i}
-                        ref={el => { focusInputRefs.current[i] = el; }}
-                        type="text"
-                        value={themeFormData.focusAreas[i] || ''}
-                        onChange={(e) => {
-                          const newAreas = [...themeFormData.focusAreas];
-                          newAreas[i] = e.target.value;
-                          setThemeFormData(prev => ({ ...prev, focusAreas: newAreas }));
-                        }}
-                        placeholder={`Focus ${i + 1}`}
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Non-focus areas */}
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
-                  <div className="space-y-2">
-                    {[0, 1].map(i => (
-                      <input
-                        key={i}
-                        ref={el => { nonFocusInputRefs.current[i] = el; }}
-                        type="text"
-                        value={themeFormData.nonFocusAreas[i] || ''}
-                        onChange={(e) => {
-                          const newAreas = [...themeFormData.nonFocusAreas];
-                          newAreas[i] = e.target.value;
-                          setThemeFormData(prev => ({ ...prev, nonFocusAreas: newAreas }));
-                        }}
-                        placeholder={`Non-focus ${i + 1}`}
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setEditingThemeMonth(null)}
-                    className="flex-1 px-3 py-2 text-sm text-neutral-400 hover:text-neutral-300 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      const [year, month] = editingThemeMonth.split('-').map(Number);
-                      handleSaveMonthTheme(year, month);
-                    }}
-                    className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Mobile: Year Settings Bottom Sheet */}
-      {showYearSettings && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end" onClick={() => setShowYearSettings(false)}>
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="relative w-full max-h-[85vh] bg-neutral-900 rounded-t-2xl border-t border-neutral-800 overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle bar */}
-            <div className="flex justify-center py-2">
-              <div className="w-10 h-1 bg-neutral-700 rounded-full" />
-            </div>
-            
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 px-4 pb-3 pt-1 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-neutral-100">
-                {selectedYear}
-              </h3>
-              <button
-                onClick={() => setShowYearSettings(false)}
-                className={cn(tokens.button.ghost, 'p-2')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 space-y-6 pb-8">
-              {/* Year Theme Section */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
-                  <input
-                    type="text"
-                    value={yearThemeForm.theme}
-                    onChange={(e) => setYearThemeForm(prev => ({ ...prev, theme: e.target.value }))}
-                    placeholder="Theme"
-                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
-                  <div className="space-y-2">
-                    {[0, 1, 2].map(i => (
-                      <input
-                        key={i}
-                        type="text"
-                        value={yearThemeForm.focusAreas[i] || ''}
-                        onChange={(e) => {
-                          const newAreas = [...yearThemeForm.focusAreas];
-                          newAreas[i] = e.target.value;
-                          setYearThemeForm(prev => ({ ...prev, focusAreas: newAreas }));
-                        }}
-                        placeholder={`Focus ${i + 1}`}
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
-                  <div className="space-y-2">
-                    {[0, 1].map(i => (
-                      <input
-                        key={i}
-                        type="text"
-                        value={yearThemeForm.nonFocusAreas[i] || ''}
-                        onChange={(e) => {
-                          const newAreas = [...yearThemeForm.nonFocusAreas];
-                          newAreas[i] = e.target.value;
-                          setYearThemeForm(prev => ({ ...prev, nonFocusAreas: newAreas }));
-                        }}
-                        placeholder={`Non-focus ${i + 1}`}
-                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                <button
-                  onClick={handleSaveYearTheme}
-                  className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  Save
-                </button>
-              </div>
-
-              <div className="border-t border-neutral-700" />
-
-              {/* Year Goals Section */}
-              <div className="space-y-3">
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider">Goals</div>
-                
-                {yearGoals.length > 0 ? (
-                  <div className="space-y-2">
-                    {yearGoals.map(goal => {
-                      const progress = goal.target_value > 0 ? (goal.current_value / goal.target_value) * 100 : 0;
-                      const linkedHabit = goal.linked_habit_id ? habits.find(h => h.id === goal.linked_habit_id) : null;
-                      const isEditingLink = editingLinkForGoal === goal.id;
-                      
-                      return (
-                        <div 
-                          key={goal.id}
-                          className={cn(
-                            'p-3 rounded-lg border transition-colors',
-                            goal.completed 
-                              ? 'bg-emerald-950/30 border-emerald-800/40' 
-                              : 'bg-neutral-800/50 border-neutral-700/50'
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            {/* Link toggle button */}
-                            <button
-                              onClick={() => setEditingLinkForGoal(isEditingLink ? null : goal.id)}
-                              className={cn(
-                                'p-1.5 rounded transition-colors flex-shrink-0 mt-0.5',
-                                isEditingLink || linkedHabit 
-                                  ? 'text-blue-400 bg-blue-900/20' 
-                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700'
-                              )}
-                              title={linkedHabit ? `Linked to ${linkedHabit.name}` : 'Link to habit'}
-                            >
-                              <Link2 className="w-3.5 h-3.5" />
-                            </button>
-                            
-                            <div className="flex-1 min-w-0">
-                              {isEditingLink ? (
-                                /* Show habit selector when linking */
-                                <select
-                                  value={goal.linked_habit_id || ''}
-                                  onChange={async (e) => {
-                                    const habitId = e.target.value || null;
-                                    const selectedHabit = habitId ? habits.find(h => h.id === habitId) : null;
-                                    
-                                    try {
-                                      await apiClient.updateYearGoal(goal.id, {
-                                        title: selectedHabit ? selectedHabit.name : goal.title,
-                                        data_source: habitId ? 'habit' : 'manual',
-                                        linked_habit_id: habitId,
-                                        auto_sync: habitId ? true : false
-                                      });
-                                      
-                                      // Update local state
-                                      setYearGoals(prev => prev.map(g => 
-                                        g.id === goal.id 
-                                          ? { 
-                                              ...g, 
-                                              title: selectedHabit ? selectedHabit.name : g.title,
-                                              data_source: habitId ? 'habit' : 'manual', 
-                                              linked_habit_id: habitId, 
-                                              auto_sync: habitId ? true : false 
-                                            }
-                                          : g
-                                      ));
-                                      
-                                      if (habitId) {
-                                        await handleSyncGoal({ ...goal, linked_habit_id: habitId });
-                                      }
-                                      
-                                      setEditingLinkForGoal(null);
-                                      toast.success(habitId ? 'Goal linked to habit' : 'Goal unlinked');
-                                    } catch (error) {
-                                      toast.error('Failed to update goal link');
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-500/50 mb-2"
-                                >
-                                  <option value="" className="bg-neutral-800">Manual goal</option>
-                                  {habits.map(habit => (
-                                    <option key={habit.id} value={habit.id} className="bg-neutral-800">{habit.name}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                /* Normal display */
-                                <div className="flex items-center gap-2 mb-1">
-                                  {goal.completed && <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />}
-                                  <span className={cn(
-                                    'font-medium text-sm truncate',
-                                    goal.completed ? 'text-emerald-300' : 'text-neutral-100'
-                                  )}>
-                                    {goal.title}
-                                  </span>
-                                  {linkedHabit && <Link2 className="w-3 h-3 text-blue-400 flex-shrink-0" />}
-                                </div>
-                              )}
-                              
-                              {!isEditingLink && (
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div className="flex-1 h-1.5 bg-neutral-700 rounded-full overflow-hidden">
-                                    <div 
-                                      className={cn(
-                                        'h-full rounded-full transition-all',
-                                        goal.completed ? 'bg-emerald-500' : 'bg-violet-500'
-                                      )}
-                                      style={{ width: `${Math.min(progress, 100)}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-neutral-400 tabular-nums">
-                                    {goal.current_value}/{goal.target_value}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="flex items-center gap-0.5">
-                              {goal.data_source === 'manual' && !goal.completed && (
-                                <>
-                                  <button
-                                    onClick={() => handleUpdateGoalProgress(goal, -1)}
-                                    className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-neutral-700 rounded transition-colors"
-                                    title="Decrease"
-                                  >
-                                    <Minus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleUpdateGoalProgress(goal, 1)}
-                                    className="p-1 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-700 rounded transition-colors"
-                                    title="Increase"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-                              
-                              {/* Sync button for linked goals */}
-                              {linkedHabit && (
-                                <button
-                                  onClick={() => handleSyncGoal(goal)}
-                                  className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
-                                  title="Sync from habit"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                </button>
-                              )}
-                              
-                              <button
-                                onClick={() => handleDeleteGoal(goal.id)}
-                                className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-neutral-700 rounded transition-colors"
-                                title="Delete goal"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-neutral-500 italic">No goals yet. Add your first goal below!</p>
-                )}
-                
-                {/* Add New Goal - inline */}
-                <div className="flex items-center gap-2 p-2 bg-neutral-800/30 border border-neutral-700/30 border-dashed rounded-lg">
-                  {/* Link toggle button */}
-                  <button
-                    onClick={() => {
-                      const newDataSource = newGoalForm.dataSource === 'manual' ? 'habit' : 'manual';
-                      setNewGoalForm(prev => ({
-                        ...prev,
-                        dataSource: newDataSource,
-                        title: '',
-                        linkedHabitId: newDataSource === 'habit' && habits.length > 0 ? habits[0].id : null
-                      }));
-                      // If switching to habit mode and there are habits, set the title to the first habit's name
-                      if (newDataSource === 'habit' && habits.length > 0) {
-                        setNewGoalForm(prev => ({ ...prev, title: habits[0].name }));
-                      }
-                    }}
-                    className={cn(
-                      'p-1.5 rounded transition-colors flex-shrink-0',
-                      newGoalForm.dataSource === 'habit'
-                        ? 'text-blue-400 bg-blue-900/20 hover:bg-blue-900/30'
-                        : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700'
-                    )}
-                    title={newGoalForm.dataSource === 'habit' ? 'Switch to manual' : 'Link to habit'}
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                  </button>
-                  
-                  {/* Manual mode: text input */}
-                  {newGoalForm.dataSource === 'manual' ? (
-                    <input
-                      type="text"
-                      value={newGoalForm.title}
-                      onChange={(e) => setNewGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Add goal..."
-                      className="flex-1 px-2 py-1 bg-transparent border-none text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none"
-                    />
-                  ) : (
-                    /* Link mode: habit selector */
-                    <select
-                      value={newGoalForm.linkedHabitId || ''}
-                      onChange={(e) => {
-                        const habitId = e.target.value;
-                        const selectedHabit = habits.find(h => h.id === habitId);
-                        setNewGoalForm(prev => ({
-                          ...prev,
-                          linkedHabitId: habitId,
-                          title: selectedHabit ? selectedHabit.name : ''
-                        }));
-                      }}
-                      className="flex-1 px-2 py-1 bg-transparent border-none text-sm text-neutral-100 focus:outline-none"
-                    >
-                      {habits.map(habit => (
-                        <option key={habit.id} value={habit.id} className="bg-neutral-800">{habit.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  
-                  <input
-                    type="number"
-                    min="1"
-                    value={newGoalForm.targetValue}
-                    onChange={(e) => setNewGoalForm(prev => ({ ...prev, targetValue: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    className="w-12 px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-                    placeholder="0"
-                  />
-                  <button
-                    onClick={handleAddGoal}
-                    disabled={!newGoalForm.title.trim() || (newGoalForm.dataSource === 'habit' && !newGoalForm.linkedHabitId)}
-                    className={cn(
-                      'p-1.5 rounded transition-colors flex-shrink-0',
-                      newGoalForm.title.trim() && (newGoalForm.dataSource !== 'habit' || newGoalForm.linkedHabitId)
-                        ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20'
-                        : 'text-neutral-600 cursor-not-allowed'
-                    )}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile: Month Theme Bottom Sheet */}
-      {editingThemeMonth && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end" onClick={() => setEditingThemeMonth(null)}>
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="relative w-full max-h-[85vh] bg-neutral-900 rounded-t-2xl border-t border-neutral-800 overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle bar */}
-            <div className="flex justify-center py-2">
-              <div className="w-10 h-1 bg-neutral-700 rounded-full" />
-            </div>
-            
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-neutral-900 border-b border-neutral-800 px-4 pb-3 pt-1 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-neutral-100">
-                {(() => {
-                  const [, month] = editingThemeMonth.split('-').map(Number);
-                  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                  return monthNames[month - 1];
-                })()}
-              </h3>
-              <button
-                onClick={() => setEditingThemeMonth(null)}
-                className={cn(tokens.button.ghost, 'p-2')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 space-y-4 pb-8">
-              {/* Theme input */}
-              <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-2">Theme</label>
-                <input
-                  ref={themeInputRef}
-                  type="text"
-                  value={themeFormData.theme}
-                  onChange={(e) => setThemeFormData(prev => ({ ...prev, theme: e.target.value }))}
-                  placeholder="Theme"
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                />
-              </div>
-              
-              {/* Focus areas */}
-              <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-2">Focus Areas</label>
-                <div className="space-y-2">
-                  {[0, 1, 2].map(i => (
-                    <input
-                      key={i}
-                      ref={el => { focusInputRefs.current[i] = el; }}
-                      type="text"
-                      value={themeFormData.focusAreas[i] || ''}
-                      onChange={(e) => {
-                        const newAreas = [...themeFormData.focusAreas];
-                        newAreas[i] = e.target.value;
-                        setThemeFormData(prev => ({ ...prev, focusAreas: newAreas }));
-                      }}
-                      placeholder={`Focus ${i + 1}`}
-                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Non-focus areas */}
-              <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-2">Non Focus Areas</label>
-                <div className="space-y-2">
-                  {[0, 1].map(i => (
-                    <input
-                      key={i}
-                      ref={el => { nonFocusInputRefs.current[i] = el; }}
-                      type="text"
-                      value={themeFormData.nonFocusAreas[i] || ''}
-                      onChange={(e) => {
-                        const newAreas = [...themeFormData.nonFocusAreas];
-                        newAreas[i] = e.target.value;
-                        setThemeFormData(prev => ({ ...prev, nonFocusAreas: newAreas }));
-                      }}
-                      placeholder={`Non-focus ${i + 1}`}
-                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setEditingThemeMonth(null)}
-                  className="flex-1 px-3 py-2 text-sm text-neutral-400 hover:text-neutral-300 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    const [year, month] = editingThemeMonth.split('-').map(Number);
-                    handleSaveMonthTheme(year, month);
-                  }}
-                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Mobile: Bottom sheet for day details */}
       {selectedDate && selectedDayData && (

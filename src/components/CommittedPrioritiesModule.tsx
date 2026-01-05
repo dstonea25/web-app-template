@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Check } from 'lucide-react';
+import { Check, X, Undo2 } from 'lucide-react';
 import { cn, tokens } from '../theme/config';
 import type { ActiveFocusRow, PrioritiesOverviewResponse } from '../types';
-import { refreshActiveFocus, toggleComplete, toggleCommit, getPrioritiesOverview } from '../lib/priorities';
+import { refreshActiveFocus, toggleComplete, toggleCommit, getPrioritiesOverview, deleteMilestone } from '../lib/priorities';
 import { toast } from '../lib/notifications/toast';
 
 interface CommittedPrioritiesModuleProps {
@@ -67,6 +67,9 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
 
     console.log('[CommittedPrioritiesModule] Completing milestone:', milestoneId);
 
+    // Save scroll position before making changes
+    const scrollY = window.scrollY;
+
     // Optimistic UI: remove completed milestone from view immediately
     if (nextVal === true) {
       setActiveFocus(prev => prev.map(group => ({
@@ -84,6 +87,10 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
           ...group,
           milestones: group.milestones.filter(m => m.milestone_id !== milestoneId)
         })));
+        // Restore scroll position after DOM update
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
       }, 300); // Match transition duration
     }
 
@@ -98,7 +105,97 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
     } catch (e) {
       // Rollback on error
       setActiveFocus(prevActiveFocus);
+      // Restore scroll position on error too
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
       toast.error(`Failed to update: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDelete = async (milestoneId: string) => {
+    const prevActiveFocus = JSON.parse(JSON.stringify(activeFocus)) as ActiveFocusRow[];
+
+    // Save scroll position before making changes
+    const scrollY = window.scrollY;
+
+    // Optimistic UI: remove milestone from view immediately with animation
+    setActiveFocus(prev => prev.map(group => ({
+      ...group,
+      milestones: group.milestones.map(m => 
+        m.milestone_id === milestoneId 
+          ? { ...m, _removing: true } as any // Mark for fade-out animation
+          : m
+      )
+    })));
+    
+    // After animation, actually remove it
+    setTimeout(() => {
+      setActiveFocus(prev => prev.map(group => ({
+        ...group,
+        milestones: group.milestones.filter(m => m.milestone_id !== milestoneId)
+      })));
+      // Restore scroll position after DOM update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+    }, 300); // Match transition duration
+
+    try {
+      await deleteMilestone(milestoneId);
+      toast.success('Milestone deleted');
+      // Don't trigger refresh - optimistic update already handled it
+    } catch (e) {
+      // Rollback on error
+      setActiveFocus(prevActiveFocus);
+      // Restore scroll position on error too
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+      toast.error(`Failed to delete: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleUncommit = async (milestoneId: string) => {
+    const prevActiveFocus = JSON.parse(JSON.stringify(activeFocus)) as ActiveFocusRow[];
+
+    // Save scroll position before making changes
+    const scrollY = window.scrollY;
+
+    // Optimistic UI: remove milestone from view immediately with animation
+    setActiveFocus(prev => prev.map(group => ({
+      ...group,
+      milestones: group.milestones.map(m => 
+        m.milestone_id === milestoneId 
+          ? { ...m, _removing: true } as any // Mark for fade-out animation
+          : m
+      )
+    })));
+    
+    // After animation, actually remove it
+    setTimeout(() => {
+      setActiveFocus(prev => prev.map(group => ({
+        ...group,
+        milestones: group.milestones.filter(m => m.milestone_id !== milestoneId)
+      })));
+      // Restore scroll position after DOM update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+    }, 300); // Match transition duration
+
+    try {
+      await toggleCommit(milestoneId);
+      toast.success('Milestone uncommitted');
+      // Don't trigger refresh - optimistic update already handled it
+    } catch (e) {
+      // Rollback on error
+      setActiveFocus(prevActiveFocus);
+      // Restore scroll position on error too
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+      toast.error(`Failed to uncommit: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
 
@@ -217,17 +314,10 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
             {priority.priority_title}
           </h3>
           
-          {/* Pillar as subtext with emoji and stats */}
-          <div className="flex items-center justify-between gap-3 mt-2 mb-4">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs text-neutral-500 uppercase tracking-wide font-medium truncate">{priority.pillar_name}</span>
-              <span className="text-sm flex-shrink-0" aria-hidden>{priority.pillar_emoji || '🗂️'}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium flex-shrink-0">
-              <span className="text-emerald-400">{priority.stats.completed}</span>
-              <span className="text-neutral-500">/</span>
-              <span className="text-neutral-400">{priority.stats.total}</span>
-            </div>
+          {/* Pillar as subtext with emoji */}
+          <div className="flex items-center gap-1.5 mt-2 mb-4">
+            <span className="text-xs text-neutral-500 uppercase tracking-wide font-medium truncate">{priority.pillar_name}</span>
+            <span className="text-sm flex-shrink-0" aria-hidden>{priority.pillar_emoji || '🗂️'}</span>
           </div>
           
           {/* Simple milestone list - no collapsing, no heavy borders */}
@@ -239,24 +329,62 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
                 <div 
                   key={m.milestone_id}
                   className={cn(
-                    "flex items-center justify-between gap-3 p-3 rounded-xl",
+                    "group flex items-center gap-3 p-3 rounded-xl",
                     "border border-neutral-800 bg-neutral-900/50",
                     "transition-all duration-300 ease-out",
-                    "hover:bg-neutral-800/60 hover:border-neutral-700 hover:scale-[1.02] cursor-pointer",
+                    "hover:bg-neutral-800/60 hover:border-neutral-700 hover:scale-[1.02]",
                     (m as any)._removing 
                       ? "opacity-0 scale-95 h-0 p-0 my-0 overflow-hidden border-0" 
                       : "opacity-100 scale-100"
                   )}
                 >
+                  {/* Milestone title - left aligned */}
                   <span className="text-neutral-100 text-sm break-words flex-1">{m.title}</span>
-                  <button
-                    className="text-green-500 hover:text-green-400 transition-colors cursor-pointer flex-shrink-0"
-                    onClick={() => handleCompleteToggle(m.milestone_id, m.completed)}
-                    title="Complete milestone"
-                    aria-label="Complete milestone"
-                  >
-                    <Check className="w-5 h-5" />
-                  </button>
+                  
+                  {/* Right side: X (delete), U (uncommit), and Complete buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Delete button - always visible on mobile, hover on desktop */}
+                    <button
+                      className={cn(
+                        "text-rose-400 hover:text-rose-300 transition-colors cursor-pointer p-0.5",
+                        "lg:opacity-0 lg:group-hover:opacity-100" // Hidden on desktop unless hovering
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(m.milestone_id);
+                      }}
+                      title="Delete milestone"
+                      aria-label="Delete milestone"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Uncommit button - always visible on mobile, hover on desktop */}
+                    <button
+                      className={cn(
+                        "text-amber-400 hover:text-amber-300 transition-colors cursor-pointer p-0.5",
+                        "lg:opacity-0 lg:group-hover:opacity-100" // Hidden on desktop unless hovering
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUncommit(m.milestone_id);
+                      }}
+                      title="Uncommit milestone"
+                      aria-label="Uncommit milestone"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Complete button */}
+                    <button
+                      className="text-green-500 hover:text-green-400 transition-colors cursor-pointer"
+                      onClick={() => handleCompleteToggle(m.milestone_id, m.completed)}
+                      title="Complete milestone"
+                      aria-label="Complete milestone"
+                    >
+                      <Check className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
