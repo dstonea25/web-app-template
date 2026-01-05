@@ -375,9 +375,12 @@ export const CommittedPrioritiesModule: React.FC<CommittedPrioritiesModuleProps>
                       <Undo2 className="w-4 h-4" />
                     </button>
                     
-                    {/* Complete button */}
+                    {/* Complete button - always visible on mobile, hover on desktop */}
                     <button
-                      className="text-green-500 hover:text-green-400 transition-colors cursor-pointer"
+                      className={cn(
+                        "text-green-500 hover:text-green-400 transition-colors cursor-pointer",
+                        "lg:opacity-0 lg:group-hover:opacity-100" // Hidden on desktop unless hovering
+                      )}
                       onClick={() => handleCompleteToggle(m.milestone_id, m.completed)}
                       title="Complete milestone"
                       aria-label="Complete milestone"
