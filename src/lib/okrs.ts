@@ -311,13 +311,14 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
     .from('okrs')
     .select('quarter, end_date')
     .order('end_date', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
   
-  if (error || !data) return null;
+  if (error || !data || data.length === 0) return null;
+  
+  const mostRecent = Array.isArray(data) ? data[0] : data;
   
   // Parse current quarter
-  const endDate = new Date(data.end_date);
+  const endDate = new Date(mostRecent.end_date);
   const nextStart = new Date(endDate);
   nextStart.setDate(nextStart.getDate() + 1); // Day after end
   

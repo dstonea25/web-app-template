@@ -761,22 +761,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               </svg>
             </button>
             
-            {nextQuarter && !isPastQuarter && (
-              <button
-                onClick={() => setShowQuarterlySetup(true)}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
-                  'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
-                )}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Set {nextQuarter.quarter} OKRs
-              </button>
-            )}
-            
-            {nextQuarter && isPastQuarter && (
+            {nextQuarter && (
               <button
                 onClick={() => setShowQuarterlySetup(true)}
                 className={cn(
@@ -793,6 +778,23 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
           </div>
           {sectionsVisible.okrs && (
             <div className="mt-4 space-y-4">
+              {/* Past Quarter Summary Banner */}
+              {isPastQuarter && quarterInfo && (
+                <div className="p-4 bg-gradient-to-r from-amber-500/10 to-emerald-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-amber-400 mb-1">
+                        {quarterInfo.quarter} Complete!
+                      </h3>
+                      <p className="text-xs text-neutral-300">
+                        Here's how you finished the quarter.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Year Theme Display for OKRs */}
               {(() => {
                 const hasTheme = currentYearTheme && (
@@ -868,23 +870,6 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
                 </div>
               );
               })()}
-              
-              {/* Past Quarter Summary Banner */}
-              {isPastQuarter && quarterInfo && (
-                <div className="p-4 bg-gradient-to-r from-amber-500/10 to-emerald-500/10 border border-amber-500/30 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-amber-400 mb-1">
-                        {quarterInfo.quarter} Complete!
-                      </h3>
-                      <p className="text-xs text-neutral-300">
-                        Here's how you finished the quarter.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
               
               <OKRModule key={okrsKey} isVisible={sectionsVisible.okrs} hideHeader={true} />
             </div>
