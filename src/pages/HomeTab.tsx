@@ -88,6 +88,8 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
     try {
       const { okrs, isPastQuarter: isPast, quarterInfo: info } = await fetchCurrentOrRecentOkrs();
       
+      console.log('[HomeTab] Quarter Info:', { isPast, quarterInfo: info, okrsCount: okrs.length });
+      
       setIsPastQuarter(isPast);
       setQuarterInfo(info);
       
@@ -98,6 +100,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
       }
       
       const next = await getNextQuarter();
+      console.log('[HomeTab] Next Quarter:', next);
       setNextQuarter(next);
     } catch (error) {
       console.error('Failed to load quarter info:', error);
@@ -761,20 +764,23 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               </svg>
             </button>
             
-            {nextQuarter && (
-              <button
-                onClick={() => setShowQuarterlySetup(true)}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
-                  'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
-                )}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Set {nextQuarter.quarter} OKRs
-              </button>
-            )}
+            {(() => {
+              console.log('[HomeTab Render] nextQuarter:', nextQuarter, 'isPastQuarter:', isPastQuarter);
+              return nextQuarter && (
+                <button
+                  onClick={() => setShowQuarterlySetup(true)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
+                    'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+                  )}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Set {nextQuarter.quarter} OKRs
+                </button>
+              );
+            })()}
           </div>
           {sectionsVisible.okrs && (
             <div className="mt-4 space-y-4">
@@ -795,8 +801,8 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
                 </div>
               )}
               
-              {/* Year Theme Display for OKRs */}
-              {(() => {
+              {/* Year Theme Display for OKRs - Only show when NOT past quarter */}
+              {!isPastQuarter && (() => {
                 const hasTheme = currentYearTheme && (
                   currentYearTheme.theme || 
                   (currentYearTheme.focus_areas && currentYearTheme.focus_areas.filter(a => a && a.trim()).length > 0) || 
