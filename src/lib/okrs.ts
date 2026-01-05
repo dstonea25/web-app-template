@@ -104,7 +104,6 @@ export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQ
   if (!isSupabaseConfigured || !supabase) return { okrs: [], isPastQuarter: false, quarterInfo: null };
   
   const today = new Date().toISOString().split('T')[0];
-  console.log('[fetchCurrentOrRecentOkrs] Today:', today);
   
   // First, try to get current quarter OKRs (where today is within the date range)
   const { data: currentData, error: currentError } = await supabase
@@ -114,14 +113,11 @@ export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQ
     .lte('start_date', today)
     .gte('end_date', today);
   
-  console.log('[fetchCurrentOrRecentOkrs] Current quarter query:', { currentData, currentError });
-  
   if (currentError && currentError.code !== 'PGRST116') throw currentError;
   
   // If we have current OKRs, return them
   if (currentData && currentData.length > 0) {
     const okrs = processOkrData(currentData);
-    console.log('[fetchCurrentOrRecentOkrs] Found current quarter OKRs:', okrs.length);
     return {
       okrs,
       isPastQuarter: false,
@@ -133,8 +129,6 @@ export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQ
     };
   }
   
-  console.log('[fetchCurrentOrRecentOkrs] No current quarter OKRs, fetching past...');
-  
   // No current OKRs, fetch the most recent past quarter
   const { data: pastData, error: pastError } = await supabase
     .from('okrs_with_progress')
@@ -144,13 +138,10 @@ export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQ
     .order('end_date', { ascending: false })
     .limit(4); // Assume max 4 OKRs per quarter
   
-  console.log('[fetchCurrentOrRecentOkrs] Past quarter query:', { pastData, pastError });
-  
   if (pastError) throw pastError;
   
   if (pastData && pastData.length > 0) {
     const okrs = processOkrData(pastData);
-    console.log('[fetchCurrentOrRecentOkrs] Found past quarter OKRs:', okrs.length, 'isPastQuarter: true');
     return {
       okrs,
       isPastQuarter: true,
@@ -162,7 +153,6 @@ export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQ
     };
   }
   
-  console.log('[fetchCurrentOrRecentOkrs] No OKRs found at all');
   return { okrs: [], isPastQuarter: false, quarterInfo: null };
 }
 
@@ -314,10 +304,7 @@ export async function syncHabitToKR(krId: string): Promise<number> {
 }
 
 export async function getNextQuarter(): Promise<{ quarter: string; start_date: string; end_date: string } | null> {
-  if (!isSupabaseConfigured || !supabase) {
-    console.log('[getNextQuarter] Supabase not configured');
-    return null;
-  }
+  if (!isSupabaseConfigured || !supabase) return null;
   
   // Get the most recent quarter
   const { data, error } = await supabase
@@ -326,24 +313,15 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
     .order('end_date', { ascending: false })
     .limit(1);
   
-  console.log('[getNextQuarter] Most recent quarter query:', { data, error });
-  
-  if (error || !data || data.length === 0) {
-    console.log('[getNextQuarter] No data or error, returning null');
-    return null;
-  }
+  if (error || !data || data.length === 0) return null;
   
   const mostRecent = Array.isArray(data) ? data[0] : data;
   
-  console.log('[getNextQuarter] Most recent OKR end_date:', mostRecent.end_date);
-  
   // Parse current quarter - ensure we're working with date strings properly
   const endDate = new Date(mostRecent.end_date + 'T00:00:00'); // Add time to ensure correct parsing
-  console.log('[getNextQuarter] Parsed end date:', endDate.toISOString());
   
   const nextStart = new Date(endDate);
   nextStart.setDate(nextStart.getDate() + 1); // Day after end
-  console.log('[getNextQuarter] Next start date:', nextStart.toISOString(), 'Month:', nextStart.getMonth(), 'Year:', nextStart.getFullYear());
   
   const nextEnd = new Date(nextStart);
   nextEnd.setMonth(nextEnd.getMonth() + 3);
@@ -355,8 +333,6 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
   const quarterNum = Math.floor(month / 3) + 1;
   const quarter = `Q${quarterNum} ${year}`;
   
-  console.log('[getNextQuarter] Calculated: month=', month, 'year=', year, 'quarterNum=', quarterNum, 'quarter=', quarter);
-  
   // Check if OKRs for this quarter already exist
   const { data: existingOkrs } = await supabase
     .from('okrs')
@@ -364,22 +340,16 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
     .eq('quarter', quarter)
     .limit(1);
   
-  console.log('[getNextQuarter] Existing OKRs check:', { quarter, existingOkrs });
-  
   // If OKRs already exist for this quarter, return null (don't show button)
   if (existingOkrs && existingOkrs.length > 0) {
-    console.log('[getNextQuarter] OKRs already exist for', quarter, '- returning null');
     return null;
   }
   
-  const result = {
+  return {
     quarter,
     start_date: nextStart.toISOString().split('T')[0],
     end_date: nextEnd.toISOString().split('T')[0]
   };
-  
-  console.log('[getNextQuarter] Returning:', result);
-  return result;
 }
 
 /**
