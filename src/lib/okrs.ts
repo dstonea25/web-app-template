@@ -335,10 +335,15 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
   
   const mostRecent = Array.isArray(data) ? data[0] : data;
   
-  // Parse current quarter
-  const endDate = new Date(mostRecent.end_date);
+  console.log('[getNextQuarter] Most recent OKR end_date:', mostRecent.end_date);
+  
+  // Parse current quarter - ensure we're working with date strings properly
+  const endDate = new Date(mostRecent.end_date + 'T00:00:00'); // Add time to ensure correct parsing
+  console.log('[getNextQuarter] Parsed end date:', endDate.toISOString());
+  
   const nextStart = new Date(endDate);
   nextStart.setDate(nextStart.getDate() + 1); // Day after end
+  console.log('[getNextQuarter] Next start date:', nextStart.toISOString(), 'Month:', nextStart.getMonth(), 'Year:', nextStart.getFullYear());
   
   const nextEnd = new Date(nextStart);
   nextEnd.setMonth(nextEnd.getMonth() + 3);
@@ -350,7 +355,7 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
   const quarterNum = Math.floor(month / 3) + 1;
   const quarter = `Q${quarterNum} ${year}`;
   
-  console.log('[getNextQuarter] Calculated next quarter:', quarter);
+  console.log('[getNextQuarter] Calculated: month=', month, 'year=', year, 'quarterNum=', quarterNum, 'quarter=', quarter);
   
   // Check if OKRs for this quarter already exist
   const { data: existingOkrs } = await supabase
