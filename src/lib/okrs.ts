@@ -64,7 +64,7 @@ export function normalizeKrProgress(kr: OkrKeyResult): number {
 
 export async function fetchOkrsWithProgress(): Promise<Okr[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase.from('okrs_with_progress').select('*');
+  const { data, error } = await supabase.from('okrs_with_progress').select('*').eq('archived', false);
   if (error) throw error;
 
   // Define pillar order for consistent display
@@ -89,11 +89,101 @@ export async function fetchOkrsWithProgress(): Promise<Okr[]> {
       objective,
       progress,
       key_results,
+      quarter: row.quarter,
+      start_date: row.start_date,
+      end_date: row.end_date,
     };
     return okr;
   });
 
   // Sort by pillar order for consistent display
+  return okrs.sort((a, b) => getPillarIndex(a.pillar) - getPillarIndex(b.pillar));
+}
+
+export async function fetchCurrentOrRecentOkrs(): Promise<{ okrs: Okr[]; isPastQuarter: boolean; quarterInfo: { quarter: string; start_date: string; end_date: string } | null }> {
+  if (!isSupabaseConfigured || !supabase) return { okrs: [], isPastQuarter: false, quarterInfo: null };
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // First, try to get current quarter OKRs (where today is within the date range)
+  const { data: currentData, error: currentError } = await supabase
+    .from('okrs_with_progress')
+    .select('*')
+    .eq('archived', false)
+    .lte('start_date', today)
+    .gte('end_date', today);
+  
+  if (currentError && currentError.code !== 'PGRST116') throw currentError;
+  
+  // If we have current OKRs, return them
+  if (currentData && currentData.length > 0) {
+    const okrs = processOkrData(currentData);
+    return {
+      okrs,
+      isPastQuarter: false,
+      quarterInfo: {
+        quarter: currentData[0].quarter,
+        start_date: currentData[0].start_date,
+        end_date: currentData[0].end_date
+      }
+    };
+  }
+  
+  // No current OKRs, fetch the most recent past quarter
+  const { data: pastData, error: pastError } = await supabase
+    .from('okrs_with_progress')
+    .select('*')
+    .eq('archived', false)
+    .lt('end_date', today)
+    .order('end_date', { ascending: false })
+    .limit(4); // Assume max 4 OKRs per quarter
+  
+  if (pastError) throw pastError;
+  
+  if (pastData && pastData.length > 0) {
+    const okrs = processOkrData(pastData);
+    return {
+      okrs,
+      isPastQuarter: true,
+      quarterInfo: {
+        quarter: pastData[0].quarter,
+        start_date: pastData[0].start_date,
+        end_date: pastData[0].end_date
+      }
+    };
+  }
+  
+  return { okrs: [], isPastQuarter: false, quarterInfo: null };
+}
+
+function processOkrData(data: any[]): Okr[] {
+  const PILLAR_ORDER = ['Power', 'Passion', 'Purpose', 'Production'];
+  const getPillarIndex = (pillar: string) => {
+    const index = PILLAR_ORDER.indexOf(pillar);
+    return index === -1 ? 999 : index;
+  };
+
+  const okrs = data.map((row: any) => {
+    const keyResultsRaw = row.key_results ?? row.keyResults ?? row.krs;
+    const key_results: OkrKeyResult[] = ensureArray<OkrKeyResult>(keyResultsRaw).map((kr) => ({
+      ...kr,
+      progress: normalizeKrProgress(kr as OkrKeyResult),
+    }));
+    const progress = normalizeProgress(row.progress);
+    const pillar: OkrPillar = row.pillar;
+    const objective: string = row.objective || row.title || '';
+    return {
+      id: String(row.id),
+      pillar,
+      objective,
+      progress,
+      key_results,
+      quarter: row.quarter,
+      start_date: row.start_date,
+      end_date: row.end_date,
+    } as Okr;
+  });
+
   return okrs.sort((a, b) => getPillarIndex(a.pillar) - getPillarIndex(b.pillar));
 }
 

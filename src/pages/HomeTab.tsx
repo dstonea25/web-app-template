@@ -11,8 +11,8 @@ import UpcomingCalendarModule, { type UpcomingCalendarModuleRef } from '../compo
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
-import { fetchOkrsWithProgress, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
-import { Sparkles, ChevronRight, Target, X } from 'lucide-react';
+import { fetchCurrentOrRecentOkrs, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
+import { Sparkles, ChevronRight, Target, X, Trophy } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
 
@@ -34,6 +34,8 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   const [previousOkrs, setPreviousOkrs] = useState<Okr[]>([]);
   const [showQuarterlySetup, setShowQuarterlySetup] = useState(false);
   const [okrsKey, setOkrsKey] = useState(0); // Force OKR module refresh
+  const [isPastQuarter, setIsPastQuarter] = useState(false);
+  const [quarterInfo, setQuarterInfo] = useState<{ quarter: string; start_date: string; end_date: string } | null>(null);
   
   // Section visibility state
   const [sectionsVisible, setSectionsVisible] = useState({
@@ -84,12 +86,17 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
 
   const loadQuarterInfo = async () => {
     try {
-      const okrs = await fetchOkrsWithProgress();
+      const { okrs, isPastQuarter: isPast, quarterInfo: info } = await fetchCurrentOrRecentOkrs();
+      
+      setIsPastQuarter(isPast);
+      setQuarterInfo(info);
+      
       if (okrs.length > 0) {
         const quarter = okrs[0].quarter;
         setCurrentQuarter(quarter || null);
         setPreviousOkrs(okrs);
       }
+      
       const next = await getNextQuarter();
       setNextQuarter(next);
     } catch (error) {
@@ -336,16 +343,17 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   }, [todos, workMode]);
 
   const daysLeftInQuarter = useMemo(() => {
+    if (!quarterInfo || isPastQuarter) return 0;
+    
     const now = new Date();
-    const startMonth = Math.floor(now.getMonth() / 3) * 3;
-    const end = new Date(now.getFullYear(), startMonth + 3, 0);
+    const endDate = new Date(quarterInfo.end_date);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endMid = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const endMid = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
     const diffMs = endMid.getTime() - today.getTime();
     const oneDay = 24 * 60 * 60 * 1000;
     const days = Math.max(0, Math.ceil(diffMs / oneDay));
     return days;
-  }, []);
+  }, [quarterInfo, isPastQuarter]);
 
   if (loading && isVisible) {
     return (
@@ -738,7 +746,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
               className="flex items-center gap-2 text-left text-neutral-100 hover:text-emerald-400 transition-colors min-w-0 flex-1"
             >
               <h2 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, tokens.palette.dark.text)}>
-                {currentQuarter ? currentQuarter.split(' ')[0] : ''} OKRs - {daysLeftInQuarter} {daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left
+                {currentQuarter ? currentQuarter.split(' ')[0] : ''} OKRs{isPastQuarter ? ' - Final Results' : ` - ${daysLeftInQuarter} ${daysLeftInQuarter === 1 ? 'Day' : 'Days'} Left`}
               </h2>
               <svg
                 className={cn(
@@ -845,6 +853,23 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
                 </div>
               );
               })()}
+              
+              {/* Past Quarter Summary Banner */}
+              {isPastQuarter && quarterInfo && (
+                <div className="p-4 bg-gradient-to-r from-amber-500/10 to-emerald-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-amber-400 mb-1">
+                        {quarterInfo.quarter} Complete!
+                      </h3>
+                      <p className="text-xs text-neutral-300">
+                        Here's how you finished the quarter. Ready to set new OKRs for {nextQuarter?.quarter}?
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <OKRModule key={okrsKey} isVisible={sectionsVisible.okrs} hideHeader={true} />
             </div>
