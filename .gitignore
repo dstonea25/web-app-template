@@ -60,3 +60,6 @@ coverage/
 # Backups (if you want to keep local backups out of git)
 # backups/
 
+
+# Sync conflict files (from file syncing software)
+*.sync-conflict-*
