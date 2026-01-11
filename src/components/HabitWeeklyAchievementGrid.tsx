@@ -199,20 +199,33 @@ export const HabitWeeklyAchievementGrid: React.FC<HabitWeeklyAchievementGridProp
   }, [handleSaveGoal, handleCancelEditGoal]);
 
   // Get current ISO week number (matches database calculation)
+  // Uses Chicago timezone to match backend
   const currentWeekNumber = React.useMemo(() => {
+    // Get current date in Chicago timezone
     const now = new Date();
+    const chicagoTimeString = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+    const chicagoDate = new Date(chicagoTimeString);
     
     // Get the Thursday of the current week (ISO week definition)
-    const thursday = new Date(now);
-    thursday.setDate(now.getDate() - ((now.getDay() + 6) % 7) + 3);
+    const thursday = new Date(chicagoDate);
+    const dayOfWeek = thursday.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Calculate days to subtract to get to Monday, then add 3 to get to Thursday
+    // Sunday = 0 -> need to go back 6 days to Monday
+    // Monday = 1 -> need to go back 0 days
+    // Tuesday = 2 -> need to go back 1 day
+    const daysFromMonday = (dayOfWeek + 6) % 7; // Sunday becomes 6, Monday becomes 0, etc.
+    thursday.setDate(chicagoDate.getDate() - daysFromMonday + 3); // Move to Thursday of current week
     
     // Get the first Thursday of the year
-    const jan4 = new Date(thursday.getFullYear(), 0, 4);
+    const year = thursday.getFullYear();
+    const jan4 = new Date(year, 0, 4); // January 4th
     const firstThursday = new Date(jan4);
-    firstThursday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + 3);
+    const jan4DayOfWeek = jan4.getDay();
+    const daysFromMondayJan4 = (jan4DayOfWeek + 6) % 7;
+    firstThursday.setDate(4 - daysFromMondayJan4 + 3); // Move to first Thursday
     
-    // Calculate week number
-    const weekNumber = Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    // Calculate week number (ISO week starts with week 1 containing first Thursday)
+    const weekNumber = Math.floor((thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
     
     return weekNumber;
   }, []);

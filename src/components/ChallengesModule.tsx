@@ -76,6 +76,12 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
       const sorted = [...data.challenges].sort((a, b) => a.slot_index - b.slot_index);
       setChallenges(sorted);
       
+      // Store the week info in localStorage to detect week changes
+      localStorage.setItem('challenges_current_week', JSON.stringify({
+        year: data.week.year,
+        week_number: data.week.week_number
+      }));
+      
       // Update config values if present
       if (data.config?.total_challenges) {
         setTotalChallenges(data.config.total_challenges);
@@ -117,8 +123,57 @@ export const ChallengesModule: React.FC<ChallengesModuleProps> = ({ className, h
     }
   }, []);
 
+  // Initial fetch on mount
   useEffect(() => {
     fetchChallenges();
+  }, [fetchChallenges]);
+
+  // Check for new week every minute when tab is visible
+  useEffect(() => {
+    const checkForNewWeek = async () => {
+      // Only check if document is visible
+      if (document.hidden) return;
+      
+      try {
+        // Get stored week info
+        const storedWeek = localStorage.getItem('challenges_current_week');
+        if (!storedWeek) return;
+        
+        const { year: storedYear, week_number: storedWeekNumber } = JSON.parse(storedWeek);
+        
+        // Calculate current week in Chicago timezone (matches backend)
+        const now = new Date();
+        const chicagoTimeString = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+        const chicagoDate = new Date(chicagoTimeString);
+        const currentYear = chicagoDate.getFullYear();
+        const currentWeekNumber = Math.floor((chicagoDate.getTime() - new Date(currentYear, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+        
+        // If week changed, refetch challenges
+        if (storedYear !== currentYear || storedWeekNumber !== currentWeekNumber) {
+          console.log('New week detected! Refreshing challenges...');
+          await fetchChallenges(true);
+        }
+      } catch (err) {
+        console.error('Error checking for new week:', err);
+      }
+    };
+    
+    // Check immediately, then every minute
+    checkForNewWeek();
+    const interval = setInterval(checkForNewWeek, 60000); // Check every minute
+    
+    // Also check when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkForNewWeek();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchChallenges]);
 
   // Fetch protocols, habits, and OKRs when settings modal opens
