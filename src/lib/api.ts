@@ -1253,6 +1253,73 @@ export class ApiClient {
     return syncedCount;
   }
 
+  // ===== Bug Reporting =====
+  async submitBug(input: import('../types').BugInput): Promise<import('../types').Bug> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('bugs')
+      .insert({
+        description: input.description,
+        url: input.url ?? null,
+        user_agent: input.user_agent ?? null,
+        status: 'open',
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as import('../types').Bug;
+  }
+
+  async fetchBugs(status?: import('../types').BugStatus): Promise<import('../types').Bug[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    let query = supabase
+      .from('bugs')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []) as import('../types').Bug[];
+  }
+
+  async updateBugStatus(id: string, status: import('../types').BugStatus): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const updateData: any = { status };
+    if (status === 'fixed') {
+      updateData.fixed_at = new Date().toISOString();
+    }
+    
+    const { error } = await supabase
+      .from('bugs')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async deleteBug(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('bugs')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
   // ===== Calendar Natural Language Parsing =====
   async parseNaturalLanguageEvent(text: string, context?: { currentDate?: string }): Promise<import('../types').CalendarEventInput> {
     // TODO: Replace with your actual n8n webhook URL
@@ -2141,4 +2208,21 @@ export const postTodosBatch = async (payload: { updates: TodoPatch[]; completes:
 // Explicit export for full-file API
 export const postTodosFile = async (payload: TodoFileItem[]): Promise<ApiResponse> => {
   return apiClient.postTodosFile(payload);
+};
+
+// Bug reporting exports
+export const submitBug = async (input: import('../types').BugInput): Promise<import('../types').Bug> => {
+  return apiClient.submitBug(input);
+};
+
+export const fetchBugs = async (status?: import('../types').BugStatus): Promise<import('../types').Bug[]> => {
+  return apiClient.fetchBugs(status);
+};
+
+export const updateBugStatus = async (id: string, status: import('../types').BugStatus): Promise<void> => {
+  return apiClient.updateBugStatus(id, status);
+};
+
+export const deleteBug = async (id: string): Promise<void> => {
+  return apiClient.deleteBug(id);
 };

@@ -572,3 +572,25 @@ export interface YearGoalInput {
   auto_sync?: boolean;
   display_order?: number;
 }
+
+// Bug Reporting
+export type BugStatus = 'open' | 'in_progress' | 'fixed' | 'closed';
+
+export interface Bug {
+  id: string;
+  description: string;
+  status: BugStatus;
+  url?: string | null;
+  user_agent?: string | null;
+  notes?: string | null;
+  user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  fixed_at?: string | null;
+}
+
+export interface BugInput {
+  description: string;
+  url?: string;
+  user_agent?: string;
+}

@@ -166,10 +166,15 @@ const InlineEdit: React.FC<{
             'flex-1 bg-neutral-800 border border-neutral-600 rounded-lg px-3 py-2',
             'text-neutral-100 placeholder:text-neutral-500',
             'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent',
+            'caret-neutral-100',  // Ensure cursor is visible
             multiline && 'min-h-[100px] resize-none',
             className
           )}
           placeholder={placeholder}
+          style={{ 
+            color: '#f5f5f5',  // Force text color to be visible
+            WebkitTextFillColor: '#f5f5f5'  // Override any browser autocomplete styling
+          }}
         />
         <div className="flex flex-col gap-1">
           <button
@@ -195,14 +200,14 @@ const InlineEdit: React.FC<{
     <button
       onClick={() => setIsEditing(true)}
       className={cn(
-        'text-left w-full group',
+        'text-left w-full group block',  // Added 'block' to make button fill container
         !value && 'text-neutral-500 italic',
         className
       )}
     >
-      <span className="inline-flex items-center gap-2">
+      <span className="block w-full">
         {value || placeholder}
-        <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+        <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity inline-block ml-2" />
       </span>
     </button>
   );
