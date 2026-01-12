@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { LogOut, Bug } from 'lucide-react';
+import { LogOut, Bug, Lightbulb } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 import { useAuth } from '../contexts/AuthContext';
 import { HeaderTimerMini } from './HeaderTimerMini';
 import WorkModeToggle from './WorkModeToggle';
 import { BugReportModal } from './BugReportModal';
+import { FeatureIdeaModal } from './FeatureIdeaModal';
 
 interface TopBannerProps {
   title?: string;
@@ -21,6 +22,7 @@ export const TopBanner: React.FC<TopBannerProps> = ({
 }) => {
   const { logout } = useAuth();
   const [isBugModalOpen, setIsBugModalOpen] = useState(false);
+  const [isFeatureIdeaModalOpen, setIsFeatureIdeaModalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -47,6 +49,13 @@ export const TopBanner: React.FC<TopBannerProps> = ({
                 <HeaderTimerMini onOpenTimeTab={onOpenTimeTab} isOnTimeTab={isOnTimeTab} />
               )}
               <button
+                onClick={() => setIsFeatureIdeaModalOpen(true)}
+                className="p-2 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 rounded-lg transition-colors"
+                title="Submit feature idea"
+              >
+                <Lightbulb className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => setIsBugModalOpen(true)}
                 className="p-2 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded-lg transition-colors"
                 title="Report a bug"
@@ -69,6 +78,10 @@ export const TopBanner: React.FC<TopBannerProps> = ({
       <BugReportModal 
         isOpen={isBugModalOpen} 
         onClose={() => setIsBugModalOpen(false)} 
+      />
+      <FeatureIdeaModal 
+        isOpen={isFeatureIdeaModalOpen} 
+        onClose={() => setIsFeatureIdeaModalOpen(false)} 
       />
     </>
   );

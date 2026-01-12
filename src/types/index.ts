@@ -594,3 +594,25 @@ export interface BugInput {
   url?: string;
   user_agent?: string;
 }
+
+// Feature Ideas types
+export type FeatureIdeaStatus = 'backlog' | 'planned' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface FeatureIdea {
+  id: string;
+  description: string; // Brain dump of the feature idea
+  status: FeatureIdeaStatus;
+  url?: string | null; // URL where the idea was submitted from
+  user_agent?: string | null;
+  notes?: string | null; // Implementation notes added later
+  user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+}
+
+export interface FeatureIdeaInput {
+  description: string;
+  url?: string;
+  user_agent?: string;
+}

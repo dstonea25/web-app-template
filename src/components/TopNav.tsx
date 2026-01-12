@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, Bug } from 'lucide-react';
+import { Menu, Bug, Lightbulb } from 'lucide-react';
 import { tokens } from '../theme/config';
 import { BugReportModal } from './BugReportModal';
+import { FeatureIdeaModal } from './FeatureIdeaModal';
 
 interface TopNavProps {
   onHamburger: () => void;
@@ -12,6 +13,7 @@ interface TopNavProps {
 
 export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOpen, title = 'Geronimo' }) => {
   const [isBugModalOpen, setIsBugModalOpen] = useState(false);
+  const [isFeatureIdeaModalOpen, setIsFeatureIdeaModalOpen] = useState(false);
 
   return (
     <>
@@ -32,6 +34,14 @@ export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOp
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setIsFeatureIdeaModalOpen(true)}
+            className="p-2 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 rounded-lg transition-colors"
+            aria-label="Submit feature idea"
+            title="Submit feature idea"
+          >
+            <Lightbulb className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => setIsBugModalOpen(true)}
             className="p-2 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded-lg transition-colors"
             aria-label="Report a bug"
@@ -50,6 +60,10 @@ export const TopNav: React.FC<TopNavProps> = ({ onHamburger, rightSlot, mobileOp
       <BugReportModal 
         isOpen={isBugModalOpen} 
         onClose={() => setIsBugModalOpen(false)} 
+      />
+      <FeatureIdeaModal 
+        isOpen={isFeatureIdeaModalOpen} 
+        onClose={() => setIsFeatureIdeaModalOpen(false)} 
       />
     </>
   );

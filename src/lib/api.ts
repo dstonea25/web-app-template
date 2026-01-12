@@ -1320,6 +1320,91 @@ export class ApiClient {
     if (error) throw error;
   }
 
+  // ===== Feature Ideas =====
+  async submitFeatureIdea(input: import('../types').FeatureIdeaInput): Promise<import('../types').FeatureIdea> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { data, error } = await supabase
+      .from('feature_ideas')
+      .insert({
+        description: input.description,
+        url: input.url ?? null,
+        user_agent: input.user_agent ?? null,
+        status: 'backlog',
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as import('../types').FeatureIdea;
+  }
+
+  async fetchFeatureIdeas(status?: import('../types').FeatureIdeaStatus): Promise<import('../types').FeatureIdea[]> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    let query = supabase
+      .from('feature_ideas')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []) as import('../types').FeatureIdea[];
+  }
+
+  async updateFeatureIdeaStatus(id: string, status: import('../types').FeatureIdeaStatus): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const updateData: any = { status };
+    if (status === 'completed') {
+      updateData.completed_at = new Date().toISOString();
+    }
+    
+    const { error } = await supabase
+      .from('feature_ideas')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async updateFeatureIdea(id: string, patch: Partial<import('../types').FeatureIdeaInput> & { 
+    status?: import('../types').FeatureIdeaStatus;
+    notes?: string | null;
+  }): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('feature_ideas')
+      .update({
+        ...patch,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async deleteFeatureIdea(id: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await this.getSupabaseSafe();
+    if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+    
+    const { error } = await supabase
+      .from('feature_ideas')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
   // ===== Calendar Natural Language Parsing =====
   async parseNaturalLanguageEvent(text: string, context?: { currentDate?: string }): Promise<import('../types').CalendarEventInput> {
     // TODO: Replace with your actual n8n webhook URL
@@ -2225,4 +2310,28 @@ export const updateBugStatus = async (id: string, status: import('../types').Bug
 
 export const deleteBug = async (id: string): Promise<void> => {
   return apiClient.deleteBug(id);
+};
+
+// Feature Ideas exports
+export const submitFeatureIdea = async (input: import('../types').FeatureIdeaInput): Promise<import('../types').FeatureIdea> => {
+  return apiClient.submitFeatureIdea(input);
+};
+
+export const fetchFeatureIdeas = async (status?: import('../types').FeatureIdeaStatus): Promise<import('../types').FeatureIdea[]> => {
+  return apiClient.fetchFeatureIdeas(status);
+};
+
+export const updateFeatureIdeaStatus = async (id: string, status: import('../types').FeatureIdeaStatus): Promise<void> => {
+  return apiClient.updateFeatureIdeaStatus(id, status);
+};
+
+export const updateFeatureIdea = async (id: string, patch: Partial<import('../types').FeatureIdeaInput> & { 
+  status?: import('../types').FeatureIdeaStatus;
+  notes?: string | null;
+}): Promise<void> => {
+  return apiClient.updateFeatureIdea(id, patch);
+};
+
+export const deleteFeatureIdea = async (id: string): Promise<void> => {
+  return apiClient.deleteFeatureIdea(id);
 };
