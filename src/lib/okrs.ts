@@ -74,7 +74,21 @@ export async function fetchOkrsWithProgress(): Promise<Okr[]> {
     return index === -1 ? 999 : index; // Unknown pillars go to end
   };
 
-  const okrs = (data || []).map((row: any) => {
+  // Determine which quarter to display based on current date
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Find the most recent quarter that has started (start_date <= today)
+  const activeQuarter = (data || [])
+    .filter((row: any) => row.start_date <= today)
+    .sort((a: any, b: any) => b.start_date.localeCompare(a.start_date))[0];
+  
+  // Only show OKRs from the active quarter
+  const quarterToShow = activeQuarter?.quarter;
+  const filteredData = quarterToShow 
+    ? (data || []).filter((row: any) => row.quarter === quarterToShow)
+    : [];
+
+  const okrs = filteredData.map((row: any) => {
     const keyResultsRaw = row.key_results ?? row.keyResults ?? row.krs;
     const key_results: OkrKeyResult[] = ensureArray<OkrKeyResult>(keyResultsRaw).map((kr) => ({
       ...kr,
@@ -306,10 +320,12 @@ export async function syncHabitToKR(krId: string): Promise<number> {
 export async function getNextQuarter(): Promise<{ quarter: string; start_date: string; end_date: string } | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   
+  const today = new Date().toISOString().split('T')[0];
+  
   // Get the most recent quarter
   const { data, error } = await supabase
     .from('okrs')
-    .select('quarter, end_date')
+    .select('quarter, start_date, end_date')
     .order('end_date', { ascending: false })
     .limit(1);
   
@@ -317,8 +333,17 @@ export async function getNextQuarter(): Promise<{ quarter: string; start_date: s
   
   const mostRecent = Array.isArray(data) ? data[0] : data;
   
-  // Parse current quarter - ensure we're working with date strings properly
-  const endDate = new Date(mostRecent.end_date + 'T00:00:00'); // Add time to ensure correct parsing
+  // Only show "Create next quarter" button if:
+  // 1. Current date is AFTER the most recent quarter's end date (quarter has ended)
+  // This way you see the completed quarter and can create the next one
+  const quarterEndDate = mostRecent.end_date;
+  if (today <= quarterEndDate) {
+    // We're still in the current quarter, don't show button yet
+    return null;
+  }
+  
+  // Parse quarter end date
+  const endDate = new Date(quarterEndDate + 'T00:00:00');
   
   const nextStart = new Date(endDate);
   nextStart.setDate(nextStart.getDate() + 1); // Day after end
@@ -390,9 +415,12 @@ export async function createQuarterOKRs(
       linked_habit_id?: string | null;
       auto_sync?: boolean;
     }>;
-  }>
+  }>,
+  draft: boolean = true  // Create as draft by default to prevent partial creation issues
 ): Promise<void> {
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  const status = draft ? 'draft' : 'active';
   
   for (const okrData of okrsData) {
     // Create OKR
@@ -404,7 +432,7 @@ export async function createQuarterOKRs(
         quarter,
         start_date,
         end_date,
-        status: 'active',
+        status,
         archived: false
       })
       .select()
@@ -427,12 +455,39 @@ export async function createQuarterOKRs(
           data_source: kr.data_source || 'manual',
           linked_habit_id: kr.linked_habit_id || null,
           auto_sync: kr.auto_sync || false,
-          status: 'active'
+          status
         });
       
       if (krError) throw krError;
     }
   }
+}
+
+/**
+ * Commit draft OKRs to make them active
+ */
+export async function commitDraftOkrs(quarter: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  const { error } = await supabase.rpc('commit_draft_okrs', {
+    p_quarter: quarter
+  });
+  
+  if (error) throw error;
+}
+
+/**
+ * Delete draft OKRs (cleanup on cancel)
+ */
+export async function deleteDraftOkrs(quarter: string): Promise<number> {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase not configured');
+  
+  const { data, error } = await supabase.rpc('delete_draft_okrs', {
+    p_quarter: quarter
+  });
+  
+  if (error) throw error;
+  return data || 0;
 }
 
 

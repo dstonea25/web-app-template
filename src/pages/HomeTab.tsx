@@ -11,7 +11,7 @@ import UpcomingCalendarModule, { type UpcomingCalendarModuleRef } from '../compo
 import { StorageManager, stageComplete, getStagedChanges, getCachedData, setCachedData, applyStagedChangesToTodos, getWorkingTodos } from '../lib/storage';
 import { fetchTodosFromWebhook, saveTodosBatchToWebhook } from '../lib/api';
 import { useWorkMode } from '../contexts/WorkModeContext';
-import { fetchCurrentOrRecentOkrs, getNextQuarter, createQuarterOKRs } from '../lib/okrs';
+import { fetchCurrentOrRecentOkrs, getNextQuarter, createQuarterOKRs, commitDraftOkrs, deleteDraftOkrs } from '../lib/okrs';
 import { Sparkles, ChevronRight, Target, X, Trophy } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { toast } from '../lib/notifications/toast';
@@ -202,12 +202,24 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
   const handleCreateQuarterOKRs = async (okrsData: any[]) => {
     if (!nextQuarter) return;
     try {
+      console.log('Creating OKRs as drafts...', { quarter: nextQuarter.quarter, okrsData });
+      
+      // Create as drafts first
       await createQuarterOKRs(
         nextQuarter.quarter,
         nextQuarter.start_date,
         nextQuarter.end_date,
-        okrsData
+        okrsData,
+        true  // Create as draft
       );
+      
+      console.log('Drafts created, now committing...');
+      
+      // Commit the drafts to make them active
+      await commitDraftOkrs(nextQuarter.quarter);
+      
+      console.log('OKRs committed successfully!');
+      
       // Immediately hide the button by clearing nextQuarter
       setNextQuarter(null);
       setShowQuarterlySetup(false);
@@ -215,9 +227,33 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
       await loadQuarterInfo();
       setOkrsKey(prev => prev + 1); // Force OKR module refresh
     } catch (error) {
-      console.error('Failed to create quarterly OKRs:', error);
+      console.error('Error during OKR creation:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
+      
+      // If something fails, cleanup any draft OKRs that were created
+      if (nextQuarter) {
+        try {
+          console.log('Attempting cleanup of draft OKRs...');
+          await deleteDraftOkrs(nextQuarter.quarter);
+          console.log('Cleanup successful');
+        } catch (cleanupError) {
+          console.error('Failed to cleanup draft OKRs:', cleanupError);
+        }
+      }
       throw error;
     }
+  };
+  
+  const handleCancelQuarterlySetup = async () => {
+    // Cleanup any draft OKRs that may have been created
+    if (nextQuarter) {
+      try {
+        await deleteDraftOkrs(nextQuarter.quarter);
+      } catch (error) {
+        console.error('Failed to cleanup draft OKRs:', error);
+      }
+    }
+    setShowQuarterlySetup(false);
   };
 
   // Cross-tab sync: refresh when storage broadcasts updates
@@ -914,7 +950,7 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
           <QuarterlySetupModal
             nextQuarter={nextQuarter.quarter}
             previousOkrs={previousOkrs}
-            onClose={() => setShowQuarterlySetup(false)}
+            onClose={handleCancelQuarterlySetup}
             onCreate={handleCreateQuarterOKRs}
           />
         )}

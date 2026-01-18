@@ -23,7 +23,7 @@ class ChallengesService {
    * This is the single source of truth - always returns 3 challenges for the current week.
    * Creates challenges if first call of the week (idempotent).
    */
-  async fetchWeeklyChallenges(): Promise<WeeklyChallengesResponse> {
+  async fetchWeeklyChallenges(skipRetryOnConflict = false): Promise<WeeklyChallengesResponse> {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('Supabase not configured');
     }
@@ -31,14 +31,13 @@ class ChallengesService {
     const { data, error } = await supabase.rpc('get_or_create_weekly_challenges');
     
     if (error) {
-      // If duplicate key constraint violation, clean up and retry
-      if (error.message && error.message.includes('duplicate key value violates unique constraint')) {
-        console.warn('Duplicate challenge detected, attempting to regenerate...');
-        try {
-          return await this.regenerateChallenges();
-        } catch (retryError) {
-          throw new Error(`Failed to regenerate challenges after duplicate key error: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
-        }
+      // If duplicate key constraint violation, the RPC likely had a race condition
+      // Just retry the call once - the RPC should be idempotent
+      if (!skipRetryOnConflict && error.message && error.message.includes('duplicate key value violates unique constraint')) {
+        console.warn('Duplicate challenge detected (409 conflict), retrying once...');
+        // Wait a tiny bit and retry once
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return await this.fetchWeeklyChallenges(true); // Retry with flag to prevent infinite loop
       }
       throw new Error(`Failed to fetch weekly challenges: ${error.message}`);
     }
@@ -109,25 +108,31 @@ class ChallengesService {
       throw new Error('Supabase not configured');
     }
 
-    // First, get current week info to find the set to delete
-    const currentData = await this.fetchWeeklyChallenges();
-    const { year, week_number } = currentData.week;
+    // Calculate current week (same logic as RPC function uses)
+    const now = new Date();
+    const year = now.getFullYear();
+    // ISO week calculation - simplified
+    const startOfYear = new Date(year, 0, 1);
+    const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+    const week_number = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+
+    // First, find the set_id for this week
+    const { data: sets } = await supabase
+      .from('weekly_challenge_sets')
+      .select('id')
+      .eq('year', year)
+      .eq('week_number', week_number);
 
     // Delete challenges for this week's set
-    // The challenges reference set_id, so we need to find and delete the set
-    // which should cascade delete the challenges (or we delete challenges first)
-    
-    // Delete challenges first (by their IDs from current data)
-    const challengeIds = currentData.challenges.map(c => c.id);
-    if (challengeIds.length > 0) {
+    if (sets && sets.length > 0) {
+      const setIds = sets.map(s => s.id);
       const { error: deleteChallError } = await supabase
         .from('weekly_challenges')
         .delete()
-        .in('id', challengeIds);
+        .in('set_id', setIds);
       
       if (deleteChallError) {
         console.warn('Failed to delete challenges:', deleteChallError);
-        // Continue anyway - maybe they're already gone
       }
     }
 
@@ -140,11 +145,13 @@ class ChallengesService {
 
     if (deleteSetError) {
       console.warn('Failed to delete challenge set:', deleteSetError);
-      // Continue anyway
     }
 
+    // Wait a tiny bit for deletes to propagate
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     // Now call get_or_create which will generate fresh challenges
-    return await this.fetchWeeklyChallenges();
+    return await this.fetchWeeklyChallenges(true); // Skip retry logic since we just cleaned up
   }
 
   /**
