@@ -31,6 +31,15 @@ class ChallengesService {
     const { data, error } = await supabase.rpc('get_or_create_weekly_challenges');
     
     if (error) {
+      // If duplicate key constraint violation, clean up and retry
+      if (error.message && error.message.includes('duplicate key value violates unique constraint')) {
+        console.warn('Duplicate challenge detected, attempting to regenerate...');
+        try {
+          return await this.regenerateChallenges();
+        } catch (retryError) {
+          throw new Error(`Failed to regenerate challenges after duplicate key error: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
+        }
+      }
       throw new Error(`Failed to fetch weekly challenges: ${error.message}`);
     }
 

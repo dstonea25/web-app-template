@@ -1159,8 +1159,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
       setDeleteTimeoutId(null);
     }
     
-    // Restore event to UI
-    setEvents(prev => [...prev, deletingEvent]);
+    // Restore event to UI and sort by start date to maintain proper order
+    setEvents(prev => {
+      const restored = [...prev, deletingEvent];
+      // Sort events by start date to ensure proper chronological order
+      return restored.sort((a, b) => {
+        const dateCompare = a.start_date.localeCompare(b.start_date);
+        if (dateCompare !== 0) return dateCompare;
+        // If same date, sort by time (all-day events first)
+        if (a.all_day && !b.all_day) return -1;
+        if (!a.all_day && b.all_day) return 1;
+        if (a.start_time && b.start_time) {
+          return a.start_time.localeCompare(b.start_time);
+        }
+        return 0;
+      });
+    });
     setDeletingEvent(null);
     
     toast.success('Deletion undone');
@@ -2204,7 +2218,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500',
                             !isInDragRange && !isSelected && rowAppearance.bg,
                             !isInDragRange && !isSelected && rowAppearance.border,
-                            isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                            isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-950/30',
                             isDragging && 'select-none',
                           )}
                           style={{ 
@@ -2383,7 +2397,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                               !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500 ring-2 ring-emerald-500/30',
                               !isInDragRange && !isSelected && rowAppearance.bg,
                               !isInDragRange && !isSelected && rowAppearance.border,
-                              isToday && !isSelected && !isInDragRange && 'ring-2 ring-emerald-400/50',
+                              isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-950/30',
                               isDragging && 'select-none',
                             )}
                             style={{ 
@@ -3864,7 +3878,7 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
         source_pattern_id: null,
       });
     }
-  }, [editingEvent, dayData.date, dragEndDate]);
+  }, [editingEvent, dayData.date, dragEndDate, isCreating]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -4207,7 +4221,12 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
                         affects_row_appearance: shouldAffectRow
                       }));
                     }}
-                    className={cn(tokens.select.base, 'text-sm')}
+                    className={cn(
+                      'w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-base font-medium text-neutral-100',
+                      'hover:bg-neutral-750 hover:border-neutral-600 transition-colors cursor-pointer',
+                      'focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500',
+                      '[&>option]:bg-neutral-800 [&>option]:text-neutral-100 [&>option]:py-2'
+                    )}
                   >
                     <option value="">None</option>
                     <option value="vacation">🏖️ Vacation</option>
@@ -4249,23 +4268,43 @@ const DayDetailPane: React.FC<DayDetailPaneProps> = ({
 
             {/* Action Buttons - only show when title is entered */}
             {formData.title.trim() && (
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
+            <div className="flex flex-col gap-2 pt-4">
+              <div className="flex gap-3">
+                <button
+                  type="submit"
                   className={cn(tokens.button.primary, 'flex-1 py-3 font-semibold rounded-xl')}
-              >
-                {editingEvent ? '✓ Update Event' : '+ Create Event'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onEditEvent(null as any);
-                  onClose();
-                }}
+                >
+                  {editingEvent ? '✓ Update Event' : '+ Create Event'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEditEvent(null as any);
+                    onClose();
+                  }}
                   className={cn(tokens.button.secondary, 'px-6 py-3 rounded-xl')}
-              >
-                Cancel
-              </button>
+                >
+                  Cancel
+                </button>
+              </div>
+              {!editingEvent && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!formData.title.trim()) return;
+                    onSaveEvent(formData);
+                    // Keep modal open and reset for next event
+                    onCreateEvent();
+                  }}
+                  className={cn(
+                    'w-full py-2.5 text-sm font-medium rounded-xl transition-colors',
+                    'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/30'
+                  )}
+                >
+                  Save & Create Another
+                </button>
+              )}
             </div>
             )}
           </form>

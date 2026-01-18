@@ -208,10 +208,12 @@ export const HomeTab: React.FC<{ isVisible?: boolean }> = ({ isVisible = true })
         nextQuarter.end_date,
         okrsData
       );
-      // Refresh
+      // Immediately hide the button by clearing nextQuarter
+      setNextQuarter(null);
+      setShowQuarterlySetup(false);
+      // Refresh data
       await loadQuarterInfo();
       setOkrsKey(prev => prev + 1); // Force OKR module refresh
-      setShowQuarterlySetup(false);
     } catch (error) {
       console.error('Failed to create quarterly OKRs:', error);
       throw error;

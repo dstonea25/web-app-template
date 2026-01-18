@@ -715,9 +715,43 @@ export const UpcomingCalendarModule = forwardRef<UpcomingCalendarModuleRef, Upco
         }
       }
     } else {
-      // Past or today - toggle habit completion (not implemented yet in this module)
-      // This would need to integrate with the habit tracker system
-      toast.info('Habit tracking for past dates - coming soon!');
+      // Past or today - toggle habit completion
+      const isCompleted = isHabitCompletedOnDate(habit.id, date);
+      const nextVal = !isCompleted;
+      
+      try {
+        // Optimistically update local state
+        setHabitEntries(prev => {
+          const filtered = prev.filter(e => !(e.habitId === habit.id && e.date === date));
+          if (nextVal) {
+            return [...filtered, { habitId: habit.id, date, complete: true }];
+          }
+          return filtered;
+        });
+        
+        // Save to database
+        const res = await apiClient.upsertHabitEntry({ 
+          habitId: habit.id, 
+          date, 
+          isDone: nextVal, 
+          source: 'calendar' 
+        });
+        
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to save');
+        }
+        
+        // Reload habit data to sync with database
+        await loadHabitsData();
+        
+        toast.success(nextVal ? `Completed: ${habit.name}` : `Unchecked: ${habit.name}`);
+      } catch (error) {
+        console.error('Failed to toggle habit:', error);
+        toast.error('Failed to save habit');
+        
+        // Rollback optimistic update
+        await loadHabitsData();
+      }
     }
   };
 

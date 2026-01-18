@@ -147,12 +147,25 @@ export const QuarterlySetupModal: React.FC<QuarterlySetupModalProps> = ({
       >
         {/* Header */}
         <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 px-6 py-4 flex items-center justify-between z-10">
-          <div>
+          <div className="space-y-2">
             <h3 className={cn(tokens.typography.scale.h2, tokens.typography.weights.semibold, 'text-neutral-100')}>
-              Create {nextQuarter} OKRs
+              Setting Up <span className="text-emerald-400">{nextQuarter}</span> OKRs
             </h3>
-            <p className="text-sm text-neutral-400 mt-1">
-              Pre-filled from previous quarter - edit as needed
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800 rounded-lg border border-neutral-700">
+                <span className="text-neutral-400">Previous:</span>
+                <span className="text-neutral-200 font-medium">{previousOkrs[0]?.quarter || 'None'}</span>
+              </div>
+              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                <span className="text-emerald-300">Creating:</span>
+                <span className="text-emerald-100 font-semibold">{nextQuarter}</span>
+              </div>
+            </div>
+            <p className="text-xs text-neutral-500">
+              Pre-filled from previous quarter for your convenience - edit as needed
             </p>
           </div>
           <button
@@ -244,21 +257,28 @@ export const QuarterlySetupModal: React.FC<QuarterlySetupModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-neutral-900 border-t border-neutral-800 px-6 py-4 flex items-center justify-between">
-          <button
-            onClick={onClose}
-            disabled={creating}
-            className={cn(tokens.button.base, tokens.button.secondary)}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className={cn(tokens.button.base, tokens.button.primary)}
-          >
-            {creating ? 'Creating...' : `Create ${nextQuarter} OKRs`}
-          </button>
+        <div className="sticky bottom-0 bg-neutral-900 border-t border-neutral-800 px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-neutral-500 max-w-md">
+              Note: Your previous quarter OKRs will remain visible for reference. This creates new OKRs for {nextQuarter}.
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onClose}
+              disabled={creating}
+              className={cn(tokens.button.base, tokens.button.secondary)}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className={cn(tokens.button.base, tokens.button.primary)}
+            >
+              {creating ? 'Creating...' : `Create ${nextQuarter} OKRs`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

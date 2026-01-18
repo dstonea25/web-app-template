@@ -666,8 +666,21 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                 >
                                   {pr.committed ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
                                 </button>
-                                <div className="min-w-0">
-                                  <div className={cn(tokens.typography.scale.h3, tokens.typography.weights.semibold, 'text-neutral-100 break-words')}>{pr.title}</div>
+                                <div className="min-w-0 flex-1">
+                                  <button 
+                                    className={cn(
+                                      tokens.typography.scale.h3, 
+                                      tokens.typography.weights.semibold, 
+                                      'text-neutral-100 break-words text-left hover:text-emerald-400 transition-colors cursor-pointer'
+                                    )}
+                                    onClick={() => {
+                                      setShowRenamePriority(s => ({ ...s, [pr.priority_id]: true }));
+                                      setEditingPriorityTitle(s => ({ ...s, [pr.priority_id]: pr.title }));
+                                    }}
+                                    title="Click to rename"
+                                  >
+                                    {pr.title}
+                                  </button>
                                   <div className="text-xs text-neutral-400 mt-1">
                                     {pillar.pillar_name} • {pr.milestones.length} milestone{pr.milestones.length === 1 ? '' : 's'}
                                     {pr.committed && <span className="ml-2 inline-block align-middle">| <span className={cn(tokens.badge.base, tokens.badge.success, 'ml-2')}>Committed</span></span>}
@@ -802,7 +815,19 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                         </div>
                                       ) : (
                                         <>
-                                          <div className={cn('text-sm text-neutral-100 break-words', m.completed && 'line-through text-neutral-400')}>{m.title}</div>
+                                          <button
+                                            className={cn(
+                                              'text-sm text-neutral-100 break-words text-left hover:text-emerald-400 transition-colors cursor-pointer',
+                                              m.completed && 'line-through text-neutral-400 hover:text-neutral-300'
+                                            )}
+                                            onClick={() => {
+                                              setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: true }));
+                                              setEditingMilestoneTitle(s => ({ ...s, [m.milestone_id]: m.title }));
+                                            }}
+                                            title="Click to rename"
+                                          >
+                                            {m.title}
+                                          </button>
                                       {(m.definition_of_done || m.due_date) && (
                                             <div className="mt-1 text-xs text-neutral-400">
                                               {m.definition_of_done && <span>DoD: {m.definition_of_done}</span>}
