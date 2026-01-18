@@ -2218,7 +2218,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                             !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500',
                             !isInDragRange && !isSelected && rowAppearance.bg,
                             !isInDragRange && !isSelected && rowAppearance.border,
-                            isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-950/30',
+                            isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-400/10',
                             isDragging && 'select-none',
                           )}
                           style={{ 
@@ -2397,7 +2397,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isVisible }) => {
                               !isInDragRange && isSelected && 'bg-neutral-800 border-emerald-500 ring-2 ring-emerald-500/30',
                               !isInDragRange && !isSelected && rowAppearance.bg,
                               !isInDragRange && !isSelected && rowAppearance.border,
-                              isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-950/30',
+                              isToday && !isSelected && !isInDragRange && 'ring-[3px] ring-emerald-400 border-emerald-400 bg-emerald-400/10',
                               isDragging && 'select-none',
                             )}
                             style={{ 
