@@ -398,11 +398,20 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                    const stroke = isHovered ? habitGlow : (isComplete ? habitColor : (isToday ? '#ffffff' : offStroke));
                    const textFill = isComplete ? habitColor : (isToday ? '#ffffff' : offStroke);
                    
+                   // Week separator: add visual separator after every 7th day
+                   const isEndOfWeek = day % 7 === 0 && day < daysInMonth;
+                   
                    return (
                      <div
                        key={dateIso}
                        className="relative"
-                       style={{ width: '28px', height: '28px' }}
+                       style={{ 
+                         width: '28px', 
+                         height: '28px',
+                         marginRight: isEndOfWeek ? '8px' : undefined,
+                         paddingRight: isEndOfWeek ? '8px' : undefined,
+                         borderRight: isEndOfWeek ? '1px solid #404040' : undefined
+                       }}
                      >
                        {/* EXACT copy of yearly view SVG */}
                        <svg

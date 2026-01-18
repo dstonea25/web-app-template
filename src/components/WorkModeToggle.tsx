@@ -1,24 +1,28 @@
 import React from 'react';
+import { Briefcase } from 'lucide-react';
 import { useWorkMode } from '../contexts/WorkModeContext';
-import { tokens, cn } from '../theme/config';
+import { cn } from '../theme/config';
 
 interface WorkModeToggleProps {
   compact?: boolean;
 }
 
-export const WorkModeToggle: React.FC<WorkModeToggleProps> = ({ compact = false }) => {
+export const WorkModeToggle: React.FC<WorkModeToggleProps> = () => {
   const { workMode, toggleWorkMode } = useWorkMode();
 
   return (
     <button
       onClick={toggleWorkMode}
-      className={cn(tokens.button.base, tokens.button.ghost, 'text-sm flex items-center gap-2', compact && 'px-2 py-1')}
+      className={cn(
+        "p-2 rounded-lg transition-colors",
+        workMode 
+          ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30" 
+          : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
+      )}
+      title={workMode ? "Work Mode: ON - Click to disable" : "Work Mode: OFF - Click to enable"}
       aria-pressed={workMode}
-      title={workMode ? 'Disable Work Mode' : 'Enable Work Mode'}
     >
-      <span className={cn('inline-flex h-2.5 w-2.5 rounded-full', workMode ? 'bg-emerald-400' : 'bg-neutral-500')} />
-      <span className={cn('hidden sm:inline')}>Work Mode</span>
-      <span className={cn('sm:hidden')}>Work</span>
+      <Briefcase className="w-5 h-5" />
     </button>
   );
 };

@@ -199,11 +199,10 @@ export const AppShell: React.FC = () => {
   const LogoutButton = () => (
     <button
       onClick={handleLogout}
-      className={`${tokens.button.base} ${tokens.button.ghost} text-sm`}
+      className="p-2 text-neutral-400 hover:text-red-300 hover:bg-neutral-800 rounded-lg transition-colors"
       title="Sign out"
     >
-      <LogOut className="w-4 h-4" />
-      <span className="hidden sm:inline ml-2">Sign out</span>
+      <LogOut className="w-5 h-5" />
     </button>
   );
 
@@ -291,7 +290,7 @@ export const AppShell: React.FC = () => {
           title={getCurrentTabTitle()}
           rightSlot={(
             <div className="flex items-center gap-2">
-              <WorkModeToggle compact />
+              <WorkModeToggle />
               <LogoutButton />
             </div>
           )}
