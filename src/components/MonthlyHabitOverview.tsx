@@ -398,19 +398,18 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                    const stroke = isHovered ? habitGlow : (isComplete ? habitColor : (isToday ? '#ffffff' : offStroke));
                    const textFill = isComplete ? habitColor : (isToday ? '#ffffff' : offStroke);
                    
-                   // Week separator: add visual separator after every 7th day
-                   const isEndOfWeek = day % 7 === 0 && day < daysInMonth;
+                   // Week separator: add visual separator after Saturdays (end of week)
+                   // Week starts Sunday (0) and ends Saturday (6)
+                   const dayOfWeek = cellDate.getDay();
+                   const isEndOfWeek = dayOfWeek === 6 && day < daysInMonth;
                    
                    return (
+                     <React.Fragment key={dateIso}>
                      <div
-                       key={dateIso}
                        className="relative"
                        style={{ 
                          width: '28px', 
-                         height: '28px',
-                         marginRight: isEndOfWeek ? '8px' : undefined,
-                         paddingRight: isEndOfWeek ? '8px' : undefined,
-                         borderRight: isEndOfWeek ? '1px solid #404040' : undefined
+                         height: '28px'
                        }}
                      >
                        {/* EXACT copy of yearly view SVG */}
@@ -494,6 +493,22 @@ export const MonthlyHabitOverview: React.FC<MonthlyHabitOverviewProps> = ({
                          </text>
                        </svg>
                      </div>
+                     {/* Week separator line after Saturdays */}
+                     {isEndOfWeek && (
+                       <div 
+                         className="flex items-center justify-center"
+                         style={{ width: '12px', height: '28px' }}
+                       >
+                         <div 
+                           style={{ 
+                             width: '1px', 
+                             height: '100%', 
+                             backgroundColor: '#525252'
+                           }}
+                         />
+                       </div>
+                     )}
+                     </React.Fragment>
                    );
                  })}
                </div>
