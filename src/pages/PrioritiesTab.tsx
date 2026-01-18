@@ -723,7 +723,7 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                             </div>
 
                             {showRenamePriority[pr.priority_id] && (
-                              <div className="mt-2 flex items-center gap-2">
+                              <div className="mt-2">
                                 <input
                                   type="text"
                                   className={cn(tokens.input.base, tokens.input.focus, 'w-full')}
@@ -734,19 +734,18 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                     if (e.key === 'Enter') { 
                                       handleUpdatePriorityTitle(pr.priority_id); 
                                       setShowRenamePriority(s => ({ ...s, [pr.priority_id]: false })); 
-                                    } 
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setShowRenamePriority(s => ({ ...s, [pr.priority_id]: false }));
+                                    }
                                   }}
+                                  onBlur={() => {
+                                    handleUpdatePriorityTitle(pr.priority_id);
+                                    setShowRenamePriority(s => ({ ...s, [pr.priority_id]: false }));
+                                  }}
+                                  autoFocus
                                   aria-label={`Rename priority ${pr.title}`}
                                 />
-                                <button 
-                                  className="text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
-                                  onClick={() => { 
-                                    handleUpdatePriorityTitle(pr.priority_id); 
-                                    setShowRenamePriority(s => ({ ...s, [pr.priority_id]: false })); 
-                                  }}
-                                >
-                                  <Check className="w-5 h-5" />
-                                </button>
                               </div>
                             )}
                           </div>
@@ -780,7 +779,7 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                     {/* Middle: content */}
                                     <div className="min-w-0">
                                       {showRenameMilestone[m.milestone_id] ? (
-                                        <div className="flex items-center gap-2">
+                                        <div>
                                           <input
                                             type="text"
                                             value={editingMilestoneTitle[m.milestone_id] ?? m.title}
@@ -789,20 +788,19 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                               if (e.key === 'Enter') { 
                                                 handleUpdateMilestoneTitle(pr.priority_id, m.milestone_id); 
                                                 setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: false })); 
-                                              } 
+                                              }
+                                              if (e.key === 'Escape') {
+                                                setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: false }));
+                                              }
                                             }}
+                                            onBlur={() => {
+                                              handleUpdateMilestoneTitle(pr.priority_id, m.milestone_id);
+                                              setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: false }));
+                                            }}
+                                            autoFocus
                                             className={cn(tokens.input.base, tokens.input.focus, 'w-full')}
                                             aria-label={`Rename milestone ${m.title}`}
                                           />
-                                          <button 
-                                            className="text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
-                                            onClick={() => { 
-                                              handleUpdateMilestoneTitle(pr.priority_id, m.milestone_id); 
-                                              setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: false })); 
-                                            }}
-                                          >
-                                            <Check className="w-5 h-5" />
-                                          </button>
                                         </div>
                                       ) : (
                                         <>
