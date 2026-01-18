@@ -710,15 +710,6 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                       <button 
                                         className="w-full text-left px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800" 
                                         onClick={() => { 
-                                          setShowRenamePriority(s => ({ ...s, [pr.priority_id]: true })); 
-                                          setShowPriorityMenu(s => ({ ...s, [pr.priority_id]: false })); 
-                                        }}
-                                      >
-                                        Rename
-                                      </button>
-                                      <button 
-                                        className="w-full text-left px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800" 
-                                        onClick={() => { 
                                           setShowPriorityMenu(s => ({ ...s, [pr.priority_id]: false })); 
                                           handleDeletePriority(pillar.pillar_id, pr.priority_id); 
                                         }}
@@ -859,15 +850,6 @@ export const PrioritiesTab: React.FC<{ isVisible?: boolean }> = ({ isVisible: _i
                                       </button>
                                       {showMilestoneMenu[m.milestone_id] && (
                                         <div className="absolute right-0 mt-2 w-40 rounded-lg border border-neutral-800 bg-neutral-900 shadow-xl z-10">
-                                          <button 
-                                            className="w-full text-left px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800" 
-                                            onClick={() => { 
-                                              setShowRenameMilestone(s => ({ ...s, [m.milestone_id]: true })); 
-                                              setShowMilestoneMenu(s => ({ ...s, [m.milestone_id]: false })); 
-                                            }}
-                                          >
-                                            Rename
-                                          </button>
                                           <button 
                                             className="w-full text-left px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800" 
                                             onClick={() => { 
