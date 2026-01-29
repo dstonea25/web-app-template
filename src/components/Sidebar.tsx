@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 
 // Update this type when adding new tabs
-export type ModuleId = 'home' | 'showcase';
+export type ModuleId = 'home' | 'showcase' | 'patterns';
 
 interface SidebarItem {
   id: ModuleId;

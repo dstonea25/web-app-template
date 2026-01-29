@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Home, LayoutGrid, LogOut } from 'lucide-react';
+import { Home, LayoutGrid, Layers, LogOut } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import { Sidebar, type ModuleId } from './Sidebar';
 import { MobileDrawer } from './MobileDrawer';
 import { HomeTab } from '../pages/HomeTab';
 import { ShowcaseTab } from '../pages/ShowcaseTab';
+import { PatternsTab } from '../pages/PatternsTab';
 import { tokens, cn, theme, palette } from '../theme/config';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
@@ -90,6 +91,7 @@ export const AppShell: React.FC = () => {
   const iconMap: Record<string, React.ReactNode> = {
     'home': <Home className={tokens.icon.default} />,
     'layout-grid': <LayoutGrid className={tokens.icon.default} />,
+    'layers': <Layers className={tokens.icon.default} />,
   };
   
   const navigationItems = enabledTabs.map(tab => ({
@@ -131,6 +133,7 @@ export const AppShell: React.FC = () => {
     const subtitles: Record<ModuleId, string> = {
       home: 'Your app dashboard',
       showcase: 'Explore available UI components',
+      patterns: 'Live demos of UI patterns from scaffolds',
     };
     return subtitles[activeModule] || '';
   };
@@ -177,6 +180,12 @@ export const AppShell: React.FC = () => {
                 <ShowcaseTab isVisible={activeModule === 'showcase'} />
               </section>
             )}
+            
+            {visitedTabs.has('patterns') && (
+              <section style={{ display: activeModule === 'patterns' ? 'block' : 'none' }}>
+                <PatternsTab isVisible={activeModule === 'patterns'} />
+              </section>
+            )}
           </main>
         </div>
       </div>
@@ -199,6 +208,12 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('showcase') && (
             <section style={{ display: activeModule === 'showcase' ? 'block' : 'none' }}>
               <ShowcaseTab isVisible={activeModule === 'showcase'} />
+            </section>
+          )}
+          
+          {visitedTabs.has('patterns') && (
+            <section style={{ display: activeModule === 'patterns' ? 'block' : 'none' }}>
+              <PatternsTab isVisible={activeModule === 'patterns'} />
             </section>
           )}
         </main>
