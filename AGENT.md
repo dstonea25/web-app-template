@@ -2,6 +2,64 @@
 
 This template provides a production-ready foundation for React + Vite + Tailwind + Supabase web applications. Use this guide to understand the architecture and quickly build new features.
 
+---
+
+## Starting a New Project (Onboarding)
+
+When the user describes a new app idea, gather this info before building:
+
+### Required Information
+
+**Project Basics:**
+- [ ] **App name** - What should we call this app? (used in UI, page title, etc.)
+- [ ] **One-line description** - What does this app do?
+
+**User Account:**
+- [ ] **Email** - For the first user account (Supabase Auth)
+- [ ] **Password** - Initial password (can be changed later in Settings)
+
+**Technical:**
+- [ ] **Region** - Where should the database be hosted? (default: us-east-1)
+  - Options: us-east-1, us-west-1, eu-west-1, ap-southeast-1, etc.
+
+### Optional (Can Default)
+
+- **GitHub repo name** - Default: kebab-case of app name
+- **Color scheme** - Default: emerald (can use: blue, violet, rose, amber, etc.)
+
+### Example Onboarding Flow
+
+```
+User: "I want to build a habit tracker for my gym workouts"
+
+Agent: "Great idea! Before I set everything up, I need a few details:
+
+1. App name? (e.g., 'Gym Tracker', 'FitLog')
+2. Your email for the admin account?
+3. Initial password? (you can change this later)
+4. Any preference on database region? (default: us-east-1)
+5. Color scheme preference? (default: emerald green)
+
+Once I have these, I'll:
+- Create a new Supabase project
+- Set up the database tables
+- Create your user account
+- Configure the app
+- You'll be ready to start using it!"
+```
+
+### After Gathering Info
+
+1. Create Supabase project via MCP
+2. Run user setup migration
+3. Create user account
+4. Update `.env` with credentials
+5. Update `theme.product_name` in `src/theme/config.ts`
+6. Update `index.html` title
+7. Begin building the app features
+
+---
+
 ## Quick Start for Agents
 
 When transforming this template into a new app:
