@@ -15,9 +15,11 @@ import {
   ChevronDown,
   Plus,
   Trash2,
-  Edit
+  Edit,
+  Bell
 } from 'lucide-react';
 import { tokens, cn, palette, theme } from '../theme/config';
+import { toast } from '../lib/notifications/toast';
 
 interface ShowcaseTabProps {
   isVisible?: boolean;
@@ -26,10 +28,44 @@ interface ShowcaseTabProps {
 export const ShowcaseTab: React.FC<ShowcaseTabProps> = ({ isVisible }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectValue, setSelectValue] = useState('option1');
+  
+  // Inline editing state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [items, setItems] = useState([
+    { id: '1', name: 'Click to edit this text', status: 'active' },
+    { id: '2', name: 'Tab to navigate between rows', status: 'pending' },
+    { id: '3', name: 'Enter to save, Escape to cancel', status: 'done' },
+  ]);
 
   if (!isVisible) return null;
 
   const c = theme.colors;
+  
+  // Inline edit handlers
+  const handleItemChange = (id: string, value: string) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, name: value } : item));
+  };
+  
+  const handleCommit = (_id: string) => {
+    setEditingId(null);
+    toast.success('Saved changes');
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter') {
+      handleCommit(id);
+    } else if (e.key === 'Escape') {
+      setEditingId(null);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleCommit(id);
+      const currentIndex = items.findIndex(item => item.id === id);
+      const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+      if (nextIndex >= 0 && nextIndex < items.length) {
+        setEditingId(items[nextIndex].id);
+      }
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -67,6 +103,94 @@ export const ShowcaseTab: React.FC<ShowcaseTabProps> = ({ isVisible }) => {
           <button className={cn(tokens.button.base, tokens.button.danger, 'px-2')}>
             <X className="w-4 h-4" />
           </button>
+        </div>
+      </section>
+
+      {/* Toast Section */}
+      <section className={tokens.card.base}>
+        <h2 className={cn('text-xl font-semibold mb-4', palette.text)}>Toasts</h2>
+        <p className={cn('mb-4', tokens.text.muted)}>
+          Global notification system. Import <code className={palette.accentText}>toast</code> from <code className={palette.accentText}>lib/notifications/toast</code>.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button 
+            className={cn(tokens.button.base, tokens.button.success)}
+            onClick={() => toast.success('Changes saved successfully!')}
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Success Toast
+          </button>
+          <button 
+            className={cn(tokens.button.base, tokens.button.danger)}
+            onClick={() => toast.error('Something went wrong')}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Error Toast
+          </button>
+          <button 
+            className={cn(tokens.button.base, tokens.button.info)}
+            onClick={() => toast.info('Here is some information', { 
+              actionLabel: 'Undo', 
+              onAction: () => toast.success('Undone!') 
+            })}
+          >
+            <Bell className="w-4 h-4 mr-2" />
+            Info with Action
+          </button>
+        </div>
+      </section>
+
+      {/* Inline Editing Section */}
+      <section className={tokens.card.base}>
+        <h2 className={cn('text-xl font-semibold mb-4', palette.text)}>Inline Editing</h2>
+        <p className={cn('mb-4', tokens.text.muted)}>
+          Click text to edit. Tab to navigate. Enter/blur to save. Escape to cancel.
+        </p>
+        <div className={tokens.table.wrapper}>
+          <table className={tokens.table.table}>
+            <thead className={tokens.table.thead}>
+              <tr>
+                <th className={tokens.table.th}>Name (click to edit)</th>
+                <th className={tokens.table.th}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className={cn(tokens.table.tr_zebra, tokens.table.row_hover)}>
+                  <td className={tokens.table.td}>
+                    {editingId === item.id ? (
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) => handleItemChange(item.id, e.target.value)}
+                        onBlur={() => handleCommit(item.id)}
+                        onKeyDown={(e) => handleKeyDown(e, item.id)}
+                        className={cn(tokens.input.base, tokens.input.focus, 'py-1')}
+                        autoFocus
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => setEditingId(item.id)}
+                        className={cn('cursor-pointer', palette.primaryTextHover)}
+                      >
+                        {item.name}
+                      </span>
+                    )}
+                  </td>
+                  <td className={tokens.table.td}>
+                    <span className={cn(
+                      tokens.badge.base,
+                      item.status === 'active' ? tokens.badge.success :
+                      item.status === 'pending' ? tokens.badge.warning :
+                      tokens.badge.neutral
+                    )}>
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

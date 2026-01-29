@@ -424,6 +424,118 @@ See `src/scaffolds/README.md` for detailed documentation on each pattern.
 
 ---
 
+## Critical UX Patterns
+
+These patterns have been refined and should be followed for consistency:
+
+### Toasts (Global Notifications)
+
+```typescript
+import { toast } from '../lib/notifications/toast';
+
+// Success - auto-dismisses in 3s
+toast.success('Changes saved');
+
+// Error - auto-dismisses in 4s
+toast.error('Failed to save');
+
+// Info with action button
+toast.info('Item deleted', { 
+  actionLabel: 'Undo', 
+  onAction: () => restoreItem() 
+});
+```
+
+### Inline Editing Pattern
+
+Text fields should be editable inline (click to edit) rather than via modals:
+
+```typescript
+const [editingId, setEditingId] = useState<string | null>(null);
+
+// Click to start editing
+<span onClick={() => setEditingId(item.id)} className="cursor-pointer">
+  {item.name}
+</span>
+
+// When editing, show input
+{editingId === item.id && (
+  <input
+    value={item.name}
+    onChange={(e) => updateItem(item.id, e.target.value)}
+    onBlur={() => commitEdit(item.id)}        // Save on blur
+    onKeyDown={(e) => {
+      if (e.key === 'Enter') commitEdit(item.id);  // Save on Enter
+      if (e.key === 'Escape') setEditingId(null);  // Cancel on Escape
+      if (e.key === 'Tab') {                       // Navigate on Tab
+        e.preventDefault();
+        commitEdit(item.id);
+        setEditingId(nextItemId);
+      }
+    }}
+    autoFocus
+  />
+)}
+```
+
+### Smart Saving (Avoid Excessive DB Writes)
+
+Don't save on every keystroke. Use these patterns:
+
+1. **Save on blur** (recommended for inline editing)
+2. **Save on Enter** (explicit user intent)
+3. **Debounced save** for rapid changes:
+
+```typescript
+// Debounce utility
+const debounce = <T extends (...args: any[]) => void>(fn: T, ms: number) => {
+  let timeout: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), ms);
+  };
+};
+
+// Usage: save 500ms after user stops typing
+const debouncedSave = useMemo(() => debounce((data) => saveToDb(data), 500), []);
+```
+
+4. **Dirty flag tracking** for batch saves:
+
+```typescript
+// Track which items have changed
+onUpdate={(id, value) => setItems(prev => 
+  prev.map(item => item.id === id 
+    ? { ...item, value, _dirty: true } 
+    : item
+  )
+)}
+
+// Only save dirty items
+const dirtyItems = items.filter(i => i._dirty);
+await Promise.all(dirtyItems.map(item => saveItem(item)));
+```
+
+### Detail Views: Sidebar vs Modal
+
+- **Use sidebar/panel** for detail views that need to stay open while user scans the list
+- **Use modal** for focused actions (confirm delete, create new, settings)
+
+The `PrioritiesTab` scaffold shows the 2-pane pattern:
+```
+┌──────────────────────────────────────────────────┐
+│  Left Pane (List)        │  Right Pane (Detail)  │
+│  ─────────────────       │  ──────────────────   │
+│  > Item 1                │  Item 2 Details       │
+│  > Item 2 (selected)     │  ───────────────      │
+│  > Item 3                │  [fields, actions]    │
+└──────────────────────────────────────────────────┘
+```
+
+Grid setup: `grid grid-cols-1 lg:grid-cols-[300px_1fr]`
+
+---
+
 ## File Checklist for New Projects
 
 When creating a new app from this template:
