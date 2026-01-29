@@ -9,6 +9,19 @@ This folder contains reference implementations of common UI patterns from a real
 
 ## Page Patterns (`pages/`)
 
+### AllocationsTab.tsx - Redemption/Shop System
+**Use when:** You need a points/currency system with redeemable items
+- Balance display with point totals
+- Card grid showing available items with costs
+- Availability tracking (quotas per period)
+- Recent redemptions history
+- Celebration animations on redemption
+
+**Key patterns:**
+- Card grid layout with icons, costs, availability
+- Balance tracking and validation
+- Cadence-based availability (weekly/monthly/etc)
+
 ### PrioritiesTab.tsx - Two-Pane Master/Detail Layout
 **Use when:** You need a sidebar list with a detail view
 - Left pane: scrollable list of items (pillars/categories)

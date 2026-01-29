@@ -969,6 +969,128 @@ const EditableTablePattern: React.FC = () => {
 };
 
 // =============================================================================
+// PATTERN 9: Redemption Cards / Shop Grid (like AllocationsTab)
+// =============================================================================
+const RedemptionCardsPattern: React.FC = () => {
+  const [balance, setBalance] = useState(1250);
+  const [recentRedemptions, setRecentRedemptions] = useState([
+    { id: '1', item: 'Coffee Break', ts: '2 hours ago' },
+    { id: '2', item: 'Movie Night', ts: 'Yesterday' },
+  ]);
+
+  const items = [
+    { id: '1', name: 'Coffee Break', cost: 50, available: 3, icon: '☕', category: 'breaks' },
+    { id: '2', name: 'Movie Night', cost: 200, available: 2, icon: '🎬', category: 'entertainment' },
+    { id: '3', name: 'Sleep In', cost: 150, available: 1, icon: '😴', category: 'rest' },
+    { id: '4', name: 'Game Session', cost: 100, available: 5, icon: '🎮', category: 'entertainment' },
+    { id: '5', name: 'Takeout Dinner', cost: 300, available: 0, icon: '🍕', category: 'food', nextAvailable: 'in 3 days' },
+    { id: '6', name: 'Day Off', cost: 500, available: 1, icon: '🏖️', category: 'rest' },
+  ];
+
+  const handleRedeem = (item: typeof items[0]) => {
+    if (item.available <= 0 || balance < item.cost) return;
+    
+    setBalance(prev => prev - item.cost);
+    setRecentRedemptions(prev => [
+      { id: Date.now().toString(), item: item.name, ts: 'Just now' },
+      ...prev.slice(0, 4)
+    ]);
+    toast.success(`🎉 Redeemed ${item.name}!`);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Balance Header */}
+      <div className={cn(tokens.card.base, 'flex items-center justify-between')}>
+        <div>
+          <div className={cn('text-sm', palette.textMuted)}>Available Balance</div>
+          <div className={cn('text-3xl font-bold', palette.primaryText)}>{balance.toLocaleString()} pts</div>
+        </div>
+        <button className={cn(tokens.button.base, tokens.button.secondary)}>
+          <Plus className="w-4 h-4 mr-2" /> Earn More
+        </button>
+      </div>
+
+      {/* Cards Grid */}
+      <div>
+        <h3 className={cn('font-semibold mb-3', palette.text)}>Available Rewards</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map(item => {
+            const canAfford = balance >= item.cost;
+            const isAvailable = item.available > 0;
+            const canRedeem = canAfford && isAvailable;
+            
+            return (
+              <div 
+                key={item.id}
+                className={cn(
+                  tokens.card.base,
+                  !isAvailable && 'opacity-50'
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={cn(
+                    'w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
+                    palette.bgSurfaceAlt
+                  )}>
+                    {item.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={cn('font-medium', palette.text)}>{item.name}</div>
+                    <div className={cn('text-sm', palette.textMuted)}>
+                      {item.cost} pts
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-3 flex items-center justify-between">
+                  <div className={cn('text-sm', isAvailable ? palette.textMuted : palette.dangerText)}>
+                    {isAvailable 
+                      ? `${item.available} available` 
+                      : item.nextAvailable || 'Unavailable'
+                    }
+                  </div>
+                  <button
+                    onClick={() => handleRedeem(item)}
+                    disabled={!canRedeem}
+                    className={cn(
+                      tokens.button.base,
+                      canRedeem ? tokens.button.primary : tokens.button.secondary,
+                      !canRedeem && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    {!isAvailable ? 'Locked' : !canAfford ? 'Need more' : 'Redeem'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recent Redemptions */}
+      <div>
+        <h3 className={cn('font-semibold mb-3', palette.text)}>Recent Redemptions</h3>
+        <div className={tokens.card.base}>
+          {recentRedemptions.length === 0 ? (
+            <div className={cn('text-center py-4', palette.textMuted)}>No redemptions yet</div>
+          ) : (
+            <div className="divide-y divide-neutral-800">
+              {recentRedemptions.map(r => (
+                <div key={r.id} className="flex items-center justify-between py-2">
+                  <span className={palette.text}>{r.item}</span>
+                  <span className={cn('text-sm', palette.textMuted)}>{r.ts}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
 // MAIN PATTERNS TAB
 // =============================================================================
 export const PatternsTab: React.FC<PatternsTabProps> = ({ isVisible }) => {
@@ -1032,6 +1154,13 @@ export const PatternsTab: React.FC<PatternsTabProps> = ({ isVisible }) => {
       desc: 'Table with inline editing (click to edit, Tab navigation, Enter/Escape). Good for: task lists, data management, CRUD.',
       scaffold: 'TodosTable.tsx',
       component: EditableTablePattern 
+    },
+    { 
+      id: 'redemption-cards', 
+      name: 'Redemption Cards / Shop', 
+      desc: 'Card grid with costs, availability, and balance tracking. Good for: rewards, shops, inventory, unlockables.',
+      scaffold: 'AllocationsTab.tsx',
+      component: RedemptionCardsPattern 
     },
   ];
 
