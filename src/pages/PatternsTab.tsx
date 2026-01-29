@@ -1091,6 +1091,132 @@ const RedemptionCardsPattern: React.FC = () => {
 };
 
 // =============================================================================
+// PATTERN 10: Collapsible Modules (Tab Organization)
+// =============================================================================
+const CollapsibleModulesPattern: React.FC = () => {
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set(['overview', 'details']));
+
+  const toggleModule = (id: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const modules = [
+    { 
+      id: 'overview', 
+      title: 'Overview', 
+      subtitle: 'Quick summary',
+      badge: '3 items',
+      content: (
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className={cn(tokens.card.base, 'text-center py-6')}>
+              <div className={cn('text-2xl font-bold', palette.primaryText)}>{i * 12}</div>
+              <div className={cn('text-sm', palette.textMuted)}>Metric {i}</div>
+            </div>
+          ))}
+        </div>
+      )
+    },
+    { 
+      id: 'details', 
+      title: 'Detailed View', 
+      subtitle: 'In-depth analysis',
+      content: (
+        <div className={tokens.card.base}>
+          <p className={palette.text}>This is the detailed content that can be collapsed.</p>
+          <p className={cn('mt-2', palette.textMuted)}>
+            Add charts, tables, or any complex content here.
+          </p>
+        </div>
+      )
+    },
+    { 
+      id: 'settings', 
+      title: 'Settings', 
+      content: (
+        <div className={tokens.card.base}>
+          <div className="space-y-3">
+            {['Notifications', 'Auto-refresh', 'Dark mode'].map(setting => (
+              <label key={setting} className="flex items-center justify-between">
+                <span className={palette.text}>{setting}</span>
+                <input type="checkbox" defaultChecked className="w-4 h-4" />
+              </label>
+            ))}
+          </div>
+        </div>
+      )
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Global controls */}
+      <div className="flex justify-end gap-2">
+        <button 
+          onClick={() => setExpandedModules(new Set(modules.map(m => m.id)))}
+          className={cn(tokens.button.base, tokens.button.ghost, 'text-sm')}
+        >
+          Expand All
+        </button>
+        <button 
+          onClick={() => setExpandedModules(new Set())}
+          className={cn(tokens.button.base, tokens.button.ghost, 'text-sm')}
+        >
+          Collapse All
+        </button>
+      </div>
+
+      {/* Modules */}
+      {modules.map(module => {
+        const isExpanded = expandedModules.has(module.id);
+        return (
+          <section key={module.id} className="mb-4">
+            <button
+              onClick={() => toggleModule(module.id)}
+              className={cn(
+                'flex items-center gap-2 w-full text-left mb-3',
+                palette.text, palette.primaryTextHover
+              )}
+            >
+              <ChevronDown className={cn(
+                'w-5 h-5 transition-transform',
+                !isExpanded && '-rotate-90'
+              )} />
+              <div className="flex-1">
+                <span className="font-semibold">{module.title}</span>
+                {module.subtitle && (
+                  <span className={cn('text-sm ml-2', palette.textMuted)}>
+                    — {module.subtitle}
+                  </span>
+                )}
+              </div>
+              {module.badge && (
+                <span className={cn(tokens.badge.base, tokens.badge.neutral)}>
+                  {module.badge}
+                </span>
+              )}
+            </button>
+            {isExpanded && module.content}
+          </section>
+        );
+      })}
+
+      {/* Usage note */}
+      <div className={cn('text-sm p-3 rounded-lg', palette.bgSurfaceAlt, palette.textMuted)}>
+        <strong>Tip:</strong> Use the <code className={palette.accentText}>CollapsibleModule</code> component 
+        from <code className={palette.accentText}>src/components/CollapsibleModule.tsx</code> for 
+        a ready-to-use implementation with controlled/uncontrolled modes.
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
 // MAIN PATTERNS TAB
 // =============================================================================
 export const PatternsTab: React.FC<PatternsTabProps> = ({ isVisible }) => {
@@ -1161,6 +1287,13 @@ export const PatternsTab: React.FC<PatternsTabProps> = ({ isVisible }) => {
       desc: 'Card grid with costs, availability, and balance tracking. Good for: rewards, shops, inventory, unlockables.',
       scaffold: 'AllocationsTab.tsx',
       component: RedemptionCardsPattern 
+    },
+    { 
+      id: 'collapsible-modules', 
+      name: 'Collapsible Modules', 
+      desc: 'Organize tabs into multiple expandable sections. Good for: dashboards, settings pages, complex tabs.',
+      scaffold: 'CollapsibleModule.tsx (component)',
+      component: CollapsibleModulesPattern 
     },
   ];
 

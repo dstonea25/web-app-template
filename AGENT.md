@@ -516,6 +516,36 @@ const dirtyItems = items.filter(i => i._dirty);
 await Promise.all(dirtyItems.map(item => saveItem(item)));
 ```
 
+### Collapsible Modules (Tab Organization)
+
+Organize tabs into multiple collapsible sections:
+
+```typescript
+import { CollapsibleModule, useModuleState } from '../components/CollapsibleModule';
+
+// Simple usage
+<CollapsibleModule title="Monthly Overview" subtitle="Track your progress">
+  <YourContent />
+</CollapsibleModule>
+
+// With badge and actions
+<CollapsibleModule 
+  title="Settings" 
+  badge="3 items"
+  headerActions={<button>Edit</button>}
+>
+  <SettingsContent />
+</CollapsibleModule>
+
+// Managing multiple modules with hook
+const { isExpanded, toggle, expandAll, collapseAll } = useModuleState(
+  ['overview', 'details', 'settings'],
+  true // default expanded
+);
+```
+
+**Mental model:** Tabs contain Modules. Each module is a collapsible section with a header.
+
 ### Detail Views: Sidebar vs Modal
 
 - **Use sidebar/panel** for detail views that need to stay open while user scans the list
