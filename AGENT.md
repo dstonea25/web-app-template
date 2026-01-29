@@ -566,6 +566,64 @@ Grid setup: `grid grid-cols-1 lg:grid-cols-[300px_1fr]`
 
 ---
 
+## User & Authentication Setup
+
+This template uses Supabase Auth for user management.
+
+### Setting Up a New Project
+
+1. **Create Supabase Project** at [supabase.com](https://supabase.com)
+
+2. **Add your first user** (Supabase Dashboard > Authentication > Users > Add User)
+
+3. **Run the user setup migration** (`supabase/migrations/001_user_setup.sql`)
+
+4. **Update `.env`** with your Supabase credentials:
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Per-User Data Pattern (Row Level Security)
+
+All user-specific tables should follow this pattern:
+
+```sql
+CREATE TABLE your_table (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- your columns --
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can CRUD own data" ON your_table
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Getting Current User in Code
+
+```typescript
+import { useAuth } from '../contexts/AuthContext';
+
+const { user, isAuthenticated } = useAuth();
+
+// user.id - UUID for database queries
+// user.email - User's email
+// user.displayName - Display name (from profile)
+```
+
+### Settings Tab
+
+The template includes a Settings tab (`/settings`) with:
+- Profile editing (display name)
+- Preferences (notifications, theme)
+- Password change
+- Sign out
+
+---
+
 ## File Checklist for New Projects
 
 When creating a new app from this template:

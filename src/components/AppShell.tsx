@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, LayoutGrid, Layers, LogOut } from 'lucide-react';
+import { Home, LayoutGrid, Layers, Settings, LogOut } from 'lucide-react';
 import { TopBanner } from './TopBanner';
 import { TopNav } from './TopNav';
 import { Sidebar, type ModuleId } from './Sidebar';
@@ -7,6 +7,7 @@ import { MobileDrawer } from './MobileDrawer';
 import { HomeTab } from '../pages/HomeTab';
 import { ShowcaseTab } from '../pages/ShowcaseTab';
 import { PatternsTab } from '../pages/PatternsTab';
+import { SettingsTab } from '../pages/SettingsTab';
 import { tokens, cn, theme, palette } from '../theme/config';
 import { ToastHost } from './notifications/ToastHost';
 import { TAB_REGISTRY } from '../config/tabs';
@@ -92,6 +93,7 @@ export const AppShell: React.FC = () => {
     'home': <Home className={tokens.icon.default} />,
     'layout-grid': <LayoutGrid className={tokens.icon.default} />,
     'layers': <Layers className={tokens.icon.default} />,
+    'settings': <Settings className={tokens.icon.default} />,
   };
   
   const navigationItems = enabledTabs.map(tab => ({
@@ -134,6 +136,7 @@ export const AppShell: React.FC = () => {
       home: 'Your app dashboard',
       showcase: 'Explore available UI components',
       patterns: 'Live demos of UI patterns from scaffolds',
+      settings: 'Profile, preferences, and account',
     };
     return subtitles[activeModule] || '';
   };
@@ -186,6 +189,12 @@ export const AppShell: React.FC = () => {
                 <PatternsTab isVisible={activeModule === 'patterns'} />
               </section>
             )}
+            
+            {visitedTabs.has('settings') && (
+              <section style={{ display: activeModule === 'settings' ? 'block' : 'none' }}>
+                <SettingsTab isVisible={activeModule === 'settings'} />
+              </section>
+            )}
           </main>
         </div>
       </div>
@@ -214,6 +223,12 @@ export const AppShell: React.FC = () => {
           {visitedTabs.has('patterns') && (
             <section style={{ display: activeModule === 'patterns' ? 'block' : 'none' }}>
               <PatternsTab isVisible={activeModule === 'patterns'} />
+            </section>
+          )}
+          
+          {visitedTabs.has('settings') && (
+            <section style={{ display: activeModule === 'settings' ? 'block' : 'none' }}>
+              <SettingsTab isVisible={activeModule === 'settings'} />
             </section>
           )}
         </main>

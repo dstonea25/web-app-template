@@ -47,11 +47,27 @@ export interface AuthCredentials {
   password: string;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+  createdAt?: string;
+}
+
+export interface UserSettings {
+  theme: 'dark' | 'light' | 'system';
+  notifications: boolean;
+  compactMode: boolean;
+}
+
 export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  user: UserProfile | null;
   login: (credentials: AuthCredentials) => Promise<boolean>;
   logout: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
 }
 
 // ===== Add your types below =====

@@ -1,4 +1,4 @@
-import type { AuthCredentials } from '../types';
+import type { AuthCredentials, UserProfile } from '../types';
 import { supabase } from './supabase';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
@@ -89,6 +89,45 @@ export class AuthService {
 
   getUser(): User | null {
     return this.currentUser;
+  }
+
+  async updateProfile(updates: Partial<UserProfile>): Promise<boolean> {
+    if (!supabase || !this.currentUser) return false;
+
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        display_name: updates.displayName,
+        avatar_url: updates.avatarUrl,
+      }
+    });
+
+    if (error) {
+      console.error('Profile update error:', error.message);
+      return false;
+    }
+
+    // Refresh user data
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      this.currentUser = data.user;
+      this.notifyListeners();
+    }
+
+    return true;
+  }
+
+  async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase not configured' };
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
   }
 }
 

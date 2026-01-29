@@ -12,7 +12,7 @@
  */
 
 export type AppTab = { 
-  id: 'home' | 'showcase' | 'patterns';  // Add your tab IDs here
+  id: 'home' | 'showcase' | 'patterns' | 'settings';  // Add your tab IDs here
   title: string; 
   route: string; 
   icon: string;   // Lucide icon name (lowercase): home, star, settings, etc.
@@ -43,6 +43,14 @@ export const TAB_REGISTRY: AppTab[] = [
     route: '/patterns', 
     icon: 'layers', 
     order: 15, 
+    enabled: true 
+  },
+  { 
+    id: 'settings', 
+    title: 'Settings', 
+    route: '/settings', 
+    icon: 'settings', 
+    order: 100,  // High order to show at bottom
     enabled: true 
   },
   // Add more tabs here:
