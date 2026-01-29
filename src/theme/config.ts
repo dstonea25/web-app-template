@@ -245,7 +245,7 @@ export const tokens = {
     secondary: cn(palette.text, palette.bgSurface, palette.border, palette.bgHover, palette.focusRing),
     ghost: cn(palette.text, 'bg-transparent border-transparent', palette.bgHover, palette.focusRing),
     danger: cn('text-white', palette.dangerBg, palette.dangerBorder, palette.dangerBgHover, `focus:ring-2 focus:ring-${c.danger}-500 focus:ring-offset-2 focus:ring-offset-${c.neutral}-950`),
-    info: cn(palette.text, palette.accentBg, `border-${c.accent}-500`, `hover:bg-${c.accent}-400`, palette.focusRing),
+    info: cn('text-white', palette.accentBg, `border-${c.accent}-500`, `hover:bg-${c.accent}-400`, palette.focusRing),
   },
   
   // Inputs
