@@ -1,241 +1,102 @@
-# Dashboard - React + TypeScript + Vite
+# Web App Template
 
-A modern dashboard application built with React, TypeScript, and Vite, containerized for easy deployment on NAS or any Docker environment.
+A production-ready starter template for React web applications with a beautiful dark-mode UI, responsive navigation, and Supabase backend integration.
+
+## Tech Stack
+
+- **React** + **TypeScript** - UI framework
+- **Vite** - Build tool and dev server
+- **Tailwind CSS** - Utility-first styling
+- **Supabase** - Backend (auth, database)
+- **Lucide Icons** - Icon library
 
 ## Features
 
-- ⚡ Fast development with Vite
-- ⚛️ React 19 with TypeScript
-- 🎨 Tailwind CSS for styling
-- 📱 Responsive design
-- 🐳 Docker containerized
-- 🚀 Production-ready nginx setup
+- Responsive sidebar navigation (desktop) + drawer (mobile)
+- Dark mode UI with consistent design tokens
+- Tab-based routing without React Router
+- Authentication flow ready
+- Docker deployment ready
+- Component showcase included
 
-## Quick Start with Docker
+## Quick Start
 
-### Prerequisites
+```bash
+# Install dependencies
+npm install
 
-- Docker and Docker Compose installed on your system
-- Git (to clone the repository)
+# Start development server
+npm run dev
 
-### Running with Docker Compose
-
-1. **Clone and navigate to the project:**
-   ```bash
-   git clone <your-repo-url>
-   cd Dashboard
-   ```
-
-2. **Build and start the application:**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Access the application:**
-   - Open your browser and go to `http://localhost:3000`
-   - The app will be available on port 3000
-
-4. **Stop the application:**
-   ```bash
-   docker-compose down
-   ```
-
-### Docker Commands
-
-- **Build the image:**
-  ```bash
-  docker build -t dashboard-app .
-  ```
-
-- **Run the container:**
-  ```bash
-  docker run -p 3000:8080 dashboard-app
-  ```
-
-- **View logs:**
-  ```bash
-  docker-compose logs -f dashboard
-  ```
-
-- **Rebuild after changes:**
-  ```bash
-  docker-compose up --build -d
-  ```
-
-## Development
-
-### Local Development Setup
-
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Build for production:**
-   ```bash
-   npm run build
-   ```
-
-4. **Preview production build:**
-   ```bash
-   npm run preview
-   ```
-
-## Production Deployment
-
-The Docker setup includes:
-
-- **Multi-stage build** for optimized image size
-- **Nginx** as a production web server
-- **Security headers** for enhanced security
-- **Gzip compression** for better performance
-- **Health checks** for container monitoring
-- **Non-root user** for security
-- **Persistent data storage** via volume mounts
-
-### NAS Deployment
-
-For NAS deployment, ensure:
-
-1. Your NAS supports Docker and Docker Compose
-2. Port 3000 is accessible from your network
-3. Data persistence is configured via volume mounts
-
-### Environment Variables
-
-The application can be configured using environment variables in the `docker-compose.yml`:
-
-```yaml
-environment:
-  - NODE_ENV=production
-  - VITE_N8N_WEBHOOK_TOKEN=your_webhook_token_here
+# Build for production
+npm run build
 ```
-
-#### N8N Webhook Configuration
-
-The todos tab can fetch data from an N8N webhook endpoint instead of using local JSON files. To enable this:
-
-1. **Set the webhook token:**
-   Create a `.env` file in the project root with:
-   ```
-   VITE_N8N_WEBHOOK_TOKEN=your_actual_webhook_token
-   ```
-
-2. **Webhook endpoint:**
-   The application will make GET requests to:
-   ```
-   https://geronimo.askdavidstone.com/webhook/todo
-   ```
-
-3. **Authentication:**
-   The token is sent as a Bearer token in the Authorization header.
-
-4. **Data format:**
-   The webhook should return JSON data in the same format as the local `todos.json` file:
-   ```json
-   [
-     {
-       "id": 1,
-       "task": "Sample task",
-       "status": "open",
-       "category": "work",
-       "priority": null,
-       "created_at": "2025-01-01T00:00:00.000Z"
-     }
-   ]
-   ```
-
-5. **Fallback behavior:**
-   If the webhook fails, the application will automatically fall back to the local JSON file.
 
 ## Project Structure
 
 ```
 src/
-├── components/          # React components
-├── pages/              # Page components
-├── lib/                # Utility functions
-├── types/              # TypeScript type definitions
-└── theme/              # Theme configuration
+├── components/     # Reusable UI components
+│   ├── AppShell.tsx    # Main layout
+│   ├── Sidebar.tsx     # Desktop navigation
+│   └── ...
+├── pages/          # Tab page components
+├── config/
+│   └── tabs.ts     # Tab registry (navigation config)
+├── theme/
+│   └── config.ts   # Design tokens and colors
+├── lib/
+│   └── api.ts      # API client / Supabase operations
+├── contexts/       # React contexts
+└── types/          # TypeScript definitions
 ```
 
-## Available Scripts
+## Adding a New Tab
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+1. Add tab ID to `src/config/tabs.ts`
+2. Create page component in `src/pages/`
+3. Wire it up in `src/components/AppShell.tsx`
 
-## Technology Stack
+See [AGENT.md](./AGENT.md) for detailed instructions.
 
-- **Frontend:** React 19, TypeScript, Vite
-- **Styling:** Tailwind CSS
-- **Icons:** Lucide React
-- **Container:** Docker, Nginx
-- **Build Tool:** Vite
+## Configuration
 
-## Expanding the ESLint configuration
+Copy `.env.example` to `.env` and fill in your values:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deployment
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Docker
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+docker build -t my-app \
+  --build-arg VITE_SUPABASE_URL=... \
+  --build-arg VITE_SUPABASE_ANON_KEY=... \
+  .
+
+docker run -p 3000:8080 my-app
 ```
+
+### Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+## Documentation
+
+See [AGENT.md](./AGENT.md) for comprehensive documentation on:
+- Architecture overview
+- Adding tabs/pages
+- Using design tokens
+- Connecting to Supabase
+- Responsive design patterns
+- Deployment checklist
+
+## License
+
+MIT

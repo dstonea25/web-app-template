@@ -1,21 +1,42 @@
+/**
+ * Tab Registry
+ * 
+ * This is THE source of truth for navigation tabs.
+ * Add, remove, or modify tabs here.
+ * 
+ * Instructions:
+ * 1. Add your tab ID to the AppTab type union
+ * 2. Add your tab configuration to TAB_REGISTRY
+ * 3. Create the corresponding page component in src/pages/
+ * 4. Wire it up in AppShell.tsx
+ */
+
 export type AppTab = { 
-  id: 'home' | 'todos' | 'ideas' | 'priorities' | 'time' | 'allocations' | 'habit_tracker' | 'challenges' | 'calendar' | 'growth'; 
+  id: 'home' | 'showcase';  // Add your tab IDs here
   title: string; 
   route: string; 
-  icon: string; 
-  order: number; 
+  icon: string;   // Lucide icon name (lowercase): home, star, settings, etc.
+  order: number;  // Display order in sidebar (lower = higher)
   enabled: boolean 
 };
 
 export const TAB_REGISTRY: AppTab[] = [
-  { id: 'home', title: 'Home', route: '/home', icon: 'home', order: 5, enabled: true },
-  { id: 'calendar', title: 'Calendar', route: '/calendar', icon: 'calendar', order: 6, enabled: true },
-  { id: 'priorities', title: 'Priorities', route: '/priorities', icon: 'target', order: 7, enabled: true },
-  { id: 'habit_tracker', title: 'Habit Tracker', route: '/habits', icon: 'activity', order: 8, enabled: true },
-  { id: 'growth', title: 'Growth', route: '/growth', icon: 'trending-up', order: 9, enabled: true },
-  { id: 'todos', title: 'To-Dos', route: '/todos', icon: 'check-square', order: 10, enabled: true },
-  { id: 'ideas', title: 'Ideas', route: '/ideas', icon: 'lightbulb', order: 15, enabled: true },
-  { id: 'time', title: 'Time Tracking', route: '/time', icon: 'timer', order: 20, enabled: true },
-  { id: 'allocations', title: 'Allocations', route: '/allocations', icon: 'layers', order: 25, enabled: true },
-  { id: 'challenges', title: 'Challenges', route: '/challenges', icon: 'zap', order: 35, enabled: true }
+  { 
+    id: 'home', 
+    title: 'Home', 
+    route: '/home', 
+    icon: 'home', 
+    order: 5, 
+    enabled: true 
+  },
+  { 
+    id: 'showcase', 
+    title: 'Components', 
+    route: '/components', 
+    icon: 'layout-grid', 
+    order: 10, 
+    enabled: true 
+  },
+  // Add more tabs here:
+  // { id: 'your_tab', title: 'Your Tab', route: '/your-route', icon: 'star', order: 15, enabled: true },
 ];

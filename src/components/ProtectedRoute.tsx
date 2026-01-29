@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginForm } from './LoginForm';
 import { Loader2 } from 'lucide-react';
+import { cn, palette } from '../theme/config';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,10 +13,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
+      <div className={cn('min-h-screen flex items-center justify-center', palette.bg)}>
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-4" />
-          <p className="text-neutral-400">Loading...</p>
+          <Loader2 className={cn('w-8 h-8 animate-spin mx-auto mb-4', palette.primaryText)} />
+          <p className={palette.textMuted}>Loading...</p>
         </div>
       </div>
     );

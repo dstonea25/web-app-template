@@ -1,8 +1,8 @@
 {
-  "name": "geronimo-dashboard",
+  "name": "web-app-template",
   "private": true,
   "version": "1.0.0",
-  "description": "Personal productivity dashboard for managing todos, ideas, and time tracking",
+  "description": "React + Vite + Tailwind + Supabase web app template",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,9 +1,7 @@
 import { AppShell } from './components/AppShell'
-import { PublicIntentionsPage } from './pages/PublicIntentionsPage'
 import { AuthProvider } from './contexts/AuthContext'
-import { TimerProvider } from './contexts/TimerContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { WorkModeProvider } from './contexts/WorkModeContext'
+import { cn, palette, tokens } from './theme/config'
 import React from 'react'
 
 interface ErrorBoundaryState {
@@ -32,10 +30,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', backgroundColor: 'red', color: 'white' }}>
-          <h1>Something went wrong!</h1>
-          <p>Error: {this.state.error?.message}</p>
-          <pre>{this.state.error?.stack}</pre>
+        <div className={cn('min-h-screen flex items-center justify-center p-4', palette.bg)}>
+          <div className={cn(tokens.card.base, 'max-w-lg', palette.dangerBorderSubtle)}>
+            <h1 className={cn('text-xl font-bold mb-2', palette.dangerText)}>Something went wrong</h1>
+            <p className={cn('mb-4', `text-${palette.textMuted}`)}>{this.state.error?.message}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className={cn(tokens.button.base, tokens.button.primary)}
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       );
     }
@@ -48,19 +53,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <TimerProvider>
-          <WorkModeProvider>
-            {typeof window !== 'undefined' && window.location.pathname.startsWith('/intentions') ? (
-              <ProtectedRoute>
-                <PublicIntentionsPage />
-              </ProtectedRoute>
-            ) : (
-              <ProtectedRoute>
-                <AppShell />
-              </ProtectedRoute>
-            )}
-          </WorkModeProvider>
-        </TimerProvider>
+        <ProtectedRoute>
+          <AppShell />
+        </ProtectedRoute>
       </AuthProvider>
     </ErrorBoundary>
   )

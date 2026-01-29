@@ -2,7 +2,8 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tokens, cn } from '../theme/config';
 
-export type ModuleId = 'home' | 'todos' | 'ideas' | 'priorities' | 'time_tracking' | 'allocations' | 'habit_tracker' | 'challenges' | 'calendar' | 'growth';
+// Update this type when adding new tabs
+export type ModuleId = 'home' | 'showcase';
 
 interface SidebarItem {
   id: ModuleId;
