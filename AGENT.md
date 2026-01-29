@@ -570,11 +570,28 @@ Grid setup: `grid grid-cols-1 lg:grid-cols-[300px_1fr]`
 
 This template uses Supabase Auth for user management.
 
-### Setting Up a New Project
+### Agent Workflow: Setting Up a New Supabase Project
+
+Agents have access to the **Supabase MCP** and can automate project creation:
+
+```
+1. list_organizations       → Get the user's org_id
+2. confirm_cost            → Get cost confirmation ID (required)
+3. create_project          → Create new project (name, region, org_id)
+4. get_project             → Poll until status is "ACTIVE_HEALTHY"
+5. apply_migration         → Run supabase/migrations/001_user_setup.sql
+6. get_project_url         → Get the project URL
+7. get_publishable_keys    → Get anon key
+8. Update .env             → Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+```
+
+**Important:** Supabase free tier allows 2 active projects. Projects can be paused when not in use.
+
+### Manual Setup (Alternative)
 
 1. **Create Supabase Project** at [supabase.com](https://supabase.com)
 
-2. **Add your first user** (Supabase Dashboard > Authentication > Users > Add User)
+2. **Add your first user** (Dashboard > Authentication > Users > Add User)
 
 3. **Run the user setup migration** (`supabase/migrations/001_user_setup.sql`)
 
@@ -583,6 +600,18 @@ This template uses Supabase Auth for user management.
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+### Supabase MCP Tools Reference
+
+| Tool | Use For |
+|------|---------|
+| `list_projects` | Find existing projects |
+| `create_project` | Create new project for this app |
+| `apply_migration` | Run SQL migrations |
+| `execute_sql` | Query/modify data |
+| `get_project_url` | Get project URL for .env |
+| `get_publishable_keys` | Get anon key for .env |
+| `list_tables` | See current schema |
 
 ### Per-User Data Pattern (Row Level Security)
 
